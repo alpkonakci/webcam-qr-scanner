@@ -155,9 +155,9 @@ QR code held in front of the camera does not continuously open new tabs.
 
 ### v0.1 — Windows desktop release
 
-- [ ] Publish the source code on GitHub
+- [x] Publish the source code on GitHub
 - [x] Build a standalone, terminal-free Windows executable
-- [ ] Publish a `v0.1.0` GitHub Release
+- [x] Publish a `v0.1.0` GitHub Release
 - [ ] Add a screenshot, usage GIF, and release notes
 
 ### v0.1.1 — Scan QR codes displayed on the computer screen

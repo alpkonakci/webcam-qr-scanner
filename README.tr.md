@@ -154,9 +154,9 @@ tutulduğunda sürekli yeni tarayıcı sekmeleri açılmaz.
 
 ### v0.1 — Windows masaüstü sürümü
 
-- [ ] Kaynak kodu GitHub reposunda yayımlama
+- [x] Kaynak kodu GitHub reposunda yayımlama
 - [x] Terminal göstermeyen bağımsız Windows EXE paketi
-- [ ] GitHub Releases üzerinden `v0.1.0` yayımlama
+- [x] GitHub Releases üzerinden `v0.1.0` yayımlama
 - [ ] Ekran görüntüsü, kullanım GIF'i ve sürüm notları
 
 ### v0.1.1 — Bilgisayar ekranındaki QR kodları okuma
