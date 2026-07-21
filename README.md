@@ -23,8 +23,9 @@ computer camera and opens valid web links in the default browser.
 
 ## Download and use
 
-Download `QR-Scanner.exe` from the latest GitHub Release and double-click it.
-No separate Python or OpenCV installation is required.
+Download `Webcam-QR-Scanner-v0.1.0-windows-x64.zip` from the latest GitHub
+Release, extract it, and double-click `QR-Scanner.exe`. No separate Python or
+OpenCV installation is required.
 
 1. Allow camera access if Windows asks for permission.
 2. Place the complete QR code inside the turquoise frame.
@@ -122,9 +123,15 @@ The self-test verifies OpenCV imports and QR decoding without opening a camera.
 .\build_exe.bat
 ```
 
-The build produces `dist\QR-Scanner.exe` and `dist\LICENSE.txt`. The executable
-is a single terminal-free file and includes the required Python and OpenCV
-runtime components.
+The build produces the terminal-free executable and a distributable ZIP:
+
+```text
+dist\Webcam-QR-Scanner-v0.1.0-windows-x64.zip
+```
+
+The ZIP contains `QR-Scanner.exe`, the project MIT license, the third-party
+notice, and the complete license material for bundled dependencies. A
+`SHA256SUMS.txt` file is also generated for integrity verification.
 
 ## Project structure
 
@@ -170,3 +177,5 @@ default browser after validation.
 Copyright © 2026 [alpkonakci](https://github.com/alpkonakci).
 
 This project is licensed under the [MIT License](LICENSE).
+Bundled dependency licenses are documented in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

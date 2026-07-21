@@ -23,8 +23,9 @@ tarayıcıda açan hızlı ve güvenli bir Windows masaüstü uygulaması.
 
 ## İndirme ve kullanım
 
-Son GitHub Release içinden `QR-Scanner.exe` dosyasını indirip çift tıklayın.
-Python veya OpenCV'yi ayrıca kurmanız gerekmez.
+Son GitHub Release içinden `Webcam-QR-Scanner-v0.1.0-windows-x64.zip` dosyasını
+indirin, arşivden çıkarın ve `QR-Scanner.exe` dosyasına çift tıklayın. Python
+veya OpenCV'yi ayrıca kurmanız gerekmez.
 
 1. Windows kamera izni isterse izin verin.
 2. QR kodun tamamını turkuaz çerçevenin içine yerleştirin.
@@ -121,8 +122,15 @@ Self-test, kamera açmadan OpenCV yüklemesini ve QR çözümlemeyi doğrular.
 .\build_exe.bat
 ```
 
-Build sonunda `dist\QR-Scanner.exe` ve `dist\LICENSE.txt` oluşturulur. Tek dosyalı
-EXE terminal göstermez ve gerekli Python ile OpenCV çalışma bileşenlerini içerir.
+Build sonunda terminal göstermeyen EXE ile dağıtıma hazır arşiv oluşturulur:
+
+```text
+dist\Webcam-QR-Scanner-v0.1.0-windows-x64.zip
+```
+
+ZIP içinde `QR-Scanner.exe`, proje MIT lisansı, üçüncü taraf bildirimi ve pakete
+dahil bağımlılıkların eksiksiz lisans metinleri bulunur. Bütünlük kontrolü için
+ayrıca `SHA256SUMS.txt` üretilir.
 
 ## Proje yapısı
 
@@ -169,3 +177,5 @@ bilgisayarın varsayılan tarayıcısında açılacak.
 Telif hakkı © 2026 [alpkonakci](https://github.com/alpkonakci).
 
 Bu proje [MIT Lisansı](LICENSE) ile lisanslanmıştır.
+Paketlenen bağımlılıkların lisansları
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) dosyasında açıklanmıştır.

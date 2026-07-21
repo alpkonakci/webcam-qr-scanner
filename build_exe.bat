@@ -49,6 +49,14 @@ if errorlevel 1 (
     exit /b 1
 )
 
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "package_release.ps1" -Version "v0.1.0"
+if errorlevel 1 (
+    echo.
+    echo Release package creation failed.
+    pause
+    exit /b 1
+)
+
 echo.
-echo Build completed: dist\QR-Scanner.exe and dist\LICENSE.txt
+echo Build and release package completed in the dist directory.
 exit /b 0
