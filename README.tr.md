@@ -5,6 +5,15 @@
 Bilgisayar kamerasından QR kod okuyup geçerli web bağlantılarını varsayılan
 tarayıcıda açan hızlı ve güvenli bir Windows masaüstü uygulaması.
 
+![Webcam QR Scanner arayüzü](docs/assets/webcam-qr-scanner.png)
+
+## Kullanım videosu
+
+Tanıtımda bu public GitHub reposunun adresini içeren QR kod okunur, bağlantı
+varsayılan tarayıcıda açılır ve QR Scanner otomatik olarak kapanır.
+
+![Webcam QR Scanner kullanım videosu](docs/assets/webcam-qr-scanner-demo.gif)
+
 ## Özellikler
 
 - Modern turkuaz arayüzle canlı kamera görüntüsü
@@ -150,6 +159,12 @@ Yalnızca açıkça yazılmış, geçerli `http://` ve `https://` bağlantılar�
 açılır. `javascript:` veya `file:` gibi şemalar çalıştırılmaz. QR kod kamerada
 tutulduğunda sürekli yeni tarayıcı sekmeleri açılmaz.
 
+Kamera kareleri yalnızca bilgisayar belleğinde yerel olarak işlenir; kaydedilmez
+ve bilgisayar dışına gönderilmez. Uygulama konum bilgisi istemez; analiz,
+telemetri veya cihaz kimliği toplamaz. Geçerli bir URL açıldıktan sonra hedef
+site varsayılan tarayıcı tarafından işlenir ve tarayıcının gizlilik ayarlarına
+tabidir.
+
 ## Yol haritası
 
 ### v0.1 — Windows masaüstü sürümü
@@ -157,7 +172,7 @@ tutulduğunda sürekli yeni tarayıcı sekmeleri açılmaz.
 - [x] Kaynak kodu GitHub reposunda yayımlama
 - [x] Terminal göstermeyen bağımsız Windows EXE paketi
 - [x] GitHub Releases üzerinden `v0.1.0` yayımlama
-- [ ] Ekran görüntüsü, kullanım GIF'i ve sürüm notları
+- [x] Ekran görüntüsü, kullanım GIF'i ve sürüm notları
 
 ### v0.1.1 — Bilgisayar ekranındaki QR kodları okuma
 
@@ -168,9 +183,24 @@ desteği ve isteğe bağlı onay seçeneği korunacak.
 
 ### v0.2 — Telefon-PC köprüsü
 
-Telefon ve bilgisayarın güvenli biçimde eşleştirilmesi planlanıyor. Telefonla
-okunan QR kod yerel ağ üzerinden bilgisayara iletilecek ve doğrulandıktan sonra
-bilgisayarın varsayılan tarayıcısında açılacak.
+Kısa süre geçerli QR kod ve bilgisayarda tek seferlik onay ile hesapsız
+eşleştirme planlanıyor. QR içeriği telefonda uçtan uca şifrelenecek ve içeriği
+okuyamayan bir internet aracısı üzerinden iletilecek. Böylece telefon, yerel ağ
+ve konum izni gerektirmeden mobil veri üzerinden bağlantı gönderebilecek.
+Bilgisayar içeriği doğrulayacak ve varsayılan olarak açmadan önce kullanıcıdan
+onay isteyecek.
+
+### v0.2.1 — Şifreli kuyruk ve hatırlatmalar
+
+Bilgisayar çevrimdışıysa şifreli öğe bilgisayar yeniden bağlanana kadar
+telefonda tutulacak. İsteğe bağlı hatırlatmalar ve süresi dolan öğelerin otomatik
+silinmesi planlanıyor; otomatik açma açık bir kullanıcı tercihi olarak kalacak.
+
+### v0.2.2 — İsteğe bağlı yerel ağ modu
+
+İki cihaz aynı ağdayken internet aracısı kullanmak istemeyen kullanıcılar için
+doğrudan yerel ağ aktarımı daha sonra isteğe bağlı alternatif olarak
+eklenebilir.
 
 ## Lisans
 

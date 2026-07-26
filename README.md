@@ -5,6 +5,15 @@
 A fast and secure Windows desktop application that scans QR codes with a
 computer camera and opens valid web links in the default browser.
 
+![Webcam QR Scanner interface](docs/assets/webcam-qr-scanner.png)
+
+## Demo
+
+The demo scans a QR code containing this public repository URL, opens it in the
+default browser, and closes the scanner automatically.
+
+![Webcam QR Scanner usage demo](docs/assets/webcam-qr-scanner-demo.gif)
+
 ## Features
 
 - Live camera preview with a modern turquoise interface
@@ -151,6 +160,12 @@ Only explicit, valid `http://` and `https://` URLs are opened automatically.
 Payloads using schemes such as `javascript:` or `file:` are never executed. A
 QR code held in front of the camera does not continuously open new tabs.
 
+Camera frames are processed locally in memory and are neither saved nor sent
+outside the computer. The application does not request location information or
+collect analytics, telemetry, or device identifiers. Once a valid URL is
+opened, the destination website is handled by the default browser and is
+subject to that browser's privacy settings.
+
 ## Roadmap
 
 ### v0.1 — Windows desktop release
@@ -158,7 +173,7 @@ QR code held in front of the camera does not continuously open new tabs.
 - [x] Publish the source code on GitHub
 - [x] Build a standalone, terminal-free Windows executable
 - [x] Publish a `v0.1.0` GitHub Release
-- [ ] Add a screenshot, usage GIF, and release notes
+- [x] Add a screenshot, usage GIF, and release notes
 
 ### v0.1.1 — Scan QR codes displayed on the computer screen
 
@@ -168,9 +183,24 @@ validation, multi-monitor support, and a confirmation option will be preserved.
 
 ### v0.2 — Phone-to-PC bridge
 
-Planned secure pairing between a phone and the computer. A QR code scanned with
-the phone will be sent over the local network and opened in the computer's
-default browser after validation.
+Planned account-free pairing with a short-lived QR code and one-time approval
+on the computer. QR payloads will be end-to-end encrypted on the phone and
+delivered through an internet relay that cannot read their contents, allowing
+the phone to send a link over mobile data without local-network or location
+permission. The computer will validate the payload and request confirmation
+before opening it by default.
+
+### v0.2.1 — Encrypted queue and reminders
+
+If the computer is offline, the encrypted item will remain on the phone until
+the computer reconnects. Optional reminders and expiry-based automatic cleanup
+are planned; automatic opening will remain an explicit user preference.
+
+### v0.2.2 — Optional local-network mode
+
+A direct local-network transport may be added later as an opt-in alternative
+for users who prefer a relay-free connection while both devices are on the same
+network.
 
 ## License
 
