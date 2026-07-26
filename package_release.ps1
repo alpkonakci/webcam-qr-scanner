@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "v0.1.0"
+    [string]$Version = "v0.1.1"
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,6 +37,8 @@ $licenseDirectory = Join-Path $packageDirectory "THIRD_PARTY_LICENSES"
 New-Item -ItemType Directory -Path $licenseDirectory -Force | Out-Null
 
 Copy-Item -LiteralPath $executablePath -Destination $packageDirectory
+Copy-Item -LiteralPath (Join-Path $projectDirectory "Scan Screen.vbs") `
+    -Destination $packageDirectory
 Copy-Item -LiteralPath (Join-Path $projectDirectory "LICENSE") `
     -Destination (Join-Path $packageDirectory "LICENSE.txt")
 Copy-Item -LiteralPath (Join-Path $projectDirectory "THIRD_PARTY_NOTICES.md") `

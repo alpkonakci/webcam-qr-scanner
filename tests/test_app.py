@@ -1,11 +1,11 @@
 import unittest
 import time
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import cv2
 import numpy as np
 
-from app import parse_args, run_self_test
+from app import ScreenScanStatus, parse_args, run_screen_scan, run_self_test
 from camera import CameraConfig
 from links import open_web_url, payload_kind
 from performance import FPSCounter
@@ -31,6 +31,7 @@ class AppHelpersTests(unittest.TestCase):
     def test_does_not_treat_unsafe_scheme_as_web_url(self) -> None:
         self.assertEqual(payload_kind("javascript:alert(1)"), "Text")
         self.assertEqual(payload_kind("file:///C:/secret.txt"), "Text")
+        self.assertEqual(payload_kind("https://user@"), "Text")
 
     def test_preview_is_single_line_and_bounded(self) -> None:
         preview = readable_preview("satır 1\nsatır 2" + "x" * 100, limit=30)
@@ -102,6 +103,12 @@ class AppHelpersTests(unittest.TestCase):
 
         self.assertTrue(args.show_fps)
 
+    @patch("sys.argv", ["app.py", "--screen"])
+    def test_screen_option_selects_one_shot_desktop_scan(self) -> None:
+        args = parse_args()
+
+        self.assertTrue(args.screen)
+
     @patch("sys.argv", ["app.py", "--desktop"])
     def test_desktop_option_enables_windowed_error_messages(self) -> None:
         args = parse_args()
@@ -144,6 +151,113 @@ class AppHelpersTests(unittest.TestCase):
             scaled.corners,
             np.array([[0, 0], [1280, 0], [1280, 720], [0, 720]]),
         )
+
+    @staticmethod
+    def _screen_result(value: str) -> QRResult:
+        return QRResult(
+            data=value,
+            corners=np.array([[10, 10], [90, 10], [90, 90], [10, 90]]),
+        )
+
+    @staticmethod
+    def _run_mock_screen_scan(
+        results: list[QRResult],
+        *,
+        confirmed: bool = False,
+        opened: bool = False,
+    ) -> tuple[ScreenScanStatus, Mock, Mock, Mock]:
+        reader = Mock()
+        reader.scan.return_value = results
+        confirm = Mock(return_value=confirmed)
+        opener = Mock(return_value=opened)
+        notify = Mock(return_value=1)
+
+        status = run_screen_scan(
+            capture=lambda: np.zeros((100, 100, 3), dtype=np.uint8),
+            reader=reader,
+            confirm=confirm,
+            opener=opener,
+            notify=notify,
+        )
+        reader.scan.assert_called_once()
+        return status, confirm, opener, notify
+
+    def test_screen_scan_does_not_open_when_no_qr_exists(self) -> None:
+        status, confirm, opener, notify = self._run_mock_screen_scan([])
+
+        self.assertIs(status, ScreenScanStatus.NO_CODE)
+        confirm.assert_not_called()
+        opener.assert_not_called()
+        notify.assert_called_once()
+
+    def test_screen_scan_blocks_multiple_distinct_qr_codes(self) -> None:
+        results = [
+            self._screen_result("https://example.com/one"),
+            self._screen_result("https://example.com/two"),
+        ]
+
+        status, confirm, opener, notify = self._run_mock_screen_scan(results)
+
+        self.assertIs(status, ScreenScanStatus.MULTIPLE_CODES)
+        confirm.assert_not_called()
+        opener.assert_not_called()
+        notify.assert_called_once()
+
+    def test_screen_scan_collapses_duplicate_payloads_before_confirming(self) -> None:
+        result = self._screen_result("https://example.com/same")
+
+        status, confirm, opener, notify = self._run_mock_screen_scan(
+            [result, result],
+            confirmed=True,
+            opened=True,
+        )
+
+        self.assertIs(status, ScreenScanStatus.OPENED)
+        confirm.assert_called_once_with("https://example.com/same")
+        opener.assert_called_once_with("https://example.com/same")
+        notify.assert_not_called()
+
+    def test_screen_scan_never_opens_non_web_payload(self) -> None:
+        status, confirm, opener, notify = self._run_mock_screen_scan(
+            [self._screen_result("file:///C:/secret.txt")]
+        )
+
+        self.assertIs(status, ScreenScanStatus.TEXT_FOUND)
+        confirm.assert_not_called()
+        opener.assert_not_called()
+        notify.assert_called_once()
+
+    def test_screen_scan_respects_cancelled_confirmation(self) -> None:
+        status, confirm, opener, notify = self._run_mock_screen_scan(
+            [self._screen_result("https://example.com/cancel")],
+            confirmed=False,
+        )
+
+        self.assertIs(status, ScreenScanStatus.CANCELLED)
+        confirm.assert_called_once()
+        opener.assert_not_called()
+        notify.assert_not_called()
+
+    def test_screen_scan_decodes_generated_qr_before_opening(self) -> None:
+        frame = self._qr_on_frame(
+            "https://example.com/screen-integration",
+            inside=True,
+        )
+        confirm = Mock(return_value=True)
+        opener = Mock(return_value=True)
+        notify = Mock(return_value=1)
+
+        status = run_screen_scan(
+            capture=lambda: frame,
+            confirm=confirm,
+            opener=opener,
+            notify=notify,
+        )
+
+        self.assertIs(status, ScreenScanStatus.OPENED)
+        confirm.assert_called_once_with("https://example.com/screen-integration")
+        opener.assert_called_once_with("https://example.com/screen-integration")
+        notify.assert_not_called()
 
     def test_scan_region_is_centered_square(self) -> None:
         left, top, right, bottom = scan_region((1280, 720))

@@ -3,7 +3,7 @@
 **English** | [Türkçe](README.tr.md)
 
 A fast and secure Windows desktop application that scans QR codes with a
-computer camera and opens valid web links in the default browser.
+computer camera or directly from the screen.
 
 ![Webcam QR Scanner interface](docs/assets/webcam-qr-scanner.png)
 
@@ -18,6 +18,9 @@ default browser, and closes the scanner automatically.
 
 - Live camera preview with a modern turquoise interface
 - A visible guide that is also the real QR analysis area
+- Separate, one-shot QR scanning across all connected screens
+- Link confirmation showing the destination hostname for screen scans
+- Multiple-screen-QR protection: nothing opens when different codes are found
 - Single and multiple QR-code detection
 - Automatic opening of valid HTTP/HTTPS links
 - Automatic shutdown after the first successful scan
@@ -32,14 +35,31 @@ default browser, and closes the scanner automatically.
 
 ## Download and use
 
-Download `Webcam-QR-Scanner-v0.1.0-windows-x64.zip` from the latest GitHub
-Release, extract it, and double-click `QR-Scanner.exe`. No separate Python or
-OpenCV installation is required.
+Download `Webcam-QR-Scanner-v0.1.1-windows-x64.zip` from the latest GitHub
+Release and extract it. No separate Python or OpenCV installation is required.
+
+### Scan with the camera
+
+Double-click `QR-Scanner.exe`:
 
 1. Allow camera access if Windows asks for permission.
 2. Place the complete QR code inside the turquoise frame.
 3. A valid web link opens in the default browser.
 4. The scanner closes after the first successful scan.
+
+### Scan a QR code already displayed on the computer
+
+Keep exactly one QR code clearly visible and double-click `Scan Screen.vbs`.
+
+1. The application captures all connected displays once.
+2. The image stays in memory and is never saved.
+3. If the QR contains a valid HTTP/HTTPS link, a confirmation dialog shows the
+   destination hostname and full address.
+4. Select **Yes** to open it or **No** to cancel.
+
+If different QR codes are detected at the same time, nothing is opened. Hide
+all but one and run `Scan Screen.vbs` again. The screen is not monitored
+continuously.
 
 The first launch can take a few seconds longer because the single-file package
 needs to prepare its bundled files. Windows SmartScreen may warn about unsigned
@@ -111,10 +131,14 @@ Useful options:
 
 # Display the developer FPS overlay
 .\.venv\Scripts\python.exe app.py --show-fps
+
+# Scan all connected screens once
+.\.venv\Scripts\python.exe app.py --screen
 ```
 
 `QR Scanner.vbs` starts the source version without a terminal. The
-`start_qr_scanner.bat` launcher keeps the terminal visible for diagnostics.
+`Scan Screen.vbs` launcher runs the separate one-shot screen scan without a
+terminal. `start_qr_scanner.bat` keeps the terminal visible for diagnostics.
 
 ## Tests
 
@@ -135,18 +159,20 @@ The self-test verifies OpenCV imports and QR decoding without opening a camera.
 The build produces the terminal-free executable and a distributable ZIP:
 
 ```text
-dist\Webcam-QR-Scanner-v0.1.0-windows-x64.zip
+dist\Webcam-QR-Scanner-v0.1.1-windows-x64.zip
 ```
 
-The ZIP contains `QR-Scanner.exe`, the project MIT license, the third-party
-notice, and the complete license material for bundled dependencies. A
-`SHA256SUMS.txt` file is also generated for integrity verification.
+The ZIP contains `QR-Scanner.exe`, the `Scan Screen.vbs` launcher, the project
+MIT license, the third-party notice, and the complete license material for
+bundled dependencies. A `SHA256SUMS.txt` file is also generated for integrity
+verification.
 
 ## Project structure
 
 - `app.py`: application flow and command-line options
 - `camera.py`: camera negotiation, Full HD measurement, and 720p fallback
 - `qr_reader.py`: fast and thorough QR decoding
+- `screen_capture.py`: one-shot, multi-monitor Windows desktop capture
 - `scan_worker.py`: newest-frame-only background worker
 - `scan_geometry.py`: real scan area and coordinate transformations
 - `ui.py`: interface, animated scan line, and result presentation
@@ -166,6 +192,16 @@ collect analytics, telemetry, or device identifiers. Once a valid URL is
 opened, the destination website is handled by the default browser and is
 subject to that browser's privacy settings.
 
+Screen scanning is explicitly started by the user and captures the virtual
+desktop only once. The captured pixels are processed locally in memory and are
+not written to disk. A screen QR link is never opened without confirmation, and
+different QR payloads detected together are rejected rather than selected
+arbitrarily.
+
+The application validates the URL scheme but cannot determine whether a website
+is trustworthy or malicious. Check the hostname shown in the confirmation
+dialog before opening a screen QR link.
+
 ## Roadmap
 
 ### v0.1 — Windows desktop release
@@ -177,9 +213,11 @@ subject to that browser's privacy settings.
 
 ### v0.1.1 — Scan QR codes displayed on the computer screen
 
-Planned as an opt-in feature. It will scan the active display or a user-selected
-area without permanently storing screenshots. Duplicate protection, HTTP/HTTPS
-validation, multi-monitor support, and a confirmation option will be preserved.
+- [x] Add a separate `Scan Screen` launcher
+- [x] Capture all connected displays once without saving an image
+- [x] Show the hostname and require confirmation before opening a screen URL
+- [x] Block ambiguous scans containing different QR payloads
+- [x] Add automated tests and a standalone Windows package
 
 ### v0.2 — Phone-to-PC bridge
 

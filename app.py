@@ -7,8 +7,11 @@ import ctypes
 import os
 import sys
 import time
+from collections.abc import Callable
 from datetime import datetime
+from enum import Enum, auto
 from typing import Sequence
+from urllib.parse import urlparse
 
 os.environ.setdefault("OPENCV_LOG_LEVEL", "ERROR")
 
@@ -18,16 +21,138 @@ import numpy as np
 from camera import CameraConfig, CameraError, CameraStream
 from links import open_web_url, payload_kind
 from performance import FPSCounter
-from qr_reader import QRResult
+from qr_reader import QRReader, QRResult
+from screen_capture import ScreenCaptureError, capture_virtual_screen
 from scan_geometry import scale_result, scan_region
 from scan_worker import QRScanWorker, ScanGate
 from ui import DISPLAY_SIZE, WINDOW_TITLE, draw_result, is_exit_key, show_instructions
 
 
+def show_dialog(title: str, message: str, style: int = 0) -> int:
+    """Show a native Windows message box and return the selected button."""
+    if os.name == "nt":
+        return int(ctypes.windll.user32.MessageBoxW(0, message, title, style))
+    return 0
+
+
 def show_error_dialog(title: str, message: str) -> None:
     """Show an error when the Windows application has no terminal."""
-    if os.name == "nt":
-        ctypes.windll.user32.MessageBoxW(0, message, title, 0x10)
+    show_dialog(title, message, 0x10)
+
+
+class ScreenScanStatus(Enum):
+    """Observable outcomes of a one-shot screen scan."""
+
+    NO_CODE = auto()
+    MULTIPLE_CODES = auto()
+    TEXT_FOUND = auto()
+    CANCELLED = auto()
+    OPENED = auto()
+    OPEN_FAILED = auto()
+
+
+def _dialog_preview(value: str, limit: int = 900) -> str:
+    """Keep decoded text readable and bounded inside a native dialog."""
+    clean_value = "".join(
+        character if character.isprintable() or character in "\r\n\t" else "�"
+        for character in value.strip()
+    )
+    if len(clean_value) <= limit:
+        return clean_value
+    return f"{clean_value[: limit - 3]}..."
+
+
+def _unique_results(results: list[QRResult]) -> list[QRResult]:
+    """Collapse duplicate detections while preserving distinct payloads."""
+    unique: list[QRResult] = []
+    seen: set[str] = set()
+    for result in results:
+        clean_value = result.data.strip()
+        if clean_value and clean_value not in seen:
+            seen.add(clean_value)
+            unique.append(QRResult(clean_value, result.corners))
+    return unique
+
+
+def confirm_screen_url(value: str) -> bool:
+    """Ask before opening a URL discovered in a screen capture."""
+    host = urlparse(value).hostname or "(unknown host)"
+    try:
+        host = host.encode("idna").decode("ascii")
+    except UnicodeError:
+        pass
+    message = (
+        "A QR code on the screen contains this web address.\n\n"
+        f"Website:\n{host}\n\n"
+        f"Full address:\n{_dialog_preview(value)}\n\n"
+        "Open it in the default browser?"
+    )
+    # Yes/No, warning icon, and No as the default button.
+    return show_dialog("Scan Screen - Confirm link", message, 0x04 | 0x30 | 0x100) == 6
+
+
+def run_screen_scan(
+    *,
+    capture: Callable[[], np.ndarray] | None = None,
+    reader: QRReader | None = None,
+    confirm: Callable[[str], bool] | None = None,
+    opener: Callable[[str], bool] | None = None,
+    notify: Callable[[str, str, int], int] | None = None,
+) -> ScreenScanStatus:
+    """Capture all displays once, decode one QR, and safely handle its payload."""
+    capture = capture or capture_virtual_screen
+    reader = reader or QRReader()
+    confirm = confirm or confirm_screen_url
+    opener = opener or open_web_url
+    notify = notify or show_dialog
+
+    print("Scanning all connected screens once...")
+    results = _unique_results(reader.scan(capture(), thorough=True))
+
+    if not results:
+        notify(
+            "Scan Screen",
+            "No QR code was found. Make the QR code clearly visible and try again.",
+            0x40,
+        )
+        return ScreenScanStatus.NO_CODE
+
+    if len(results) > 1:
+        notify(
+            "Scan Screen",
+            (
+                "Multiple QR codes were found. Nothing was opened.\n\n"
+                "Keep only one QR code visible and try again."
+            ),
+            0x30,
+        )
+        return ScreenScanStatus.MULTIPLE_CODES
+
+    value = results[0].data
+    if payload_kind(value) != "URL":
+        notify(
+            "Scan Screen - Text QR",
+            (
+                "The QR code does not contain a valid HTTP/HTTPS web address."
+                f"\n\nDecoded text:\n{_dialog_preview(value)}"
+            ),
+            0x40,
+        )
+        return ScreenScanStatus.TEXT_FOUND
+
+    if not confirm(value):
+        return ScreenScanStatus.CANCELLED
+
+    if opener(value):
+        print("Link opened in the default browser.")
+        return ScreenScanStatus.OPENED
+
+    notify(
+        "Scan Screen - Browser error",
+        "The link could not be opened in the default browser.",
+        0x10,
+    )
+    return ScreenScanStatus.OPEN_FAILED
 
 
 def _report_scan(result: QRResult, auto_open: bool) -> None:
@@ -195,6 +320,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Show the developer FPS overlay",
     )
+    parser.add_argument(
+        "--screen",
+        action="store_true",
+        help="Scan all connected screens once instead of opening the camera",
+    )
     parser.add_argument("--desktop", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--self-test", action="store_true", help=argparse.SUPPRESS)
     return parser.parse_args(argv)
@@ -207,6 +337,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     desktop_mode = args.desktop or bool(getattr(sys, "frozen", False))
     try:
+        if args.screen:
+            status = run_screen_scan()
+            return 1 if status is ScreenScanStatus.OPEN_FAILED else 0
+
         run(
             args.camera,
             auto_open=args.auto_open,
@@ -217,6 +351,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"Camera error: {error}")
         if desktop_mode:
             show_error_dialog("QR Scanner - Camera error", str(error))
+        return 1
+    except ScreenCaptureError as error:
+        print(f"Screen capture error: {error}")
+        if desktop_mode:
+            show_error_dialog("Scan Screen - Capture error", str(error))
         return 1
     except cv2.error as error:
         print(f"OpenCV error: {error}")

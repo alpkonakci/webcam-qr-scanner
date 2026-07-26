@@ -2,8 +2,8 @@
 
 [English](README.md) | **Türkçe**
 
-Bilgisayar kamerasından QR kod okuyup geçerli web bağlantılarını varsayılan
-tarayıcıda açan hızlı ve güvenli bir Windows masaüstü uygulaması.
+Bilgisayar kamerasından veya doğrudan ekrandan QR kod okuyan hızlı ve güvenli
+bir Windows masaüstü uygulaması.
 
 ![Webcam QR Scanner arayüzü](docs/assets/webcam-qr-scanner.png)
 
@@ -18,6 +18,9 @@ varsayılan tarayıcıda açılır ve QR Scanner otomatik olarak kapanır.
 
 - Modern turkuaz arayüzle canlı kamera görüntüsü
 - Aynı zamanda gerçek QR analiz alanı olan görünür tarama çerçevesi
+- Tüm bağlı ekranları tek sefer tarayan ayrı `Scan Screen` seçeneği
+- Ekran taramalarında hedef alan adını gösteren bağlantı onayı
+- Farklı QR kodlar birlikte bulunursa hiçbirini açmayan belirsizlik koruması
 - Tek veya birden fazla QR kod algılama
 - Geçerli HTTP/HTTPS bağlantılarını otomatik açma
 - İlk başarılı okumadan sonra otomatik kapanma
@@ -32,14 +35,31 @@ varsayılan tarayıcıda açılır ve QR Scanner otomatik olarak kapanır.
 
 ## İndirme ve kullanım
 
-Son GitHub Release içinden `Webcam-QR-Scanner-v0.1.0-windows-x64.zip` dosyasını
-indirin, arşivden çıkarın ve `QR-Scanner.exe` dosyasına çift tıklayın. Python
-veya OpenCV'yi ayrıca kurmanız gerekmez.
+Son GitHub Release içinden `Webcam-QR-Scanner-v0.1.1-windows-x64.zip` dosyasını
+indirin ve arşivden çıkarın. Python veya OpenCV'yi ayrıca kurmanız gerekmez.
+
+### Kamerayla tarama
+
+`QR-Scanner.exe` dosyasına çift tıklayın:
 
 1. Windows kamera izni isterse izin verin.
 2. QR kodun tamamını turkuaz çerçevenin içine yerleştirin.
 3. Geçerli web bağlantısı varsayılan tarayıcıda açılır.
 4. İlk başarılı okumadan sonra QR Scanner kapanır.
+
+### Bilgisayar ekranında görünen QR kodu tarama
+
+Ekranda yalnızca bir QR kodu açık bırakın ve `Scan Screen.vbs` dosyasına çift
+tıklayın.
+
+1. Uygulama bağlı ekranların tamamını bir kez yakalar.
+2. Görüntü yalnızca bellekte tutulur ve hiçbir zaman kaydedilmez.
+3. QR geçerli bir HTTP/HTTPS bağlantısı içeriyorsa onay penceresinde hedef alan
+   adı ve tam adres gösterilir.
+4. Açmak için **Yes**, vazgeçmek için **No** seçin.
+
+Aynı anda farklı QR kodlar algılanırsa hiçbir bağlantı açılmaz. Diğerlerini
+gizleyip `Scan Screen.vbs` dosyasını yeniden çalıştırın. Ekran sürekli izlenmez.
 
 Tek dosyalı paket, içindeki dosyaları hazırladığı için ilk açılış birkaç saniye
 daha uzun sürebilir. İnternetten indirilen imzasız EXE'ler için Windows
@@ -110,10 +130,15 @@ Kullanışlı seçenekler:
 
 # Geliştirici FPS göstergesini aç
 .\.venv\Scripts\python.exe app.py --show-fps
+
+# Bağlı ekranların tamamını bir kez tara
+.\.venv\Scripts\python.exe app.py --screen
 ```
 
 `QR Scanner.vbs` kaynak sürümü terminal göstermeden başlatır.
-`start_qr_scanner.bat` ise sorun giderme günlükleri için terminali açık tutar.
+`Scan Screen.vbs` ayrı, tek seferlik ekran taramasını terminal göstermeden
+başlatır. `start_qr_scanner.bat` ise sorun giderme günlükleri için terminali
+açık tutar.
 
 ## Testler
 
@@ -134,18 +159,19 @@ Self-test, kamera açmadan OpenCV yüklemesini ve QR çözümlemeyi doğrular.
 Build sonunda terminal göstermeyen EXE ile dağıtıma hazır arşiv oluşturulur:
 
 ```text
-dist\Webcam-QR-Scanner-v0.1.0-windows-x64.zip
+dist\Webcam-QR-Scanner-v0.1.1-windows-x64.zip
 ```
 
-ZIP içinde `QR-Scanner.exe`, proje MIT lisansı, üçüncü taraf bildirimi ve pakete
-dahil bağımlılıkların eksiksiz lisans metinleri bulunur. Bütünlük kontrolü için
-ayrıca `SHA256SUMS.txt` üretilir.
+ZIP içinde `QR-Scanner.exe`, `Scan Screen.vbs` başlatıcısı, proje MIT lisansı,
+üçüncü taraf bildirimi ve pakete dahil bağımlılıkların eksiksiz lisans metinleri
+bulunur. Bütünlük kontrolü için ayrıca `SHA256SUMS.txt` üretilir.
 
 ## Proje yapısı
 
 - `app.py`: uygulama akışı ve komut satırı seçenekleri
 - `camera.py`: kamera seçimi, Full HD ölçümü ve 720p geri dönüşü
 - `qr_reader.py`: hızlı ve kapsamlı QR çözümleme
+- `screen_capture.py`: tek seferlik, çoklu monitör Windows ekran yakalama
 - `scan_worker.py`: yalnızca en güncel kareyi işleyen arka plan işçisi
 - `scan_geometry.py`: gerçek tarama alanı ve koordinat dönüşümleri
 - `ui.py`: arayüz, hareketli tarama çizgisi ve sonuç görünümü
@@ -165,6 +191,16 @@ telemetri veya cihaz kimliği toplamaz. Geçerli bir URL açıldıktan sonra hed
 site varsayılan tarayıcı tarafından işlenir ve tarayıcının gizlilik ayarlarına
 tabidir.
 
+Ekran taraması kullanıcı tarafından açıkça başlatılır ve sanal masaüstünü
+yalnızca bir kez yakalar. Yakalanan pikseller yerel olarak bellekte işlenir,
+diske yazılmaz. Ekrandaki bir QR bağlantısı onay alınmadan açılmaz; aynı anda
+farklı QR içerikleri bulunursa uygulama keyfî seçim yapmak yerine işlemi
+reddeder.
+
+Uygulama URL şemasını doğrular ancak bir sitenin güvenilir veya zararlı olduğunu
+belirleyemez. Ekrandaki QR bağlantısını açmadan önce onay penceresinde gösterilen
+alan adını kontrol edin.
+
 ## Yol haritası
 
 ### v0.1 — Windows masaüstü sürümü
@@ -176,10 +212,11 @@ tabidir.
 
 ### v0.1.1 — Bilgisayar ekranındaki QR kodları okuma
 
-Varsayılan olarak kapalı olacak şekilde planlandı. Etkinleştirildiğinde aktif
-ekranı veya kullanıcının seçtiği alanı tarayacak; ekran görüntülerini kalıcı
-olarak saklamayacak. Tekrar koruması, HTTP/HTTPS doğrulaması, çoklu monitör
-desteği ve isteğe bağlı onay seçeneği korunacak.
+- [x] Ayrı `Scan Screen` başlatıcısı ekleme
+- [x] Bağlı ekranların tamamını görüntü kaydetmeden bir kez yakalama
+- [x] Ekran URL'sini açmadan önce alan adını gösterme ve onay isteme
+- [x] Farklı QR içerikleri bulunan belirsiz taramaları engelleme
+- [x] Otomatik testleri ve bağımsız Windows paketini hazırlama
 
 ### v0.2 — Telefon-PC köprüsü
 

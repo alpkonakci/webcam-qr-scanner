@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 def payload_kind(value: str) -> str:
     """Classify explicit HTTP(S) links without executing the payload."""
     parsed = urlparse(value.strip())
-    if parsed.scheme.lower() in {"http", "https"} and parsed.netloc:
+    if parsed.scheme.lower() in {"http", "https"} and parsed.hostname:
         return "URL"
     return "Text"
 
