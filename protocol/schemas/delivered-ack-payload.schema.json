@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/alpkonakci/webcam-qr-scanner/protocol/schemas/delivered-ack-payload.schema.json",
+  "title": "WQRS/1 delivered acknowledgement payload",
+  "type": "object",
+  "required": [
+    "payload_version",
+    "kind",
+    "message_id"
+  ],
+  "properties": {
+    "payload_version": {
+      "const": 1
+    },
+    "kind": {
+      "const": "delivered"
+    },
+    "message_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{22}$"
+    }
+  },
+  "additionalProperties": false
+}
+

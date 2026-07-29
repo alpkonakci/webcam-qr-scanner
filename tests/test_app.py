@@ -17,6 +17,7 @@ from ui import (
     COLOR_SUCCESS,
     draw_result,
     fps_color,
+    is_application_exit_key,
     is_exit_key,
     readable_preview,
     show_instructions,
@@ -79,10 +80,13 @@ class AppHelpersTests(unittest.TestCase):
         self.assertEqual(fps_color(30.0), COLOR_ACCENT)
         self.assertNotEqual(fps_color(30.0), COLOR_SUCCESS)
 
-    def test_only_escape_key_closes_the_application(self) -> None:
+    def test_escape_closes_camera_and_ctrl_q_requests_full_exit(self) -> None:
         self.assertTrue(is_exit_key(27))
         self.assertFalse(is_exit_key(ord("q")))
         self.assertFalse(is_exit_key(ord("Q")))
+        self.assertTrue(is_application_exit_key(17))
+        self.assertFalse(is_application_exit_key(27))
+        self.assertFalse(is_application_exit_key(ord("q")))
 
     @patch("sys.argv", ["app.py"])
     def test_closes_after_first_scan_by_default(self) -> None:
@@ -165,12 +169,14 @@ class AppHelpersTests(unittest.TestCase):
         *,
         confirmed: bool = False,
         opened: bool = False,
+        selector: Mock | None = None,
     ) -> tuple[ScreenScanStatus, Mock, Mock, Mock]:
         reader = Mock()
-        reader.scan.return_value = results
+        reader.scan_all.return_value = results
         confirm = Mock(return_value=confirmed)
         opener = Mock(return_value=opened)
         notify = Mock(return_value=1)
+        selector = selector or Mock(return_value=None)
 
         status = run_screen_scan(
             capture=lambda: np.zeros((100, 100, 3), dtype=np.uint8),
@@ -178,8 +184,9 @@ class AppHelpersTests(unittest.TestCase):
             confirm=confirm,
             opener=opener,
             notify=notify,
+            select=selector,
         )
-        reader.scan.assert_called_once()
+        reader.scan_all.assert_called_once()
         return status, confirm, opener, notify
 
     def test_screen_scan_does_not_open_when_no_qr_exists(self) -> None:
@@ -190,18 +197,75 @@ class AppHelpersTests(unittest.TestCase):
         opener.assert_not_called()
         notify.assert_called_once()
 
-    def test_screen_scan_blocks_multiple_distinct_qr_codes(self) -> None:
+    def test_screen_scan_opens_only_the_explicitly_selected_qr(self) -> None:
         results = [
             self._screen_result("https://example.com/one"),
-            self._screen_result("https://example.com/two"),
+            QRResult(
+                data="https://example.com/two",
+                corners=np.array(
+                    [[110, 10], [190, 10], [190, 90], [110, 90]]
+                ),
+            ),
         ]
+        selector = Mock(return_value=results[1])
 
-        status, confirm, opener, notify = self._run_mock_screen_scan(results)
+        status, confirm, opener, notify = self._run_mock_screen_scan(
+            results,
+            confirmed=True,
+            opened=True,
+            selector=selector,
+        )
 
-        self.assertIs(status, ScreenScanStatus.MULTIPLE_CODES)
+        self.assertIs(status, ScreenScanStatus.OPENED)
+        selector.assert_called_once()
+        confirm.assert_called_once_with("https://example.com/two")
+        opener.assert_called_once_with("https://example.com/two")
+        notify.assert_not_called()
+
+    def test_screen_scan_cancels_when_multiple_qr_selection_is_closed(self) -> None:
+        results = [
+            self._screen_result("https://example.com/one"),
+            QRResult(
+                data="https://example.com/two",
+                corners=np.array(
+                    [[110, 10], [190, 10], [190, 90], [110, 90]]
+                ),
+            ),
+        ]
+        selector = Mock(return_value=None)
+
+        status, confirm, opener, notify = self._run_mock_screen_scan(
+            results,
+            selector=selector,
+        )
+
+        self.assertIs(status, ScreenScanStatus.CANCELLED)
+        selector.assert_called_once()
         confirm.assert_not_called()
         opener.assert_not_called()
-        notify.assert_called_once()
+        notify.assert_not_called()
+
+    def test_screen_scan_rejects_result_not_present_in_capture(self) -> None:
+        results = [
+            self._screen_result("https://example.com/one"),
+            QRResult(
+                data="https://example.com/two",
+                corners=np.array(
+                    [[110, 10], [190, 10], [190, 90], [110, 90]]
+                ),
+            ),
+        ]
+        forged_result = self._screen_result("https://attacker.example")
+
+        status, confirm, opener, notify = self._run_mock_screen_scan(
+            results,
+            selector=Mock(return_value=forged_result),
+        )
+
+        self.assertIs(status, ScreenScanStatus.CANCELLED)
+        confirm.assert_not_called()
+        opener.assert_not_called()
+        notify.assert_not_called()
 
     def test_screen_scan_collapses_duplicate_payloads_before_confirming(self) -> None:
         result = self._screen_result("https://example.com/same")

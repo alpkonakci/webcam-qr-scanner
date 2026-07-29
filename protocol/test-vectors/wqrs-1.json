@@ -1,0 +1,123 @@
+{
+  "vector_version": 1,
+  "protocol": "wqrs/1",
+  "warning": "Public deterministic test data. Never reuse these keys, tokens, IDs, or nonces in production.",
+  "inputs": {
+    "pc_private_key": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA",
+    "phone_private_key": "ISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0-P0A",
+    "pairing_secret": "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVpbXF1eX2A",
+    "pairing_relay_token": "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1-f4A",
+    "sender_token": "gYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6A",
+    "device_id": "ABEiM0RVZneImaq7zN3u_w",
+    "pairing_id": "ECEyQ1RldoeYqbq73N3t7w",
+    "pair_id": "IDFCU2R1hpeoucrb7P0OHw",
+    "message_id": "MEFSY3SFlqe4ydrr_A0eLw"
+  },
+  "derived": {
+    "pc_public_key": "BFFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANfRTa-OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q",
+    "phone_public_key": "BB8UAUa_sbJR-E9N2-DUzc_Xev2YSpUg41eUAh-DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5-KRJxQluR8iSs",
+    "shared_secret": "T-JDkI83iqHCppU4gi5u2QjDIl2GkldVB8ZJkBJFFQo",
+    "pairing_uri": "wqrs://pair?v=1&relay=https%3A%2F%2Frelay.example&device=ABEiM0RVZneImaq7zN3u_w&pairing=ECEyQ1RldoeYqbq73N3t7w&pairing_token=YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1-f4A&pc_key=BFFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANfRTa-OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q&secret=QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVpbXF1eX2A&expires=1785100000",
+    "pairing_transcript": {
+      "protocol": "wqrs/1",
+      "relay_origin": "https://relay.example",
+      "device_id": "ABEiM0RVZneImaq7zN3u_w",
+      "pairing_id": "ECEyQ1RldoeYqbq73N3t7w",
+      "expires_at": 1785100000,
+      "pc_public_key": "BFFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANfRTa-OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q",
+      "phone_public_key": "BB8UAUa_sbJR-E9N2-DUzc_Xev2YSpUg41eUAh-DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5-KRJxQluR8iSs"
+    },
+    "pairing_transcript_jcs": "{\"device_id\":\"ABEiM0RVZneImaq7zN3u_w\",\"expires_at\":1785100000,\"pairing_id\":\"ECEyQ1RldoeYqbq73N3t7w\",\"pc_public_key\":\"BFFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANfRTa-OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q\",\"phone_public_key\":\"BB8UAUa_sbJR-E9N2-DUzc_Xev2YSpUg41eUAh-DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5-KRJxQluR8iSs\",\"protocol\":\"wqrs/1\",\"relay_origin\":\"https://relay.example\"}",
+    "transcript_hash": "GBr-NJJFkduExQZBrWL15MdCygKdoNcIiojc9ASw7CA",
+    "handshake_key": "0xI3FyD7vSnMonDmmljBv5c0pItw2f6tRAut02lPQtk",
+    "root_key": "zXbzxZVUUP3oSbJLV-fUyuK22amge2kZ5vMeL9qDcRs",
+    "message_key": "60KclzLdwDHasX8uHz4X6F0dVgrf1CFxD4KJXe2GgKQ",
+    "ack_key": "_3Ds-Pp7Ls8Nle7bwADLo0c0ivLz1niWjc8RXneKnhw"
+  },
+  "cases": {
+    "pair_request": {
+      "payload": {
+        "payload_version": 1,
+        "kind": "pair_request",
+        "phone_label": "Test Mobile Browser",
+        "platform": "pwa"
+      },
+      "payload_jcs": "{\"kind\":\"pair_request\",\"payload_version\":1,\"phone_label\":\"Test Mobile Browser\",\"platform\":\"pwa\"}",
+      "aad_jcs": "{\"created_at\":1785099910,\"device_id\":\"ABEiM0RVZneImaq7zN3u_w\",\"expires_at\":1785100000,\"nonce\":\"AAECAwQFBgcICQoL\",\"pairing_id\":\"ECEyQ1RldoeYqbq73N3t7w\",\"phone_public_key\":\"BB8UAUa_sbJR-E9N2-DUzc_Xev2YSpUg41eUAh-DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5-KRJxQluR8iSs\",\"protocol\":\"wqrs/1\",\"type\":\"pair_request\"}",
+      "envelope": {
+        "protocol": "wqrs/1",
+        "device_id": "ABEiM0RVZneImaq7zN3u_w",
+        "pairing_id": "ECEyQ1RldoeYqbq73N3t7w",
+        "phone_public_key": "BB8UAUa_sbJR-E9N2-DUzc_Xev2YSpUg41eUAh-DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5-KRJxQluR8iSs",
+        "expires_at": 1785100000,
+        "type": "pair_request",
+        "created_at": 1785099910,
+        "nonce": "AAECAwQFBgcICQoL",
+        "ciphertext": "Ighnys6UVjcb4Y2PB6YT7N8vY51xkFoiA4h_rGiGWzATqV3AUltZw4scPqYqsTHJzWyuKrcw943C_RDaQS8cp7sxxg1X1sRc5fhkbeqGMF7gNaLDu5ZWhWL1YJp8MCwokVrWLv2okFUaBOrDLsY7Kw"
+      }
+    },
+    "pair_result": {
+      "payload": {
+        "payload_version": 1,
+        "kind": "pair_approved",
+        "pair_id": "IDFCU2R1hpeoucrb7P0OHw",
+        "sender_token": "gYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6A",
+        "pc_label": "Test Windows PC",
+        "key_epoch": 1
+      },
+      "payload_jcs": "{\"key_epoch\":1,\"kind\":\"pair_approved\",\"pair_id\":\"IDFCU2R1hpeoucrb7P0OHw\",\"payload_version\":1,\"pc_label\":\"Test Windows PC\",\"sender_token\":\"gYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6A\"}",
+      "aad_jcs": "{\"created_at\":1785099940,\"device_id\":\"ABEiM0RVZneImaq7zN3u_w\",\"expires_at\":1785100000,\"nonce\":\"EBESExQVFhcYGRob\",\"pairing_id\":\"ECEyQ1RldoeYqbq73N3t7w\",\"phone_public_key\":\"BB8UAUa_sbJR-E9N2-DUzc_Xev2YSpUg41eUAh-DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5-KRJxQluR8iSs\",\"protocol\":\"wqrs/1\",\"type\":\"pair_result\"}",
+      "envelope": {
+        "protocol": "wqrs/1",
+        "device_id": "ABEiM0RVZneImaq7zN3u_w",
+        "pairing_id": "ECEyQ1RldoeYqbq73N3t7w",
+        "phone_public_key": "BB8UAUa_sbJR-E9N2-DUzc_Xev2YSpUg41eUAh-DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5-KRJxQluR8iSs",
+        "expires_at": 1785100000,
+        "type": "pair_result",
+        "created_at": 1785099940,
+        "nonce": "EBESExQVFhcYGRob",
+        "ciphertext": "jcgGKxm5D_AMK8RNC-P_YwEPR8yp7g6vfiCkpkDP96MeaofPKfCn3ILw3TsQG50RsrSV-nNRN85ebUznhqvt2t8edmW33Hg8nerY-_CO8oWM0Rl-UqxQid9e5YX4LbPtnCpotv-hrvCmQFRt_mMAUgKaPIdp89uKWmsbkJs2jUE3OBmi6qnoIm3DkvMJvSMgujX7GbVZKPYT8aMPHrNQRnrRNRULb7Tyx81mJWp6M7SsRhBtSGMQN1BBVkaHyBtnI4-hjZGgzA"
+      }
+    },
+    "url_message": {
+      "payload": {
+        "payload_version": 1,
+        "kind": "url",
+        "url": "https://example.com/path?q=qr"
+      },
+      "payload_jcs": "{\"kind\":\"url\",\"payload_version\":1,\"url\":\"https://example.com/path?q=qr\"}",
+      "aad_jcs": "{\"created_at\":1785100100,\"expires_at\":1785100400,\"key_epoch\":1,\"message_id\":\"MEFSY3SFlqe4ydrr_A0eLw\",\"nonce\":\"ICEiIyQlJicoKSor\",\"pair_id\":\"IDFCU2R1hpeoucrb7P0OHw\",\"protocol\":\"wqrs/1\",\"type\":\"url_message\"}",
+      "envelope": {
+        "protocol": "wqrs/1",
+        "type": "url_message",
+        "pair_id": "IDFCU2R1hpeoucrb7P0OHw",
+        "key_epoch": 1,
+        "message_id": "MEFSY3SFlqe4ydrr_A0eLw",
+        "created_at": 1785100100,
+        "expires_at": 1785100400,
+        "nonce": "ICEiIyQlJicoKSor",
+        "ciphertext": "7aWcJD8C00uht7jKTujxCD3G68ttREzdWzzYfKic4spETsn0UIWIJbWoJfps4rPd_vXOOWgDEstlf4F56rMAortQ_iPpq2PvECuadP-FZ8iNMrK23l0EbQ"
+      }
+    },
+    "delivered_ack": {
+      "payload": {
+        "payload_version": 1,
+        "kind": "delivered",
+        "message_id": "MEFSY3SFlqe4ydrr_A0eLw"
+      },
+      "payload_jcs": "{\"kind\":\"delivered\",\"message_id\":\"MEFSY3SFlqe4ydrr_A0eLw\",\"payload_version\":1}",
+      "aad_jcs": "{\"created_at\":1785100101,\"expires_at\":1785100111,\"key_epoch\":1,\"message_id\":\"MEFSY3SFlqe4ydrr_A0eLw\",\"nonce\":\"MDEyMzQ1Njc4OTo7\",\"pair_id\":\"IDFCU2R1hpeoucrb7P0OHw\",\"protocol\":\"wqrs/1\",\"type\":\"delivered_ack\"}",
+      "envelope": {
+        "protocol": "wqrs/1",
+        "type": "delivered_ack",
+        "pair_id": "IDFCU2R1hpeoucrb7P0OHw",
+        "key_epoch": 1,
+        "message_id": "MEFSY3SFlqe4ydrr_A0eLw",
+        "created_at": 1785100101,
+        "expires_at": 1785100111,
+        "nonce": "MDEyMzQ1Njc4OTo7",
+        "ciphertext": "-ycU6P6lTzEb54rMA2C6Em_sJk73tpLOxpwAN5RJTTBmX76yL5lDnbDYEEgZilPQv7WacQPOt2PODm8f8LE3ql46ZaA7H5xpMevUd5lTAqPuPY6gM9olGBxig2eVJw"
+      }
+    }
+  }
+}

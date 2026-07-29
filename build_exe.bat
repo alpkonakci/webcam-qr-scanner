@@ -23,8 +23,9 @@ echo Building terminal-free QR-Scanner.exe...
     --clean ^
     --onefile ^
     --windowed ^
+    --hidden-import pystray._win32 ^
     --name QR-Scanner ^
-    app.py
+    launcher.py
 
 if errorlevel 1 (
     echo.
@@ -49,7 +50,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "package_release.ps1" -Version "v0.1.1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "package_release.ps1" -Version "v0.2.0-dev"
 if errorlevel 1 (
     echo.
     echo Release package creation failed.

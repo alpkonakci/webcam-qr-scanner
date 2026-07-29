@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "v0.1.1"
+    [string]$Version = "v0.2.0-dev"
 )
 
 $ErrorActionPreference = "Stop"
@@ -65,6 +65,26 @@ $numpyLicenseSource = Join-Path $sitePackages `
     "numpy-2.5.1.dist-info\licenses"
 Copy-Item -LiteralPath $numpyLicenseSource `
     -Destination (Join-Path $licenseDirectory "NumPy") -Recurse
+
+$pillowLicenseSource = Join-Path $sitePackages `
+    "pillow-12.3.0.dist-info\licenses"
+Copy-Item -LiteralPath $pillowLicenseSource `
+    -Destination (Join-Path $licenseDirectory "Pillow") -Recurse
+
+$pystrayLicenseDirectory = New-Item -ItemType Directory -Path `
+    (Join-Path $licenseDirectory "pystray") -Force
+Copy-Item -LiteralPath `
+    (Join-Path $sitePackages "pystray-0.19.5.dist-info\COPYING") `
+    -Destination $pystrayLicenseDirectory
+Copy-Item -LiteralPath `
+    (Join-Path $sitePackages "pystray-0.19.5.dist-info\COPYING.LGPL") `
+    -Destination $pystrayLicenseDirectory
+
+$sixLicenseDirectory = New-Item -ItemType Directory -Path `
+    (Join-Path $licenseDirectory "six") -Force
+Copy-Item -LiteralPath `
+    (Join-Path $sitePackages "six-1.17.0.dist-info\LICENSE") `
+    -Destination $sixLicenseDirectory
 
 $pyInstallerLicenseDirectory = New-Item -ItemType Directory -Path `
     (Join-Path $licenseDirectory "PyInstaller") -Force
