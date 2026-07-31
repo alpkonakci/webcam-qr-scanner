@@ -136,6 +136,61 @@ class RelayStateTests(unittest.TestCase):
 
 
 class LocalRelayEndToEndTests(unittest.IsolatedAsyncioTestCase):
+    async def test_failed_secure_persistence_revokes_approved_route(
+        self,
+    ) -> None:
+        async with LiveRelay() as live:
+            async with httpx.AsyncClient(
+                base_url=live.origin,
+                timeout=5,
+            ) as client:
+                device_response = await client.post("/v1/devices")
+            device = device_response.json()
+            session = await open_pc_pairing(
+                relay_origin=live.origin,
+                device_id=device["device_id"],
+                receiver_token=device["receiver_token"],
+            )
+            phone = create_phone_pairing_attempt(
+                session.pairing_uri,
+                phone_label="Storage failure phone",
+            )
+            await submit_phone_pairing_request(phone)
+            request = await wait_for_phone_request(
+                session,
+                timeout_seconds=5,
+            )
+
+            def fail_persistence(_):
+                raise OSError("simulated secure storage failure")
+
+            with self.assertRaises(OSError):
+                await complete_pc_pairing(
+                    session,
+                    request,
+                    approved=True,
+                    pc_label="Test PC",
+                    persist_receiver=fail_persistence,
+                )
+
+            self.assertEqual(
+                live.application.state.relay.safe_snapshot()["pair_count"],
+                0,
+            )
+            async with httpx.AsyncClient(
+                base_url=live.origin,
+                timeout=5,
+            ) as client:
+                result_response = await client.get(
+                    f"/v1/pairings/{session.qr.pairing_id}/result",
+                    headers={
+                        "Authorization": (
+                            f"Bearer {session.qr.pairing_token}"
+                        )
+                    },
+                )
+            self.assertEqual(result_response.status_code, 202)
+
     async def test_rejected_phone_request_creates_no_pair_route(self) -> None:
         async with LiveRelay() as live:
             async with httpx.AsyncClient(

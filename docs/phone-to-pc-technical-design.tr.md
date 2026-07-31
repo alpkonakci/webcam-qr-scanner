@@ -4,16 +4,17 @@
 
 | Alan | Değer |
 |---|---|
-| Durum | Aşama 0 tamamlandı; uygulama bileşenleri henüz başlamadı |
+| Durum | Aşama 1 kısmen tamamlandı; Aşama 2 DPAPI dilimi uygulandı |
 | Hedef uygulama sürümü | `v0.2.0` |
 | Protokol sürümü | `wqrs/1` |
-| Tarih | 27 Temmuz 2026 |
+| Tarih | 30 Temmuz 2026 |
 | İlk masaüstü hedefi | Windows |
 | Mobil hedef | Kurulum zorunluluğu olmayan PWA |
 | İlk doğrulama sırası | Android Chrome → iOS Safari |
 
-Bu belge kod değildir. Uygulamaya başlamadan önce kapsamı, güvenlik sınırlarını,
-mesaj biçimlerini ve kabul ölçütlerini sabitlemek için hazırlanmıştır.
+Bu belge normatif kodun yerine geçmez. Kapsamı, güvenlik sınırlarını, mesaj
+biçimlerini, uygulama durumunu ve kabul ölçütlerini birlikte izlemek için
+hazırlanmıştır.
 
 Normatif `wqrs/1` şemaları, deterministik test vektörü ve tehdit modeli kontrol
 listesi [`protocol/`](../protocol/README.md) altında sürüm kontrollüdür.
@@ -142,8 +143,10 @@ Relay şunları yapmaz:
 
 Mevcut Python uygulamasına `--bridge` çalışma modu ve sistem tepsisi temeli
 eklenmiştir. Bu masaüstü denetleyicisi kamera açmadan arka planda çalışır.
-Güncel geliştirme aşamasında relay bağlantısı kurmaz; ağ alıcısı aşağıdaki
-sorumluluklar tamamlanınca ayrıca etkinleştirilecektir.
+Arka planda kendiliğinden relay bağlantısı kurmaz. Kullanıcının **Pair Phone...**
+işlemi yapılandırılmış relay'e bağlanır, iki dakikalık QR gösterir, varsayılan
+ret seçili PC onayını ister ve onaylanan eşleşmeyi DPAPI ile saklar. Kalıcı ağ
+alıcısı aşağıdaki kalan sorumluluklar tamamlanınca ayrıca etkinleştirilecektir.
 
 Sorumlulukları:
 
@@ -165,8 +168,9 @@ Kabul edilen masaüstü yaşam döngüsü şöyledir:
   sürecini başlatır.
 - Kamera bir On/Off ayarı değil, kullanıcı tarafından başlatılan bir işlemdir.
 - `Esc`, pencere kapatma düğmesi veya başarılı QR okuması yalnızca kamera
-  sürecini kapatır; denetleyici tepside kalır.
-- Kamera ilk kez kapandığında bu davranış bir kez bildirilir.
+  sürecini kapatır; ardından sade kontrol ekranı açılır.
+- Kontrol ekranı kamera, ekran taraması ve telefon eşleştirmesini görünür
+  seçenekler olarak sunar; kapatılırsa denetleyici tepside kalır.
 - Kameradayken `Ctrl+Q` veya tepsideki **Exit QR Scanner**, onaydan sonra tüm
   süreçleri kapatır.
 - İkinci EXE açılışı ikinci denetleyici veya kamera oluşturmaz; mevcut tepsi
@@ -180,11 +184,11 @@ Kabul edilen masaüstü yaşam döngüsü şöyledir:
 
 Tepsi temelinde şu işlemler bulunur:
 
+- **Open QR Scanner**
 - **Scan with Camera**
 - **Scan Screen**
 - **Phone-to-PC status**
-- **Pair Phone** — ağ alıcısı tamamlanana kadar geliştirme özelliği olarak
-  işaretli
+- **Pair Phone...** — geliştirme relay'iyle çalışan kısa ömürlü eşleştirme akışı
 - **Start with Windows**
 - **Exit QR Scanner**
 
@@ -408,6 +412,13 @@ korunacaktır:
 - `receiver_token`;
 - her telefon için `root_key`;
 - eşleşme etiketi ve protokol sürümü.
+
+30 Temmuz 2026 tarihli masaüstü diliminde relay `device_id`/`receiver_token`
+kaydı, her onaylanan telefonun `pair_id`, `root_key`, etiketi ve `key_epoch`
+değeri atomik olarak yazılan tek DPAPI ciphertext dosyasında uygulanmıştır.
+Düz metin geri dönüşü yoktur; DPAPI çözme veya doğrulama başarısız olursa işlem
+fail-closed davranır. Kalıcı PC kimlik anahtarı ve replay deposu, gerçek ağ
+alıcısıyla birlikte tamamlanacaktır.
 
 `CRYPTPROTECT_LOCAL_MACHINE` kullanılmayacaktır; aksi hâlde aynı bilgisayardaki
 diğer kullanıcıların erişim sınırı gereksiz yere genişler.
@@ -703,6 +714,7 @@ Kesin OpenAPI dosyası uygulama aşamasında oluşturulacaktır. İlk yüzey:
 | Pairing açma | `POST /v1/pairings` | Receiver bearer token |
 | Pairing isteği | `POST /v1/pairings/{pairing_id}/request` | Pairing bearer token |
 | Pairing isteğini alma | `GET /v1/pairings/{pairing_id}/request` | Receiver bearer token |
+| Pairing iptali | `DELETE /v1/pairings/{pairing_id}` | Receiver bearer token |
 | Pairing sonucunu yazma | `POST /v1/pairings/{pairing_id}/result` | Receiver bearer token |
 | Pairing sonucunu alma | `GET /v1/pairings/{pairing_id}/result` | Pairing bearer token |
 | Pair onayı kaydı | `POST /v1/pairs` | Receiver bearer token |
@@ -934,10 +946,14 @@ webcam-qr-scanner/
 ├── bridge/
 │   ├── protocol.py
 │   ├── pairing.py
+│   ├── pairing_controller.py
+│   ├── secure_storage.py
 │   ├── receiver.py
 │   ├── fake_phone.py
+│   ├── fake_pairing_phone.py
 │   ├── provision.py
 │   └── replay.py
+├── pairing_ui.py
 ├── relay/
 │   ├── app.py
 │   ├── state.py
@@ -955,8 +971,9 @@ webcam-qr-scanner/
 Bu monorepo düzeni protokol, relay ve istemci değişikliklerinin aynı commit ve
 test vektörüyle gözden geçirilmesini sağlar. Mevcut masaüstü kodunu baştan
 taşımak, ilk prototipe gereksiz risk ekleyeceği için ertelenir.
-`secure_storage.py`, kalıcı replay deposu ve üretim relay migration'ları Aşama
-2 ve Aşama 5 içinde eklenecektir.
+`secure_storage.py` içindeki DPAPI eşleşme deposu eklenmiştir. Kalıcı replay
+deposu ve üretim relay migration'ları Aşama 2 ve Aşama 5 içinde
+tamamlanacaktır.
 
 ## 20. Test stratejisi
 
@@ -1047,7 +1064,7 @@ WebCrypto modülünün gerçek Android ve iOS tarayıcılarında da geçmesi zor
 - [x] P-256/HKDF/AES-GCM uçtan uca akışı ve şifreli ACK
 - [x] Relay pair iptali ve PC tarafında özet tabanlı replay koruması
 - [x] İki dakikalık, tek kullanımlık gerçek pairing HTTP ve şifreli karar akışı
-- [ ] Tepsi menüsünden pairing QR gösterimi ve gerçek kullanıcı onayını bağlama
+- [x] Tepsi menüsünden pairing QR gösterimi ve gerçek kullanıcı onayını bağlama
 
 Çıkış ölçütü: Relay logu ve veritabanında URL görünmeden PC onay penceresi açılır.
 
@@ -1059,19 +1076,25 @@ kimlik bilgileri yerine relay üzerinden iki dakikalık ve tek kullanımlık ger
 eşleştirme HTTP akışına geçirildi. Şifreli onay/ret, değiştirme tespiti, süre
 aşımı ve yinelenen istek reddi otomatik testlerle doğrulandı.
 `bridge.local_demo` URL açma aşamasında varsayılan olarak yerel Windows onay
-penceresini kullanır. Aşama 1'in tamamlanması için pairing QR ve onay
-penceresinin tepsi denetleyicisine, PC alıcısının da gerçek `--bridge` yaşam
-döngüsüne bağlanması gerekir.
+penceresini kullanır. Aynı tarihte tepsi **Pair Phone...** işlemi, bellekiçi QR
+üretimi, geri sayım, varsayılan ret seçili onay ve ekranı bir kez okuyan yerel
+sahte pairing telefonu bağlandı. Aşama 1'in tamamlanması için yalnızca PC
+alıcısının gerçek `--bridge` yaşam döngüsüne bağlanması kalmıştır.
 
 ### Aşama 2 — Güvenli depolama
 
-- Windows DPAPI
-- Relay token HMAC depolama
-- Şifreli/özet replay veritabanı
-- Anahtar silme ve pair iptali
+- [x] Relay ve eşleşme kimlik bilgileri için Windows DPAPI
+- [x] Relay token HMAC depolama
+- [ ] Şifreli/özet kalıcı replay veritabanı
+- [ ] Kullanıcı arayüzünden anahtar silme ve pair iptali
 
 Çıkış ölçütü: Uygulama ve PC yeniden başladıktan sonra eşleşme çalışır; anahtarlar
 düz metin dosyada bulunmaz.
+
+DPAPI dosyası ve bozuk/veri değişmiş dosyada fail-closed davranış otomatik ve
+gerçek Windows DPAPI testleriyle doğrulandı. Ancak kalıcı PC alıcısı ve üretim
+relay'i henüz bağlı olmadığından Aşama 2 çıkış ölçütü bütünüyle karşılanmış
+sayılmaz.
 
 ### Aşama 3 — PWA çekirdeği
 
@@ -1175,9 +1198,8 @@ Uygulamaya devam etmeden önce çözülmesi gereken, protokolü bozmayan açık 
 4. Ham güvenlik loglarının kesin saklama süresi ne olacak?
 
 Bu kararlar protokolü değiştirmez. En önemli sonraki iş **Aşama 1'in kalan
-parçası: kısa ömürlü pairing URI'sini gerçek QR olarak tepsi arayüzünde
-göstermek, varsayılan ret kullanan onay penceresini bağlamak ve PC alıcısını
-`--bridge` tepsi yaşam döngüsüne eklemektir.**
+parçası olan PC alıcısını `--bridge` tepsi yaşam döngüsüne eklemek; ardından
+Aşama 3'te manuel URL gönderen ilk PWA çekirdeğini oluşturmaktır.**
 
 ## 24. Resmî teknik referanslar
 

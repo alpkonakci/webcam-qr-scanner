@@ -186,6 +186,26 @@ def create_app(relay_state: RelayState | None = None) -> FastAPI:
             }
         )
 
+    @app.delete("/v1/pairings/{pairing_id}")
+    async def cancel_pairing(
+        pairing_id: str,
+        request: Request,
+    ) -> dict[str, str]:
+        receiver_token = _bearer_token(request.headers.get("authorization"))
+        device_id = routes.device_for_receiver_token(receiver_token)
+        if device_id is None:
+            raise RelayApiError(401, "unauthorized", "Receiver token is invalid.")
+        if not routes.cancel_pairing(
+            device_id=device_id,
+            pairing_id=pairing_id,
+        ):
+            raise RelayApiError(
+                404,
+                "pairing_not_found",
+                "Pairing session was not found.",
+            )
+        return {"status": "cancelled", "pairing_id": pairing_id}
+
     @app.post("/v1/pairings/{pairing_id}/result", status_code=202)
     async def store_pairing_result(
         pairing_id: str,

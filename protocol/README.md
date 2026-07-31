@@ -75,9 +75,10 @@ P-256 public keys use the 65-byte SEC1/X9.62 uncompressed-point encoding
 cryptography API. Private scalars must be in the curve's valid range and are
 never sent.
 
-`relay_origin` is the normalized HTTPS origin only: lowercase scheme and host,
-an explicit non-default port when used, and no path, query, fragment, or
-credentials.
+`relay_origin` is a normalized origin: lowercase scheme and host, an explicit
+non-default port when used, and no path, query, fragment, or credentials.
+Production origins must use HTTPS. Plain HTTP is accepted only for the explicit
+`localhost`, `127.0.0.1`, or `[::1]` development exception.
 
 ## Pairing QR URI
 
@@ -89,10 +90,11 @@ wqrs://pair?v=1&relay=<HTTPS_ORIGIN>&device=<16_BYTES>&pairing=<16_BYTES>&pairin
 
 Parameter names are case-sensitive. A parser must require each listed parameter
 exactly once and reject unknown parameters, a fragment, credentials, a path
-other than the `pair` authority, non-HTTPS relay origins, expired values, or
-incorrect decoded lengths. Query values use UTF-8 percent encoding. The
-`pairing_secret` and pairing relay token are different random values even
-though both are transported inside the short-lived QR.
+other than the `pair` authority, non-HTTPS relay origins outside the exact
+loopback development exception, expired values, or incorrect decoded lengths.
+Query values use UTF-8 percent encoding. The `pairing_secret` and pairing relay
+token are different random values even though both are transported inside the
+short-lived QR.
 
 The deterministic URI in `test-vectors/wqrs-1.json` fixes parameter names,
 ordering, percent encoding, and value encoding for cross-language tests.

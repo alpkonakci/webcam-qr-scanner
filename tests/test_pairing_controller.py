@@ -1,0 +1,192 @@
+from __future__ import annotations
+
+import asyncio
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from bridge.pairing import (
+    submit_phone_pairing_request,
+    wait_for_pc_result,
+)
+from bridge.pairing_controller import (
+    DEVELOPMENT_RELAY_ORIGIN,
+    PairingController,
+    PairingControllerStatus,
+    configured_relay_origin,
+)
+from bridge.protocol import create_phone_pairing_attempt
+from bridge.secure_storage import PairingStore
+from pairing_ui import PairingWindowOutcome
+from tests.test_local_relay import LiveRelay
+
+
+class XorTestProtector:
+    def protect(self, plaintext: bytes) -> bytes:
+        return bytes(value ^ 0x5A for value in plaintext)
+
+    def unprotect(self, ciphertext: bytes) -> bytes:
+        return bytes(value ^ 0x5A for value in ciphertext)
+
+
+class PairingConfigurationTests(unittest.TestCase):
+    def test_loopback_relay_is_the_explicit_development_default(self) -> None:
+        self.assertEqual(configured_relay_origin({}), DEVELOPMENT_RELAY_ORIGIN)
+
+    def test_non_loopback_http_relay_is_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            configured_relay_origin(
+                {"WQRS_RELAY_ORIGIN": "http://relay.example"}
+            )
+
+
+class PairingControllerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_closing_qr_immediately_revokes_relay_session(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = PairingStore(
+                Path(directory) / "phone-to-pc.dat",
+                protector=XorTestProtector(),
+            )
+            async with LiveRelay() as live:
+                controller = PairingController(
+                    relay_origin=live.origin,
+                    store=store,
+                    pc_label="Test PC",
+                )
+                with patch(
+                    "bridge.pairing_controller.show_pairing_qr_window",
+                    return_value=PairingWindowOutcome.CANCELLED,
+                ):
+                    result = await asyncio.to_thread(controller.run)
+
+                self.assertEqual(
+                    result.status,
+                    PairingControllerStatus.CANCELLED,
+                )
+                self.assertEqual(
+                    live.application.state.relay.safe_snapshot()[
+                        "pairing_count"
+                    ],
+                    0,
+                )
+
+    async def test_approval_is_persisted_before_phone_receives_result(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = PairingStore(
+                Path(directory) / "phone-to-pc.dat",
+                protector=XorTestProtector(),
+            )
+            async with LiveRelay() as live:
+                phone_holder = {}
+
+                def fake_window(
+                    pairing_uri,
+                    *,
+                    request_received,
+                    **_,
+                ):
+                    phone = create_phone_pairing_attempt(
+                        pairing_uri,
+                        phone_label="Controller test phone",
+                    )
+                    phone_holder["attempt"] = phone
+                    asyncio.run(submit_phone_pairing_request(phone))
+                    if not request_received.wait(timeout=5):
+                        raise TimeoutError("PC did not receive pairing request")
+                    return PairingWindowOutcome.REQUEST_RECEIVED
+
+                controller = PairingController(
+                    relay_origin=live.origin,
+                    store=store,
+                    pc_label="Test PC",
+                )
+                with (
+                    patch(
+                        "bridge.pairing_controller.show_pairing_qr_window",
+                        side_effect=fake_window,
+                    ),
+                    patch(
+                        "bridge.pairing_controller.confirm_phone_pairing",
+                        return_value=True,
+                    ),
+                ):
+                    result = await asyncio.to_thread(controller.run)
+
+                phone = phone_holder["attempt"]
+                sender = await wait_for_pc_result(
+                    phone,
+                    timeout_seconds=5,
+                )
+                snapshot = store.load()
+
+                self.assertEqual(
+                    result.status,
+                    PairingControllerStatus.APPROVED,
+                )
+                self.assertIsNotNone(sender)
+                self.assertEqual(len(snapshot.devices), 1)
+                self.assertEqual(len(snapshot.pairs), 1)
+                assert sender is not None
+                self.assertEqual(snapshot.pairs[0].pair_id, sender.pair_id)
+                self.assertEqual(snapshot.pairs[0].root_key, sender.root_key)
+
+    async def test_rejection_stores_no_pair_credentials(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = PairingStore(
+                Path(directory) / "phone-to-pc.dat",
+                protector=XorTestProtector(),
+            )
+            async with LiveRelay() as live:
+                phone_holder = {}
+
+                def fake_window(
+                    pairing_uri,
+                    *,
+                    request_received,
+                    **_,
+                ):
+                    phone = create_phone_pairing_attempt(
+                        pairing_uri,
+                        phone_label="Rejected controller phone",
+                    )
+                    phone_holder["attempt"] = phone
+                    asyncio.run(submit_phone_pairing_request(phone))
+                    if not request_received.wait(timeout=5):
+                        raise TimeoutError("PC did not receive pairing request")
+                    return PairingWindowOutcome.REQUEST_RECEIVED
+
+                controller = PairingController(
+                    relay_origin=live.origin,
+                    store=store,
+                    pc_label="Test PC",
+                )
+                with (
+                    patch(
+                        "bridge.pairing_controller.show_pairing_qr_window",
+                        side_effect=fake_window,
+                    ),
+                    patch(
+                        "bridge.pairing_controller.confirm_phone_pairing",
+                        return_value=False,
+                    ),
+                ):
+                    result = await asyncio.to_thread(controller.run)
+
+                sender = await wait_for_pc_result(
+                    phone_holder["attempt"],
+                    timeout_seconds=5,
+                )
+
+                self.assertEqual(
+                    result.status,
+                    PairingControllerStatus.REJECTED,
+                )
+                self.assertIsNone(sender)
+                self.assertEqual(store.load().pairs, ())
+
+
+if __name__ == "__main__":
+    unittest.main()

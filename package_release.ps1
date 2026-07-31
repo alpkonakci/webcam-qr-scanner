@@ -52,6 +52,22 @@ Copy-Item -LiteralPath $pythonLicense `
 
 $sitePackages = Join-Path $projectDirectory ".venv\Lib\site-packages"
 
+function Copy-LicenseTree {
+    param(
+        [Parameter(Mandatory)]
+        [string]$DistributionDirectory,
+        [Parameter(Mandatory)]
+        [string]$DestinationName
+    )
+
+    $source = Join-Path $sitePackages "$DistributionDirectory\licenses"
+    if (-not (Test-Path -LiteralPath $source)) {
+        throw "Dependency license directory not found: $source"
+    }
+    Copy-Item -LiteralPath $source `
+        -Destination (Join-Path $licenseDirectory $DestinationName) -Recurse
+}
+
 $opencvLicenseDirectory = New-Item -ItemType Directory -Path `
     (Join-Path $licenseDirectory "OpenCV") -Force
 Copy-Item -LiteralPath `
@@ -85,6 +101,20 @@ $sixLicenseDirectory = New-Item -ItemType Directory -Path `
 Copy-Item -LiteralPath `
     (Join-Path $sitePackages "six-1.17.0.dist-info\LICENSE") `
     -Destination $sixLicenseDirectory
+
+@(
+    @("anyio-4.14.2.dist-info", "AnyIO"),
+    @("certifi-2026.7.22.dist-info", "certifi"),
+    @("cffi-2.1.0.dist-info", "cffi"),
+    @("cryptography-49.0.0.dist-info", "cryptography"),
+    @("h11-0.16.0.dist-info", "h11"),
+    @("httpcore-1.0.9.dist-info", "httpcore"),
+    @("httpx-0.28.1.dist-info", "HTTPX"),
+    @("idna-3.18.dist-info", "idna"),
+    @("typing_extensions-4.16.0.dist-info", "typing_extensions")
+) | ForEach-Object {
+    Copy-LicenseTree -DistributionDirectory $_[0] -DestinationName $_[1]
+}
 
 $pyInstallerLicenseDirectory = New-Item -ItemType Directory -Path `
     (Join-Path $licenseDirectory "PyInstaller") -Force

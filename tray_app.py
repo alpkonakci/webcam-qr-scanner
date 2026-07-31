@@ -5,17 +5,23 @@ from __future__ import annotations
 import subprocess
 import threading
 from collections.abc import Callable, Sequence
+from enum import Enum
 
 import pystray
 from PIL import Image, ImageDraw
 
-from app_settings import SettingsStore
 from bridge_signals import (
     consume_bridge_exit_request,
     consume_camera_closed,
     consume_open_camera_request,
 )
-from exit_codes import APPLICATION_EXIT_REQUESTED
+from exit_codes import (
+    APPLICATION_EXIT_REQUESTED,
+    CONTROL_EXIT_REQUESTED,
+    CONTROL_PAIR_PHONE,
+    CONTROL_SCAN_CAMERA,
+    CONTROL_SCAN_SCREEN,
+)
 from native_dialogs import (
     MB_ICONWARNING,
     confirm_application_exit,
@@ -29,6 +35,12 @@ APPLICATION_NAME = "QR Scanner"
 TRAY_ICON_NAME = "webcam-qr-scanner"
 CONTROL_POLL_SECONDS = 0.4
 CHILD_EXIT_TIMEOUT_SECONDS = 2.0
+
+
+class ChildRole(Enum):
+    CAMERA = "camera"
+    SCREEN = "screen"
+    HOME = "home"
 
 
 def create_tray_image(size: int = 64) -> Image.Image:
@@ -70,19 +82,21 @@ class TrayApplication:
         *,
         open_camera_on_start: bool = False,
         camera_arguments: Sequence[str] = (),
-        settings_store: SettingsStore | None = None,
         process_spawner: Callable[
             [list[str]],
             subprocess.Popen[bytes],
         ] = spawn_application,
+        pairing_runner: Callable[[], object] | None = None,
     ) -> None:
         self.open_camera_on_start = open_camera_on_start
         self.camera_arguments = tuple(camera_arguments)
-        self.settings_store = settings_store or SettingsStore()
         self.process_spawner = process_spawner
+        self.pairing_runner = pairing_runner or self._default_pairing_runner
         self._stop_event = threading.Event()
         self._children: set[subprocess.Popen[bytes]] = set()
         self._camera_process: subprocess.Popen[bytes] | None = None
+        self._home_process: subprocess.Popen[bytes] | None = None
+        self._pairing_thread: threading.Thread | None = None
         self._children_lock = threading.RLock()
         self.icon = pystray.Icon(
             TRAY_ICON_NAME,
@@ -94,19 +108,20 @@ class TrayApplication:
     def _build_menu(self) -> pystray.Menu:
         return pystray.Menu(
             pystray.MenuItem(
-                "Scan with Camera",
-                self._scan_with_camera,
+                "Open QR Scanner",
+                self._open_home,
                 default=True,
             ),
+            pystray.MenuItem("Scan with Camera", self._scan_with_camera),
             pystray.MenuItem("Scan Screen", self._scan_screen),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
-                "Phone-to-PC: Not paired",
+                "Phone-to-PC: v0.2 development",
                 lambda *_: None,
                 enabled=False,
             ),
             pystray.MenuItem(
-                "Pair Phone... (coming in v0.2)",
+                "Pair Phone...",
                 self._pair_phone,
             ),
             pystray.MenuItem(
@@ -144,28 +159,88 @@ class TrayApplication:
     ) -> None:
         self._launch_camera()
 
+    def _open_home(
+        self,
+        _: pystray.Icon,
+        __: pystray.MenuItem,
+    ) -> None:
+        self._launch_home()
+
     def _scan_screen(
         self,
         _: pystray.Icon,
         __: pystray.MenuItem,
     ) -> None:
-        self._launch_child(["--screen-process", "--desktop"])
+        self._launch_screen()
 
     def _pair_phone(
         self,
         _: pystray.Icon,
         __: pystray.MenuItem,
     ) -> None:
-        show_dialog(
-            "QR Scanner - Pair Phone",
-            (
-                "Phone-to-PC pairing is not enabled in this development "
-                "build yet.\n\n"
-                "The encrypted relay and mobile PWA must be connected and "
-                "tested before this option can be released safely."
-            ),
-            MB_ICONWARNING,
+        self._start_pairing()
+
+    def _start_pairing(self) -> None:
+        with self._children_lock:
+            if (
+                self._pairing_thread is not None
+                and self._pairing_thread.is_alive()
+            ):
+                self._notify(
+                    "A phone pairing window is already open.",
+                    "QR Scanner",
+                )
+                return
+            self._dismiss_home_locked()
+            self._pairing_thread = threading.Thread(
+                target=self._run_pairing,
+                name="phone-pairing",
+                daemon=True,
+            )
+            self._pairing_thread.start()
+
+    def _run_pairing(self) -> None:
+        try:
+            result = self.pairing_runner()
+            status = getattr(getattr(result, "status", None), "value", "")
+            phone_label = getattr(result, "phone_label", None)
+            if status == "approved":
+                self._notify(
+                    f"{phone_label or 'Phone'} was paired securely.",
+                    "QR Scanner",
+                )
+            elif status == "rejected":
+                self._notify(
+                    "The phone pairing request was rejected.",
+                    "QR Scanner",
+                )
+            elif status == "expired":
+                self._notify(
+                    "The pairing code expired. Open Pair Phone to try again.",
+                    "QR Scanner",
+                )
+        except Exception as error:
+            show_dialog(
+                "QR Scanner - Pairing unavailable",
+                _pairing_error_message(error),
+                MB_ICONWARNING,
+            )
+        finally:
+            with self._children_lock:
+                self._pairing_thread = None
+            if not self._stop_event.is_set():
+                self._launch_home()
+
+    def _default_pairing_runner(self) -> object:
+        from bridge.pairing_controller import (
+            PairingController,
+            configured_relay_origin,
         )
+
+        return PairingController(
+            relay_origin=configured_relay_origin(),
+            cancel_event=self._stop_event,
+        ).run()
 
     def _toggle_startup(
         self,
@@ -206,6 +281,7 @@ class TrayApplication:
                 )
                 return
 
+            self._dismiss_home_locked()
             camera_arguments = (
                 self.camera_arguments if arguments is None else tuple(arguments)
             )
@@ -215,23 +291,47 @@ class TrayApplication:
                     "--desktop",
                     *camera_arguments,
                 ],
-                camera=True,
+                role=ChildRole.CAMERA,
+            )
+
+    def _launch_screen(self) -> None:
+        with self._children_lock:
+            self._dismiss_home_locked()
+            self._launch_child(
+                ["--screen-process", "--desktop"],
+                role=ChildRole.SCREEN,
+            )
+
+    def _launch_home(self) -> None:
+        with self._children_lock:
+            if self._stop_event.is_set():
+                return
+            if (
+                self._home_process is not None
+                and self._home_process.poll() is None
+            ):
+                return
+            self._launch_child(
+                ["--home-process"],
+                role=ChildRole.HOME,
             )
 
     def _launch_child(
         self,
         arguments: list[str],
         *,
-        camera: bool = False,
+        role: ChildRole,
     ) -> subprocess.Popen[bytes]:
         process = self.process_spawner(arguments)
         with self._children_lock:
             self._children.add(process)
-            if camera:
+            if role is ChildRole.CAMERA:
                 self._camera_process = process
+            elif role is ChildRole.HOME:
+                self._home_process = process
         threading.Thread(
             target=self._monitor_child,
-            args=(process,),
+            args=(process, role),
             name="scanner-child-monitor",
             daemon=True,
         ).start()
@@ -240,28 +340,48 @@ class TrayApplication:
     def _monitor_child(
         self,
         process: subprocess.Popen[bytes],
+        role: ChildRole,
     ) -> None:
         return_code = process.wait()
         with self._children_lock:
             self._children.discard(process)
             if process is self._camera_process:
                 self._camera_process = None
+            if process is self._home_process:
+                self._home_process = None
         if return_code == APPLICATION_EXIT_REQUESTED:
             self._stop()
-
-    def _show_camera_closed_notice_once(self) -> None:
-        settings = self.settings_store.load()
-        if settings.camera_closed_notice_shown:
             return
-        notification_was_sent = self._notify(
-            (
-                "Camera closed. QR Scanner is still running in the system "
-                "tray. Use the tray icon to scan again or exit completely."
-            ),
-            "QR Scanner",
-        )
-        if notification_was_sent:
-            self.settings_store.update(camera_closed_notice_shown=True)
+        if self._stop_event.is_set():
+            return
+        if role is ChildRole.HOME:
+            self._handle_home_action(return_code)
+        elif role in {ChildRole.CAMERA, ChildRole.SCREEN}:
+            self._launch_home()
+
+    def _handle_home_action(self, return_code: int) -> None:
+        if return_code == CONTROL_SCAN_CAMERA:
+            self._launch_camera()
+            return
+        if return_code == CONTROL_SCAN_SCREEN:
+            self._launch_screen()
+            return
+        if return_code == CONTROL_PAIR_PHONE:
+            self._start_pairing()
+            return
+        if return_code == CONTROL_EXIT_REQUESTED:
+            if confirm_application_exit():
+                self._stop()
+            else:
+                self._launch_home()
+
+    def _dismiss_home_locked(self) -> None:
+        process = self._home_process
+        if process is None:
+            return
+        self._home_process = None
+        if process.poll() is None:
+            process.terminate()
 
     def _notify(self, message: str, title: str) -> bool:
         if not self.icon.HAS_NOTIFICATION:
@@ -281,7 +401,7 @@ class TrayApplication:
             if camera_arguments is not None:
                 self._launch_camera(camera_arguments)
             if consume_camera_closed():
-                self._show_camera_closed_notice_once()
+                self._launch_home()
 
     def _stop(self) -> None:
         if self._stop_event.is_set():
@@ -303,3 +423,29 @@ class TrayApplication:
                 process.wait(timeout=CHILD_EXIT_TIMEOUT_SECONDS)
             except subprocess.TimeoutExpired:
                 process.kill()
+
+
+def _pairing_error_message(error: Exception) -> str:
+    if error.__class__.__module__.startswith(("httpx", "httpcore")):
+        return (
+            "The Phone-to-PC relay could not be reached.\n\n"
+            "This development build uses the local relay by default. Start it "
+            "with:\n\n"
+            "python -m relay.server\n\n"
+            "The public relay and mobile PWA are not available yet."
+        )
+    code = getattr(error, "code", None)
+    if code == "unauthorized":
+        return (
+            "The saved relay registration is no longer valid. Try pairing "
+            "again after restarting the relay."
+        )
+    if error.__class__.__name__ == "SecureStorageError":
+        return (
+            "Windows could not read or save the protected Phone-to-PC "
+            "credentials. No unprotected fallback was used."
+        )
+    return (
+        "Phone-to-PC pairing stopped safely.\n\n"
+        f"Technical reason: {error.__class__.__name__}"
+    )

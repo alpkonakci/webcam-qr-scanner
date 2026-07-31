@@ -23,6 +23,7 @@ echo Building terminal-free QR-Scanner.exe...
     --clean ^
     --onefile ^
     --windowed ^
+    --hidden-import bridge.pairing_controller ^
     --hidden-import pystray._win32 ^
     --name QR-Scanner ^
     launcher.py

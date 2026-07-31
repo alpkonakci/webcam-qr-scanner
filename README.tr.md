@@ -16,11 +16,12 @@ varsayılan tarayıcıda açılır ve QR Scanner otomatik olarak kapanır.
 
 > **Geliştirme durumu:** Güncel kararlı GitHub sürümü `v0.1.1`'dir. Mevcut
 > kaynak kod aşağıda anlatılan `v0.2.0-dev` masaüstü yaşam döngüsü altyapısını
-> ve yalnızca localhost'ta çalışan yalıtılmış Telefon-PC taşıma prototipini de
-> içerir. Kısa ömürlü, tek kullanımlık şifreli eşleştirme akışı artık yerel
-> relay üzerinden çalışır. Kullanıcıya gösterilecek eşleştirme QR'ı, tepsi
-> entegrasyonu, internet relay'i ve mobil PWA henüz çalışır durumda değildir
-> ve yayıma hazır özellikler gibi sunulmaz.
+> ve yalnızca localhost'ta çalışan yalıtılmış Telefon-PC prototipini de içerir.
+> **Pair Phone...** artık tepsiden iki dakikalık, tek kullanımlık bir QR açar;
+> varsayılan seçimi **No** olan PC onayını ister ve onaylanan kimlik bilgilerini
+> Windows DPAPI ile korur. Açık internet relay'i, mobil PWA ve arka plan URL
+> alıcısı henüz çalışır durumda değildir; bu nedenle gerçek telefon bu özelliği
+> kullanamaz ve özellik yayıma hazır değildir.
 
 ## Özellikler
 
@@ -88,11 +89,14 @@ Mevcut kaynak kod ve yerel olarak oluşturulan `v0.2.0-dev` paketi yine tek bir
 - Hafif masaüstü denetleyicisi Windows sistem tepsisinde görünür kalır.
 - Kamera yalnızca kullanıcı istediğinde, ayrı bir süreçte açılır.
 - `Esc`, kamera penceresinin kapatma düğmesi veya başarılı okuma yalnızca
-  kamerayı kapatır. Denetleyici kamerayı kullanmadan tepside kalır.
-- Kamera ilk kez kapandığında uygulamanın tepside kaldığını anlatan tek seferlik
-  bildirim gösterilir.
-- Tepsi menüsünde **Scan with Camera**, **Scan Screen**, **Start with Windows**
-  ve **Exit QR Scanner** seçenekleri bulunur.
+  kamerayı kapatır ve sade kontrol ekranını açar. Denetleyici kamerayı
+  kullanmadan çalışmaya devam eder.
+- Kontrol ekranı, gizli tepsi simgesini bulmayı gerektirmeden **Scan with
+  Camera**, **Scan Computer Screen** ve **Pair a Phone** seçeneklerini sunar.
+- Kontrol ekranını kapatmak uygulamayı tepside çalışır bırakır. Ekrandaki
+  **Exit** işlemi tam kapanmadan önce mevcut onayı korur.
+- Tepsi menüsünde **Open QR Scanner**, doğrudan tarama/eşleştirme işlemleri,
+  **Start with Windows** ve **Exit QR Scanner** seçenekleri bulunur.
 - EXE yeniden açılırsa ikinci bir denetleyici veya ikinci kamera oluşturmak
   yerine mevcut tepsi örneğinden kamera açılması istenir.
 - Kameradayken `Ctrl+Q` veya tepsideki **Exit QR Scanner**, her şeyi durdurmadan
@@ -100,8 +104,11 @@ Mevcut kaynak kod ve yerel olarak oluşturulan `v0.2.0-dev` paketi yine tek bir
 - **Start with Windows** varsayılan kapalıdır; açılırsa Windows oturumunda
   yalnızca denetleyiciyi başlatır, kamerayı açmaz.
 
-Denetleyici şu anda relay'e bağlanmaz ve ağ trafiği göndermez. **Pair Phone**
-seçeneği tepside açıkça gelecek `v0.2` özelliği olarak işaretlidir.
+Denetleyici arka planda Telefon-PC ağ bağlantısı açmaz. Kullanıcının
+**Pair Phone...** seçmesi, yapılandırılmış relay'e açıkça bağlanır ve iki
+dakikalık eşleştirme QR'ını gösterir. Varsayılan geliştirme relay'i
+`127.0.0.1` olduğundan yalnızca aşağıdaki yerel sahte telefon testiyle
+denenebilir. Açık relay ve mobil PWA henüz yoktur.
 
 **Scan Screen** farklı QR kodlar bulursa geliştirme sürümü, algılanan kodları
 çerçeveleyen ve yalnızca bellekte tutulan donmuş ekran görüntüsünü gösterir.
@@ -186,8 +193,12 @@ açık tutar.
 
 ## Yerel Telefon-PC geliştirici demosu
 
-Bu yalnızca geliştirme amaçlı demo, mobil PWA veya açık internet relay'i
-eklenmeden önce ilk şifreli taşıma dilimini doğrular:
+İki ayrı localhost geliştirme kontrolü vardır. İkisi de mobil özellik değildir
+ve yerel ağa ya da internete servis açmaz.
+
+### Otomatik taşıma demosu
+
+Bu komut şifreli eşleştirmeyi ve URL aktarımını tek süreçte doğrular:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
@@ -206,6 +217,32 @@ Test adresini belirlemek için `--url https://example.com`, pencere açmadan tam
 otomatik doğrulama için `--no-dialog` kullanılabilir. Bu demo tamamen aynı
 bilgisayarda çalışır; mobil özellik değildir ve yerel ağa veya internete
 açılmaz.
+
+### Etkileşimli tepsi eşleştirmesi
+
+Bu test gerçek tepsi işlemini, görünür QR'ı, varsayılan ret seçili PC onayını ve
+Windows DPAPI deposunu çalıştırır. Üç PowerShell penceresi kullanın:
+
+```powershell
+# Terminal 1 — yerel geliştirme relay'i
+.\.venv\Scripts\python.exe -m relay.server
+
+# Terminal 2 — masaüstü denetleyicisi
+.\.venv\Scripts\python.exe launcher.py
+
+# Terminal 3 — tepsiden Pair Phone... seçildikten sonra
+.\.venv\Scripts\python.exe -m bridge.fake_pairing_phone --phone-label "Test phone"
+```
+
+Sahte telefon görünür masaüstünü bir kez yakalar, tam olarak bir tane
+`wqrs://pair` QR ister ve ekran görüntüsünü yalnızca bellekte tutar. Eşleştirme
+URI'sini veya herhangi bir gizli değeri panoya ya da terminale yazmaz. PC'de
+onay verildiğinde relay kaydı ve türetilen eşleşme anahtarı
+`%LOCALAPPDATA%\Webcam QR Scanner\phone-to-pc.dat` içine yazılır; dosyanın tamamı
+mevcut Windows kullanıcısı için DPAPI ile korunur. Ret halinde gönderici kimlik
+bilgisi oluşturulmaz. Bellekiçi yerel relay yeniden başlatılırsa rotaları
+geçersiz olur; sonraki eşleştirme yerel cihazı yeniden kaydeder ve eski yerel
+eşleşmeleri kaldırır.
 
 ## Testler
 
@@ -238,6 +275,7 @@ bulunur. Bütünlük kontrolü için ayrıca `SHA256SUMS.txt` üretilir.
 - `app.py`: uygulama akışı ve komut satırı seçenekleri
 - `launcher.py`: hafif kip seçimi ve tek denetleyici başlangıcı
 - `tray_app.py`: sistem tepsisi işlemleri ve alt süreç yaşam döngüsü
+- `home_ui.py`: kamera sonrasında açılan sade kontrol ekranı ve açık işlem seçimi
 - `app_settings.py`: atomik, kullanıcıya özel arayüz tercihleri
 - `bridge_signals.py`: EXE kipleri arasındaki yerel kontrol sinyalleri
 - `windows_startup.py`: isteğe bağlı kullanıcı bazlı Windows başlangıç kaydı
@@ -251,7 +289,9 @@ bulunur. Bütünlük kontrolü için ayrıca `SHA256SUMS.txt` üretilir.
 - `links.py`: güvenli URL sınıflandırma ve tarayıcı açma
 - `performance.py`: isteğe bağlı FPS ölçümü
 - `protocol/`: `wqrs/1` şemaları, test vektörleri ve bağımsız doğrulama araçları
-- `bridge/`: şifreli eşleştirme/mesaj çekirdeği, PC alıcısı, sahte telefon ve yerel demo
+- `bridge/`: şifreli eşleştirme/mesaj çekirdeği, denetleyici, DPAPI deposu,
+  PC alıcısı, sahte telefonlar ve yerel demo
+- `pairing_ui.py`: bellekiçi, iki dakikalık eşleştirme QR penceresi ve geri sayım
 - `relay/`: bellekiçi, yalnızca localhost'ta çalışan FastAPI relay'i
 - `tests/`: otomatik davranış, kamera seçimi ve QR okuyucu testleri
 
@@ -274,14 +314,22 @@ içerikler algılanırsa uygulama otomatik karar vermek yerine kullanıcının g
 QR sınırına tıklamasını ister. Fare yakınlığı yalnızca vurguyu değiştirir ve
 bağlantı açamaz.
 
-Geliştirme sürümündeki sistem tepsisi denetleyicisi kamerayı arka planda
-etkinleştirmez ve relay'e bağlanmaz. **Start with Windows** yalnızca bu
+Geliştirme sürümündeki sistem tepsisi denetleyicisi kamerayı veya Telefon-PC ağ
+bağlantısını arka planda etkinleştirmez. **Start with Windows** yalnızca bu
 uygulamanın mevcut kullanıcıya ait başlangıç kaydını yazar ve ancak kullanıcı
-menü seçeneğini değiştirdiğinde işlem yapar. Ayrı geliştirici relay'i yalnızca
-açık demo komutu çalışırken `127.0.0.1` adresine bağlanır; token'ların HMAC
+menü seçeneğini değiştirdiğinde işlem yapar. Yapılandırılmış relay'e bağlanan
+açık kullanıcı eylemi **Pair Phone...** seçeneğidir. Ayrı geliştirici relay'i
+yalnızca komutu çalışırken `127.0.0.1` adresine bağlanır; token'ların HMAC
 özetleriyle yönlendirme kimliklerini tutar, URL veya mesaj geçmişi tutmaz.
-Gelecekteki üretim Telefon-PC ağ bağlantısı kullanıcı eşleştirmeyi açıkça
-başlatana kadar kapalı kalacaktır.
+
+Eşleştirme QR'ı bellekte üretilir, iki dakika sonra geçersiz olur ve yalnızca bir
+kez kullanılabilir. Pencere kapatılırsa tamamlanmamış relay oturumu anında
+geçersizleştirilir. PC onayı telefon etiketini ve relay'i gösterir, varsayılan
+olarak **No** seçilidir ve ret halinde gönderici kimlik bilgisi oluşturulmaz.
+Onaylanan relay ve eşleşme kimlik bilgileri yalnızca mevcut kullanıcıya bağlı
+Windows DPAPI korumalı dosyada saklanır; uygulamanın düz metin geri dönüşü
+yoktur. Gelecekteki açık relay HTTPS kullanmak zorundadır; loopback dışındaki
+düz HTTP relay adresleri reddedilir.
 
 Uygulama URL şemasını doğrular ancak bir sitenin güvenilir veya zararlı olduğunu
 belirleyemez. Ekrandaki QR bağlantısını açmadan önce onay penceresinde gösterilen
@@ -322,13 +370,14 @@ Ayrıntılı mimari, eşleştirme protokolü, tehdit modeli ve kabul ölçütler
 - [x] P-256/HKDF/AES-GCM vektörlerini doğrulayan Python, bağımsız Node.js ve
   tarayıcı uyumlu WebCrypto kodu
 - [x] Ayrı kamera ve ekran süreçlerine sahip tek EXE masaüstü denetleyicisi
-- [x] Sistem tepsisi, tek seferlik kamera-kapandı bildirimi, isteğe bağlı
-  Windows başlangıcı ve onaylı tam çıkış
+- [x] Sistem tepsisi, kamera sonrası kontrol ekranı, isteğe bağlı Windows
+  başlangıcı ve onaylı tam çıkış
 - [x] Yalnızca arka plan denetleyicisi çalışırken kameranın kapalı kalması
 - [x] Çoklu ekran QR'ları için açık tıkla-seç görünümü
 - [x] Localhost relay ve sahte telefonla ilk şifreli uçtan uca aktarım
 - [x] İki dakikalık, tek kullanımlık ve şifreli onay/ret içeren pairing HTTP akışı
-- [ ] Eşleştirme QR'ını ve onay penceresini tepsi denetleyicisinden gösterme
+- [x] Eşleştirme QR'ını ve varsayılan ret seçili onayı tepsi denetleyicisinden gösterme
+- [x] Onaylanan masaüstü relay ve eşleşme kimlik bilgilerini Windows DPAPI ile koruma
 - [ ] Kalıcı PC alıcısını tepsi denetleyicisine bağlama
 - [ ] PWA, Browser WebCrypto, kamera ve gerçek Android/iOS tarayıcı testleri
 

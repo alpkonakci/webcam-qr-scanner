@@ -5,14 +5,20 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 
-from app_settings import SettingsStore
 from bridge_signals import (
     clear_control_requests,
     request_bridge_exit,
     request_camera_closed,
     request_open_camera,
 )
-from exit_codes import APPLICATION_EXIT_REQUESTED, CAMERA_CLOSED
+from exit_codes import (
+    APPLICATION_EXIT_REQUESTED,
+    CAMERA_CLOSED,
+    CONTROL_EXIT_REQUESTED,
+    CONTROL_PAIR_PHONE,
+    CONTROL_SCAN_CAMERA,
+    CONTROL_SCAN_SCREEN,
+)
 from single_instance import BridgeInstanceGuard
 
 
@@ -24,6 +30,7 @@ def parse_launcher_args(
     parser.add_argument("--open-camera", action="store_true")
     parser.add_argument("--camera-process", action="store_true")
     parser.add_argument("--screen-process", action="store_true")
+    parser.add_argument("--home-process", action="store_true")
     return parser.parse_known_args(argv)
 
 
@@ -41,13 +48,11 @@ def run_bridge(
             return 0
 
         clear_control_requests()
-        settings_store = SettingsStore()
         from tray_app import TrayApplication
 
         TrayApplication(
             open_camera_on_start=open_camera,
             camera_arguments=camera_arguments,
-            settings_store=settings_store,
         ).run()
     return 0
 
@@ -79,6 +84,21 @@ def run_screen(arguments: Sequence[str]) -> int:
     return camera_main(["--screen", *arguments])
 
 
+def run_home() -> int:
+    """Show the lightweight control center in its own GUI process."""
+
+    from home_ui import HomeAction, show_home_window
+
+    action = show_home_window()
+    return {
+        HomeAction.BACKGROUND: 0,
+        HomeAction.SCAN_CAMERA: CONTROL_SCAN_CAMERA,
+        HomeAction.SCAN_SCREEN: CONTROL_SCAN_SCREEN,
+        HomeAction.PAIR_PHONE: CONTROL_PAIR_PHONE,
+        HomeAction.EXIT: CONTROL_EXIT_REQUESTED,
+    }[action]
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args, remaining = parse_launcher_args(argv)
 
@@ -86,6 +106,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_camera(remaining)
     if args.screen_process:
         return run_screen(remaining)
+    if args.home_process:
+        return run_home()
     if args.bridge:
         return run_bridge(
             open_camera=args.open_camera,

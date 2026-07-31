@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -27,6 +29,10 @@ from bridge.protocol import (
 
 
 DEFAULT_POLL_INTERVAL_SECONDS = 0.5
+ReceiverPersistence = Callable[
+    [ReceiverCredentials],
+    None | Awaitable[None],
+]
 
 
 class PairingTransportError(RuntimeError):
@@ -40,6 +46,10 @@ class PairingTransportError(RuntimeError):
 
 class PairingWaitTimeout(TimeoutError):
     """Raised when the local wait ends before the two-minute QR expiry."""
+
+
+class PairingWaitCancelled(RuntimeError):
+    """Raised when the desktop closes an unfinished pairing wait."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,6 +116,7 @@ async def wait_for_phone_request(
     *,
     timeout_seconds: float | None = None,
     poll_interval_seconds: float = DEFAULT_POLL_INTERVAL_SECONDS,
+    cancellation_event: asyncio.Event | None = None,
 ) -> VerifiedPairingRequest:
     """Poll for the encrypted phone request, then authenticate it locally."""
 
@@ -116,8 +127,20 @@ async def wait_for_phone_request(
         expires_at=session.qr.expires_at,
         timeout_seconds=timeout_seconds,
         poll_interval_seconds=poll_interval_seconds,
+        cancellation_event=cancellation_event,
     )
     return decrypt_pairing_request(session, body["envelope"])
+
+
+async def cancel_pc_pairing(session: PcPairingSession) -> None:
+    """Invalidate an unneeded pairing QR immediately at the relay."""
+
+    async with _client(session.qr.relay_origin) as client:
+        response = await client.delete(
+            f"/v1/pairings/{session.qr.pairing_id}",
+            headers=_authorization(session.receiver_token),
+        )
+    _successful_json(response, expected_status=200)
 
 
 async def complete_pc_pairing(
@@ -126,6 +149,7 @@ async def complete_pc_pairing(
     *,
     approved: bool,
     pc_label: str,
+    persist_receiver: ReceiverPersistence | None = None,
 ) -> PcPairingDecision:
     """Publish an encrypted decision and register routing only when approved."""
 
@@ -145,6 +169,11 @@ async def complete_pc_pairing(
     )
     await _register_approved_pair(session, approval)
     try:
+        if persist_receiver is not None:
+            await _run_receiver_persistence(
+                persist_receiver,
+                approval.receiver,
+            )
         await _store_pairing_result(session, approval.result_envelope)
     except Exception:
         await _best_effort_revoke(session, approval.receiver.pair_id)
@@ -154,6 +183,18 @@ async def complete_pc_pairing(
         phone_label=request.phone_label,
         approved=True,
     )
+
+
+async def _run_receiver_persistence(
+    callback: ReceiverPersistence,
+    receiver: ReceiverCredentials,
+) -> None:
+    if inspect.iscoroutinefunction(callback):
+        await callback(receiver)
+        return
+    result = await asyncio.to_thread(callback, receiver)
+    if inspect.isawaitable(result):
+        await result
 
 
 async def wait_for_pc_result(
@@ -227,6 +268,7 @@ async def _poll_for_envelope(
     expires_at: int,
     timeout_seconds: float | None,
     poll_interval_seconds: float,
+    cancellation_event: asyncio.Event | None = None,
 ) -> dict[str, Any]:
     if poll_interval_seconds <= 0:
         raise ValueError("poll interval must be positive")
@@ -239,6 +281,11 @@ async def _poll_for_envelope(
     deadline = time.monotonic() + actual_timeout
     async with _client(origin) as client:
         while True:
+            if (
+                cancellation_event is not None
+                and cancellation_event.is_set()
+            ):
+                raise PairingWaitCancelled("pairing wait was cancelled")
             response = await client.get(path, headers=_authorization(token))
             if response.status_code == 200:
                 body = _successful_json(response, expected_status=200)
@@ -252,12 +299,21 @@ async def _poll_for_envelope(
                 _raise_response_error(response)
             if time.monotonic() >= deadline:
                 raise PairingWaitTimeout("pairing request timed out")
-            await asyncio.sleep(
-                min(
-                    poll_interval_seconds,
-                    max(0.0, deadline - time.monotonic()),
-                )
+            sleep_seconds = min(
+                poll_interval_seconds,
+                max(0.0, deadline - time.monotonic()),
             )
+            if cancellation_event is None:
+                await asyncio.sleep(sleep_seconds)
+                continue
+            try:
+                await asyncio.wait_for(
+                    cancellation_event.wait(),
+                    timeout=sleep_seconds,
+                )
+            except TimeoutError:
+                continue
+            raise PairingWaitCancelled("pairing wait was cancelled")
 
 
 def _client(origin: str) -> httpx.AsyncClient:

@@ -53,8 +53,9 @@ class PairingStateError(RuntimeError):
 class RelayState:
     """Store only routing identifiers and keyed token digests.
 
-    Encrypted envelopes live only in individual request/connection call stacks.
-    They are never appended to this state, an audit list, or a database.
+    URL envelopes live only in individual request/connection call stacks.
+    Opaque pairing envelopes live in their two-minute route only. Neither is
+    appended to an audit list, URL history, or persistent database.
     """
 
     def __init__(self, *, token_pepper: bytes | None = None) -> None:
@@ -194,6 +195,16 @@ class RelayState:
             )
             self._require_active_pairing(route, current_time)
             return copy.deepcopy(route.result_envelope)
+
+    def cancel_pairing(self, *, device_id: str, pairing_id: str) -> bool:
+        """Delete an unfinished pairing route when its PC closes the QR."""
+
+        with self._lock:
+            route = self._pairings.get(pairing_id)
+            if route is None or route.device_id != device_id:
+                return False
+            del self._pairings[pairing_id]
+        return True
 
     def authenticate_receiver(
         self,

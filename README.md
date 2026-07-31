@@ -16,10 +16,11 @@ default browser, and closes the scanner automatically.
 
 > **Development status:** The latest stable GitHub release is `v0.1.1`. The
 > current source also contains the `v0.2.0-dev` desktop lifecycle foundation
-> and an isolated localhost Phone-to-PC transport prototype. Its short-lived,
-> single-use encrypted pairing flow now works through the local relay. The
-> user-facing pairing QR, tray integration, internet relay, and mobile PWA are
-> not functional yet and are not presented as release-ready features.
+> and an isolated localhost Phone-to-PC prototype. **Pair Phone...** now opens a
+> two-minute, single-use QR from the tray, asks for PC approval with **No** as
+> the default, and protects approved credentials with Windows DPAPI. The public
+> internet relay, mobile PWA, and background URL receiver are not functional
+> yet, so a real phone cannot use this feature and it is not release-ready.
 
 ## Features
 
@@ -87,11 +88,14 @@ one `QR-Scanner.exe`, but the executable starts separate internal modes:
 - A lightweight controller stays visible in the Windows system tray.
 - The camera opens only after a user action and runs in a separate process.
 - `Esc`, the camera window's close button, or a successful scan closes only the
-  camera. The controller stays available without using the camera.
-- The first camera close shows a one-time notification explaining that the app
-  is still in the tray.
-- The tray offers **Scan with Camera**, **Scan Screen**, **Start with Windows**,
-  and **Exit QR Scanner**.
+  camera and opens a calm control center. The controller stays available
+  without using the camera.
+- The control center offers **Scan with Camera**, **Scan Computer Screen**, and
+  **Pair a Phone** without requiring the user to find a hidden tray icon.
+- Closing the control center keeps the app available in the tray. Its explicit
+  **Exit** action preserves the existing confirmation before full shutdown.
+- The tray offers **Open QR Scanner**, direct scan/pair actions,
+  **Start with Windows**, and **Exit QR Scanner**.
 - Reopening the EXE asks the existing tray instance to open the camera instead
   of creating a second controller or a second camera window.
 - `Ctrl+Q` in the camera or **Exit QR Scanner** in the tray asks for
@@ -99,8 +103,11 @@ one `QR-Scanner.exe`, but the executable starts separate internal modes:
 - **Start with Windows** is off by default and starts only the controller, not
   the camera.
 
-The controller does not currently connect to a relay or send any network
-traffic. **Pair Phone** is visibly marked as a coming `v0.2` feature.
+The controller does not open a Phone-to-PC network connection in the
+background. Choosing **Pair Phone...** explicitly contacts the configured relay
+and displays a two-minute pairing QR. The default development relay is
+`127.0.0.1`, so it can be exercised only with the local fake-phone test below.
+No public relay or mobile PWA is available yet.
 
 When **Scan Screen** finds different QR codes, the development build shows one
 frozen in-memory preview with every detected code outlined. Moving the pointer
@@ -184,8 +191,12 @@ terminal. `start_qr_scanner.bat` keeps the terminal visible for diagnostics.
 
 ## Local Phone-to-PC developer demo
 
-This development-only demo proves the first encrypted transport slice before a
-mobile PWA or public relay is introduced:
+There are two localhost-only development checks. Neither is the mobile feature,
+and neither exposes a service to the local network or internet.
+
+### Automated transport demo
+
+This command proves the encrypted pairing and URL transport in one process:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
@@ -203,6 +214,31 @@ in memory only until their short session expires.
 Use `--url https://example.com` to choose the test URL or `--no-dialog` for a
 fully automated verification. This demo runs entirely on one computer; it is
 not the mobile feature and is not exposed to the local network or internet.
+
+### Interactive tray pairing
+
+This test exercises the actual tray action, visible QR, default-reject PC
+dialog, and Windows DPAPI storage. Use three PowerShell windows:
+
+```powershell
+# Terminal 1 — local development relay
+.\.venv\Scripts\python.exe -m relay.server
+
+# Terminal 2 — desktop controller
+.\.venv\Scripts\python.exe launcher.py
+
+# Terminal 3 — after choosing Pair Phone... from the tray
+.\.venv\Scripts\python.exe -m bridge.fake_pairing_phone --phone-label "Test phone"
+```
+
+The fake phone captures the currently visible desktop once, requires exactly
+one `wqrs://pair` QR, and keeps the screenshot in memory only. It does not copy
+the pairing URI or any secret to the clipboard or console. Approving on the PC
+stores the relay registration and derived pair key in
+`%LOCALAPPDATA%\Webcam QR Scanner\phone-to-pc.dat`; the entire file is protected
+for the current Windows user by DPAPI. Rejecting creates no sender credentials.
+Restarting the in-memory local relay invalidates its routes, so the next pairing
+re-registers the local device and removes obsolete local pairs.
 
 ## Tests
 
@@ -236,6 +272,7 @@ verification.
 - `app.py`: application flow and command-line options
 - `launcher.py`: lightweight mode selection and single-controller startup
 - `tray_app.py`: system-tray actions and child-process lifecycle
+- `home_ui.py`: calm post-camera control center and explicit action selection
 - `app_settings.py`: atomic per-user interface preferences
 - `bridge_signals.py`: local control signals between executable modes
 - `windows_startup.py`: optional current-user Windows startup entry
@@ -249,7 +286,9 @@ verification.
 - `links.py`: safe URL classification and browser integration
 - `performance.py`: optional FPS measurement
 - `protocol/`: `wqrs/1` schemas, test vectors, and independent verification tools
-- `bridge/`: encrypted pairing/message codecs, PC receiver, fake phone, and local demo
+- `bridge/`: encrypted pairing/message codecs, controller, DPAPI storage, PC receiver,
+  fake phones, and local demo
+- `pairing_ui.py`: in-memory, two-minute pairing QR window and countdown
 - `relay/`: localhost-only FastAPI relay with in-memory opaque routing
 - `tests/`: automated behavior, camera-selection, and QR-reader tests
 
@@ -272,14 +311,21 @@ When different payloads are detected, the application requires the user to
 click a visible QR boundary instead of choosing automatically. Pointer
 proximity changes only the highlight and can never open a link.
 
-The development system-tray controller does not activate the camera in the
-background and does not connect to a relay. **Start with Windows** writes only
+The development system-tray controller does not activate the camera or start
+Phone-to-PC networking in the background. **Start with Windows** writes only
 this application's current-user startup entry and is changed solely after the
-user selects the menu option. The separate developer relay binds only to
-`127.0.0.1` while its explicit demo command is running; it stores token HMAC
-digests and routing IDs, but no URL or message history. Future production
-Phone-to-PC networking will remain off until the user explicitly starts
-pairing.
+user selects the menu option. **Pair Phone...** is the explicit action that
+contacts the configured relay. The separate developer relay binds only to
+`127.0.0.1` while its command is running; it stores token HMAC digests and
+routing IDs, but no URL or message history.
+
+The pairing QR is generated in memory, expires after two minutes, and is
+single-use. Closing it invalidates the unfinished relay session immediately.
+The PC approval dialog shows the phone label and relay, defaults to **No**, and
+rejection creates no sender credentials. Approved relay and pair credentials
+are stored only inside a Windows DPAPI-protected file bound to the current user;
+the application has no plaintext fallback. The future public relay will require
+HTTPS, and non-loopback plain HTTP relay origins are rejected.
 
 The application validates the URL scheme but cannot determine whether a website
 is trustworthy or malicious. Check the hostname shown in the confirmation
@@ -321,13 +367,14 @@ documented in the
 - [x] P-256/HKDF/AES-GCM vectors verified by Python, independent Node.js, and
   browser-compatible WebCrypto code
 - [x] One-EXE desktop controller with separate camera and screen processes
-- [x] System tray, one-time camera-close notice, optional Windows startup, and
+- [x] System tray, post-camera control center, optional Windows startup, and
   confirmed full exit
 - [x] Camera stays off while only the background controller is running
 - [x] Explicit click-to-select overlay for multiple screen QR codes
 - [x] First encrypted end-to-end transfer through a localhost relay and fake phone
 - [x] Two-minute, single-use pairing HTTP flow with encrypted approval/rejection
-- [ ] Show the pairing QR and approval dialog from the tray controller
+- [x] Show the pairing QR and default-reject approval dialog from the tray controller
+- [x] Protect approved desktop relay and pair credentials with Windows DPAPI
 - [ ] Integrate the persistent PC receiver with the tray controller
 - [ ] PWA, Browser WebCrypto, camera, and real Android/iOS browser tests
 

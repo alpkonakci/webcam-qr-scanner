@@ -2,7 +2,12 @@ import unittest
 from unittest.mock import Mock, patch
 
 import launcher
-from exit_codes import APPLICATION_EXIT_REQUESTED, CAMERA_CLOSED
+from exit_codes import (
+    APPLICATION_EXIT_REQUESTED,
+    CAMERA_CLOSED,
+    CONTROL_PAIR_PHONE,
+)
+from home_ui import HomeAction
 
 
 class LauncherTests(unittest.TestCase):
@@ -22,6 +27,15 @@ class LauncherTests(unittest.TestCase):
 
         self.assertEqual(result, 0)
         run_screen.assert_called_once_with(["--desktop"])
+
+    def test_home_process_returns_selected_action_exit_code(self) -> None:
+        with patch(
+            "home_ui.show_home_window",
+            return_value=HomeAction.PAIR_PHONE,
+        ):
+            result = launcher.main(["--home-process"])
+
+        self.assertEqual(result, CONTROL_PAIR_PHONE)
 
     def test_self_test_does_not_emit_camera_lifecycle_signal(self) -> None:
         with patch("launcher.run_camera", return_value=0) as run_camera:
