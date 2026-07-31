@@ -15,12 +15,16 @@ default browser, and closes the scanner automatically.
 ![Webcam QR Scanner usage demo](docs/assets/webcam-qr-scanner-demo.gif)
 
 > **Development status:** The latest stable GitHub release is `v0.1.1`. The
-> current source also contains the `v0.2.0-dev` desktop lifecycle foundation
-> and an isolated localhost Phone-to-PC prototype. **Pair Phone...** now opens a
-> two-minute, single-use QR from the tray, asks for PC approval with **No** as
-> the default, and protects approved credentials with Windows DPAPI. The public
-> internet relay, mobile PWA, and background URL receiver are not functional
-> yet, so a real phone cannot use this feature and it is not release-ready.
+> current source also contains the `v0.2.0-dev` Phone-to-PC implementation.
+> **Pair Phone...** opens a two-minute, single-use QR, the PC approval defaults
+> to **No**, and approved desktop credentials are protected with Windows DPAPI.
+> The install-optional PWA decodes QR codes on-device, performs the matching
+> Browser WebCrypto pairing, stores its root key as a non-extractable CryptoKey,
+> and can send an end-to-end encrypted URL to the persistent tray receiver.
+> The included D1 relay routes only short-lived opaque envelopes and rejects
+> sends while the PC is offline. The public endpoint has not been enabled and
+> real Android Chrome/iOS Safari release tests are still pending, so this is not
+> a stable release yet.
 
 ## Features
 
@@ -103,11 +107,16 @@ one `QR-Scanner.exe`, but the executable starts separate internal modes:
 - **Start with Windows** is off by default and starts only the controller, not
   the camera.
 
-The controller does not open a Phone-to-PC network connection in the
-background. Choosing **Pair Phone...** explicitly contacts the configured relay
-and displays a two-minute pairing QR. The default development relay is
-`127.0.0.1`, so it can be exercised only with the local fake-phone test below.
-No public relay or mobile PWA is available yet.
+If at least one approved phone is stored, the controller keeps a lightweight
+outbound Phone-to-PC receiver alive while the camera stays off. It never opens
+an inbound port. Choosing **Pair Phone...** explicitly contacts the configured
+relay and displays a two-minute pairing QR. The default development relay is
+`127.0.0.1`; a production build must be configured with the public HTTPS relay.
+The PWA can scan that pairing QR, request approval, store a non-extractable root
+key in IndexedDB, and enable **Send to PC**. The PC authenticates and decrypts
+the URL, sends an encrypted delivery receipt, and still asks the user before
+opening the address. The public relay implementation is present but its
+internet endpoint is not enabled yet.
 
 When **Scan Screen** finds different QR codes, the development build shows one
 frozen in-memory preview with every detected code outlined. Moving the pointer
@@ -290,6 +299,7 @@ verification.
   fake phones, and local demo
 - `pairing_ui.py`: in-memory, two-minute pairing QR window and countdown
 - `relay/`: localhost-only FastAPI relay with in-memory opaque routing
+- `pwa/`: install-optional mobile web shell, manifest, service worker, and tests
 - `tests/`: automated behavior, camera-selection, and QR-reader tests
 
 ## Security
@@ -375,8 +385,16 @@ documented in the
 - [x] Two-minute, single-use pairing HTTP flow with encrypted approval/rejection
 - [x] Show the pairing QR and default-reject approval dialog from the tray controller
 - [x] Protect approved desktop relay and pair credentials with Windows DPAPI
-- [ ] Integrate the persistent PC receiver with the tray controller
-- [ ] PWA, Browser WebCrypto, camera, and real Android/iOS browser tests
+- [x] Add the responsive, install-optional PWA shell, manifest, icons, and
+  static-only service worker
+- [x] Add user-initiated camera access, on-device QR decoding, strict URL
+  validation, and the mobile result screen
+- [x] Integrate the persistent PC receiver with the tray controller
+- [x] Add Browser WebCrypto, real browser pairing, and encrypted **Send to PC**
+- [x] Add the D1-backed HTTPS relay API with short-lived opaque envelopes,
+  online heartbeat checks, replay rejection, and encrypted delivery receipts
+- [ ] Enable and security-review the public relay endpoint
+- [ ] Complete real Android Chrome and iOS Safari device tests
 
 ### v0.2.1 — Encrypted queue and reminders
 

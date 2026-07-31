@@ -141,17 +141,18 @@ Relay şunları yapmaz:
 
 ### 5.1 Windows masaüstü alıcısı
 
-Mevcut Python uygulamasına `--bridge` çalışma modu ve sistem tepsisi temeli
-eklenmiştir. Bu masaüstü denetleyicisi kamera açmadan arka planda çalışır.
-Arka planda kendiliğinden relay bağlantısı kurmaz. Kullanıcının **Pair Phone...**
-işlemi yapılandırılmış relay'e bağlanır, iki dakikalık QR gösterir, varsayılan
-ret seçili PC onayını ister ve onaylanan eşleşmeyi DPAPI ile saklar. Kalıcı ağ
-alıcısı aşağıdaki kalan sorumluluklar tamamlanınca ayrıca etkinleştirilecektir.
+Mevcut Python uygulamasına `--bridge` çalışma modu, sistem tepsisi ve kalıcı ağ
+alıcısı eklenmiştir. Denetleyici kamera açmadan arka planda çalışır. Kayıtlı bir
+eşleşme varsa aynı relay cihazına ait telefonları tek dışa doğru bağlantı/poll
+grubunda dinler. Kullanıcının **Pair Phone...** işlemi yapılandırılmış relay'e
+bağlanır, iki dakikalık QR gösterir, varsayılan ret seçili PC onayını ister ve
+onaylanan eşleşmeyi DPAPI ile saklar.
 
 Sorumlulukları:
 
 - PC kimlik anahtarını oluşturmak ve güvenli saklamak;
-- relay'e dışarı doğru `wss://` bağlantısı kurmak;
+- localhost geliştirme relay'ine dışarı doğru `ws://`, üretim HTTPS relay'ine
+  kimlik doğrulamalı kısa `GET` polling istekleri göndermek;
 - eşleştirme QR'ı oluşturmak;
 - eşleştirme isteğini kullanıcıya göstermek;
 - telefon eşleşmelerini listelemek ve iptal etmek;
@@ -241,17 +242,17 @@ paketlenebilir. Kriptografik işlemler için böyle bir fallback yasaktır.
 
 ### 5.3 Relay servisi
 
-Önerilen başlangıç teknolojisi:
+Uygulanan internet relay teknolojisi:
 
-- Python
-- FastAPI
-- Uvicorn
-- PostgreSQL
-- TLS sonlandırma için yönetilen platform veya ters proxy
+- PWA ile aynı Cloudflare Worker içindeki TypeScript API;
+- TLS sağlayan yönetilen Sites dağıtımı;
+- kalıcı yönlendirme durumu ve migration'lar için D1/SQLite;
+- WebSocket/Durable Object zorunluluğu oluşturmayan kısa HTTP polling;
+- yerel protokol testleri için ayrıca localhost FastAPI/WebSocket relay'i.
 
-İlk dağıtım tek relay örneği olabilir. Birden fazla örneğe geçildiğinde çevrimiçi
-PC bağlantılarının yönlendirilmesi için Redis Pub/Sub gibi bir katman gerekir;
-bu, ilk MVP'nin parçası değildir.
+Bu seçim ilk MVP'de ayrı sunucu veya ücretli PostgreSQL zorunluluğunu kaldırır.
+Yük veya gecikme gereksinimi büyürse relay ayrı bir origin ve servis olarak
+taşınabilir; `wqrs/1` içindeki `relay_origin` bağı bunu destekler.
 
 Relay veritabanında yalnızca aşağıdaki kayıtlar bulunur:
 
@@ -684,8 +685,9 @@ ack_key = HKDF-SHA256(
 ```
 
 ACK rastgele 12 bayt nonce kullanır ve `pair_id`, `message_id`, `key_epoch` ile
-süreyi ilişkili veriye bağlar. Relay şifreli ACK'i en fazla 10 saniye bekleyen
-PWA HTTP isteğine döndürür; diske yazmaz.
+süreyi ilişkili veriye bağlar. D1 relay şifreli ACK'i en fazla 10 saniyelik
+ömrü boyunca geçici olarak tutar; PWA kısa polling ile alır ve yerel WebCrypto
+ile doğrular. Relay ACK'i üretemez veya değiştiremez.
 
 ### 11.4 URL kuralları
 
@@ -710,7 +712,7 @@ Kesin OpenAPI dosyası uygulama aşamasında oluşturulacaktır. İlk yüzey:
 | İşlem | Yöntem ve yol | Kimlik doğrulama |
 |---|---|---|
 | PC kaydı | `POST /v1/devices` | İlk kurulum, TLS + hız sınırı |
-| PC bağlantısı | `WSS /v1/devices/{device_id}/connect` | Receiver bearer token |
+| PC heartbeat/mesaj alma | `GET /v1/devices/{device_id}/messages` | Receiver bearer token |
 | Pairing açma | `POST /v1/pairings` | Receiver bearer token |
 | Pairing isteği | `POST /v1/pairings/{pairing_id}/request` | Pairing bearer token |
 | Pairing isteğini alma | `GET /v1/pairings/{pairing_id}/request` | Receiver bearer token |
@@ -719,6 +721,8 @@ Kesin OpenAPI dosyası uygulama aşamasında oluşturulacaktır. İlk yüzey:
 | Pairing sonucunu alma | `GET /v1/pairings/{pairing_id}/result` | Pairing bearer token |
 | Pair onayı kaydı | `POST /v1/pairs` | Receiver bearer token |
 | URL gönderme | `POST /v1/pairs/{pair_id}/messages` | Sender bearer token |
+| Teslim durumunu alma | `GET /v1/pairs/{pair_id}/deliveries/{delivery_id}` | Sender bearer token |
+| Teslim alındısı yazma | `POST /v1/devices/{device_id}/deliveries/{delivery_id}` | Receiver bearer token |
 | Pair iptali | `DELETE /v1/pairs/{pair_id}` | Receiver bearer token |
 | Sağlık kontrolü | `GET /healthz` | Yok, veri içermez |
 
@@ -756,10 +760,11 @@ yerel dile çevirecektir.
 - Eşleştirme QR süresi: 120 saniye
 - Normal mesaj süresi: 300 saniye
 - İzin verilen saat farkı: en fazla 120 saniye
-- Relay teslim bekleme süresi: 10 saniye
-- Pairing result long-poll süresi: en fazla 30 saniye
-- WSS heartbeat: 30 saniye
-- Kaçırılan heartbeat sonrası çevrimdışı: 90 saniye
+- PWA teslim alındısı bekleme üst sınırı: 15 saniye
+- Pairing result polling aralığı: 500 ms
+- PC mesaj/heartbeat polling aralığı: 1 saniye
+- PC çevrimiçi heartbeat eşiği: 15 saniye
+- D1 teslim lease süresi: 8 saniye
 - Mesaj gövdesi üst sınırı: 12 KiB
 
 PC, başarılı kimlik doğrulamadan sonra `message_id` özetini en az 24 saat
@@ -770,7 +775,9 @@ Kayıt yalnızca mesaj kimliği özeti ve sona erme zamanıdır; URL içermez.
 
 ### `v0.2.0`
 
-- PC çevrimdışıysa relay mesajı diske yazmaz.
+- Son PC heartbeat'i 15 saniyeden eskiyse relay mesajı kabul etmez.
+- PC mesaj kabul edildikten hemen sonra bağlantıyı kaybederse yalnızca şifreli
+  zarf, protokoldeki en fazla 300 saniyelik süre dolana kadar D1'da kalabilir.
 - PWA `receiver_offline` sonucu alır.
 - Mevcut ekran URL'yi yalnızca geçici bellekte tutabilir ve **Retry** sunabilir.
 - PWA sekmesi kapatılırsa gönderilmemiş URL'nin korunacağı garanti edilmez.
@@ -1059,7 +1066,7 @@ WebCrypto modülünün gerçek Android ve iOS tarayıcılarında da geçmesi zor
 ### Aşama 1 — Yerel relay ve sahte telefon
 
 - [x] Yalnızca localhost'a bağlanan bellekiçi FastAPI relay iskeleti
-- [ ] PC alıcısını gerçek `--bridge` tepsi yaşam döngüsüne bağlama
+- [x] PC alıcısını gerçek `--bridge` tepsi yaşam döngüsüne bağlama
 - [x] Komut satırından çalışan sahte telefon göndericisi
 - [x] P-256/HKDF/AES-GCM uçtan uca akışı ve şifreli ACK
 - [x] Relay pair iptali ve PC tarafında özet tabanlı replay koruması
@@ -1078,8 +1085,10 @@ aşımı ve yinelenen istek reddi otomatik testlerle doğrulandı.
 `bridge.local_demo` URL açma aşamasında varsayılan olarak yerel Windows onay
 penceresini kullanır. Aynı tarihte tepsi **Pair Phone...** işlemi, bellekiçi QR
 üretimi, geri sayım, varsayılan ret seçili onay ve ekranı bir kez okuyan yerel
-sahte pairing telefonu bağlandı. Aşama 1'in tamamlanması için yalnızca PC
-alıcısının gerçek `--bridge` yaşam döngüsüne bağlanması kalmıştır.
+sahte pairing telefonu bağlandı. 1 Ağustos 2026'da kalıcı alıcı tepsi yaşam
+döngüsüne bağlandı; aynı relay cihazındaki birden fazla eşleşmeyi tek alıcı
+grubunda doğruluyor, HTTPS relay'i polling ile dinliyor ve tarayıcı açılmadan
+önce varsayılan **No** onayını koruyor.
 
 ### Aşama 2 — Güvenli depolama
 
@@ -1092,45 +1101,66 @@ alıcısının gerçek `--bridge` yaşam döngüsüne bağlanması kalmıştır.
 düz metin dosyada bulunmaz.
 
 DPAPI dosyası ve bozuk/veri değişmiş dosyada fail-closed davranış otomatik ve
-gerçek Windows DPAPI testleriyle doğrulandı. Ancak kalıcı PC alıcısı ve üretim
-relay'i henüz bağlı olmadığından Aşama 2 çıkış ölçütü bütünüyle karşılanmış
-sayılmaz.
+gerçek Windows DPAPI testleriyle doğrulandı. Kalıcı PC alıcısı artık kayıtlı
+eşleşmeleri uygulama yeniden açıldığında yükler. Açık internet relay'i henüz
+etkinleştirilmediği ve yeniden başlatma gerçek cihazla sınanmadığı için Aşama 2
+release çıkış ölçütü bütünüyle karşılanmış sayılmaz.
 
 ### Aşama 3 — PWA çekirdeği
 
-- Install-optional PWA uygulama kabuğu ve web manifest
-- Katı CSP ve yalnızca first-party statik asset
-- Browser WebCrypto test vektörleri
-- Pairing ve non-extractable IndexedDB kök anahtarı
-- Önce manuel URL girişiyle şifreli gönderim
-- Çevrimdışı ve uyumsuz tarayıcı hata arayüzü
+- [x] Install-optional PWA uygulama kabuğu ve web manifest
+- [x] Kısıtlayıcı CSP ve yalnızca first-party statik asset
+- [x] Kullanıcı verisini önbelleğe almayan minimal service worker
+- [ ] Üretim öncesinde nonce/hash tabanlı CSP ile `unsafe-inline` bağımlılığını kaldırma
+- [x] Browser WebCrypto test vektörleri
+- [x] Pairing ve non-extractable IndexedDB kök anahtarı
+- [x] QR sonucu üzerinden şifreli gönderim ve doğrulanmış ACK
+- [x] Çevrimdışı ve uyumsuz tarayıcı hata arayüzü
+
+31 Temmuz 2026 tarihinde ilk PWA dilimi eklendi. Mobil uyumlu uygulama kabuğu,
+web manifest, platform ikonları, ana ekrana ekleme yönlendirmesi, yalnızca açık
+statik marka dosyalarını önbelleğe alan service worker ve güvenlik başlığı testleri
+hazırdır. Bu ilk dilim kamera, eşleştirme, URL gönderimi veya relay bağlantısı
+yapmıyordu. 1 Ağustos 2026 tarihli ikinci dilim, kullanıcı eylemiyle açılan
+kamera taramasını ve cihaz üzerinde URL doğrulamasını ekledi. Aynı günkü üçüncü
+dilim gerçek `wqrs/1` pairing, dışa aktarılamayan IndexedDB kök anahtarı,
+şifreli **Send to PC**, ACK doğrulaması ve Miniflare/D1 relay bütünleşme testini
+ekledi. Açık endpoint ve gerçek telefon testleri hâlâ beklemektedir.
 
 Çıkış ölçütü: PWA, localhost üzerinde manuel URL'yi relay üzerinden PC'ye
 uçtan uca şifreli gönderir ve tarayıcı test vektörlerinin tamamını geçer.
 
 ### Aşama 4 — QR tarama ve mobil deneyim
 
-- Kullanıcı eylemiyle kamera izni
-- Cihaz üzerinde QR çözümleme
-- **Open on this phone** ve **Send to PC** seçim ekranı
-- Kamera yaşam döngüsü ve arka plana geçiş temizliği
-- Gerçek Android Chrome testi
-- Gerçek iOS Safari testi
-- Ana ekrana ekleme ve tarayıcı içi kullanım testi
+- [x] Kullanıcı eylemiyle kamera izni
+- [x] Cihaz üzerinde QR çözümleme
+- [x] **Open on this phone** ve eşleşme sonrası etkin **Send to PC** seçim ekranı
+- [x] Kamera yaşam döngüsü ve arka plana geçiş temizliği
+- [ ] Gerçek Android Chrome testi
+- [ ] Gerçek iOS Safari testi
+- [ ] Ana ekrana ekleme ve tarayıcı içi kullanım testi
+
+QR çözümleme için `qr-scanner` 1.4.2 sabit sürümü first-party PWA paketi içinde
+dağıtılır; çalışma anında CDN kullanılmaz. Kütüphane desteklenen tarayıcılarda
+yerleşik `BarcodeDetector` yolunu, diğerlerinde Web Worker tabanlı çözümleyiciyi
+kullanır. Tarama saniyede en fazla 10 analizle sınırlandırılır. QR görüntüsü ağa
+gönderilmez, sonuç sayfa belleğinde tutulur ve kamera görünüm kapanınca veya
+arka plana geçince serbest bırakılır.
 
 Çıkış ölçütü: Her iki hedef mobil tarayıcıdan, uygulama mağazası kurulumu
 olmadan evde açık PC'ye URL gönderilir.
 
 ### Aşama 5 — İnternet relay ve PWA dağıtımı
 
-- TLS
-- PostgreSQL migration
-- Hız ve boyut sınırları
-- Gizli değer yönetimi
-- Sağlık kontrolü ve yedekleme
-- Log redaksiyonu
-- PWA için ayrı statik origin ve dağıtım yetkileri
-- HTTPS, güvenlik başlıkları ve değişmez asset isimleri
+- [x] Yönetilen TLS ve private önizleme dağıtımı
+- [x] D1 şeması ve sürümlü Drizzle migration
+- [x] Hız, gövde boyutu, süre ve çevrimiçi heartbeat sınırları
+- [x] Relay token'larını yalnızca SHA-256 özetleriyle saklama
+- [x] Veri içermeyen sağlık kontrolü
+- [x] URL gövdesini loglamayan relay hata yüzeyi
+- [x] HTTPS, CSP/izin başlıkları ve sürümlü asset isimleri
+- [ ] Hesapsız kullanım için açık endpoint'i etkinleştirme
+- [ ] Production gözlemleme, yedekleme ve bağımsız güvenlik incelemesi
 
 Çıkış ölçütü: Relay URL'yi bilmeden internet üzerinden güvenilir teslim yapar.
 
@@ -1159,16 +1189,16 @@ Sürüm ancak aşağıdakilerin tamamı sağlanırsa hazır sayılır:
 - [ ] Relay URL düz metnini göremiyor
 - [ ] PC çevrimdışıyken relay mesaj saklamıyor
 - [ ] Telefon doğru çevrimdışı sonucunu gösteriyor
-- [ ] PC her gelen URL için varsayılan No ile onay istiyor
-- [ ] Yalnızca HTTP(S) URL kabul ediliyor
-- [ ] Replay, süre aşımı ve pair iptali testleri geçiyor
-- [ ] PC anahtarları Windows DPAPI ile korunuyor
-- [ ] PWA kök anahtarı non-extractable CryptoKey olarak IndexedDB'de tutuluyor
-- [ ] PWA origin/CSP/service worker denetimleri geçiyor
+- [x] PC her gelen URL için varsayılan No ile onay istiyor
+- [x] Yalnızca HTTP(S) URL kabul ediliyor
+- [x] Replay, süre aşımı ve pair iptali testleri geçiyor
+- [x] PC anahtarları Windows DPAPI ile korunuyor
+- [x] PWA kök anahtarı non-extractable CryptoKey olarak IndexedDB'de tutuluyor
+- [x] PWA origin/CSP/service worker denetimleri geçiyor
 - [ ] URL, token ve anahtarlar loglanmıyor
-- [ ] Relay hız ve boyut sınırlarını uyguluyor
-- [ ] Mevcut kamera ve ekran tarama testleri bozulmuyor
-- [ ] Protokol test vektörleri Python ve Browser WebCrypto'da aynı sonucu veriyor
+- [x] Relay hız ve boyut sınırlarını uyguluyor
+- [x] Mevcut kamera ve ekran tarama testleri bozulmuyor
+- [x] Protokol test vektörleri Python ve Browser WebCrypto'da aynı sonucu veriyor
 - [ ] Android Chrome gerçek cihaz akışı baştan sona çalışıyor
 - [ ] iOS Safari gerçek cihaz akışı baştan sona çalışıyor
 - [ ] PWA mağaza kurulumu olmadan tarayıcı içinde kullanılabiliyor
@@ -1193,13 +1223,12 @@ Uygulamaya devam etmeden önce çözülmesi gereken, protokolü bozmayan açık 
 1. Resmî relay hangi hizmette ve hangi bölgede barındırılacak?
 2. PWA statik asset'leri relay'den hangi ayrı origin ve dağıtım hesabında
    barındırılacak?
-3. Yerleşik QR algılama olmayan tarayıcılar için hangi küçük ve denetlenmiş
-   decoder bağımlılığı kullanılacak?
-4. Ham güvenlik loglarının kesin saklama süresi ne olacak?
+3. Ham güvenlik loglarının kesin saklama süresi ne olacak?
 
-Bu kararlar protokolü değiştirmez. En önemli sonraki iş **Aşama 1'in kalan
-parçası olan PC alıcısını `--bridge` tepsi yaşam döngüsüne eklemek; ardından
-Aşama 3'te manuel URL gönderen ilk PWA çekirdeğini oluşturmaktır.**
+Bu kararlar protokolü değiştirmez. En önemli sonraki iş **private önizlemedeki
+PWA/relay dağıtımını açık hesapsız endpoint olarak etkinleştirmeden önce relay
+güvenlik sınırlarını gözden geçirmek; ardından Android Chrome ve iOS Safari'de
+gerçek uçtan uca eşleştirme ve gönderim testlerini tamamlamaktır.**
 
 ## 24. Resmî teknik referanslar
 

@@ -15,13 +15,16 @@ varsayılan tarayıcıda açılır ve QR Scanner otomatik olarak kapanır.
 ![Webcam QR Scanner kullanım videosu](docs/assets/webcam-qr-scanner-demo.gif)
 
 > **Geliştirme durumu:** Güncel kararlı GitHub sürümü `v0.1.1`'dir. Mevcut
-> kaynak kod aşağıda anlatılan `v0.2.0-dev` masaüstü yaşam döngüsü altyapısını
-> ve yalnızca localhost'ta çalışan yalıtılmış Telefon-PC prototipini de içerir.
-> **Pair Phone...** artık tepsiden iki dakikalık, tek kullanımlık bir QR açar;
-> varsayılan seçimi **No** olan PC onayını ister ve onaylanan kimlik bilgilerini
-> Windows DPAPI ile korur. Açık internet relay'i, mobil PWA ve arka plan URL
-> alıcısı henüz çalışır durumda değildir; bu nedenle gerçek telefon bu özelliği
-> kullanamaz ve özellik yayıma hazır değildir.
+> kaynak kod `v0.2.0-dev` Telefon-PC uygulamasını da içerir. **Pair Phone...**
+> iki dakikalık ve tek kullanımlık bir QR açar; PC onayı varsayılan olarak
+> **No** seçilidir ve onaylanan masaüstü bilgileri Windows DPAPI ile korunur.
+> İsteğe bağlı kurulabilen PWA, QR'ı cihazda çözer, aynı Browser WebCrypto
+> eşleştirmesini uygular, kök anahtarı dışa aktarılamayan CryptoKey olarak saklar
+> ve kalıcı tepsi alıcısına uçtan uca şifreli URL gönderebilir. D1 relay yalnızca
+> kısa ömürlü şifreli zarfları yönlendirir ve PC çevrimdışıyken gönderiyi kabul
+> etmez. Açık internet endpoint'i henüz etkinleştirilmedi; gerçek Android Chrome
+> ve iOS Safari sürüm testleri de bekliyor. Bu nedenle özellik kararlı sürüme
+> hazır değildir.
 
 ## Özellikler
 
@@ -104,11 +107,16 @@ Mevcut kaynak kod ve yerel olarak oluşturulan `v0.2.0-dev` paketi yine tek bir
 - **Start with Windows** varsayılan kapalıdır; açılırsa Windows oturumunda
   yalnızca denetleyiciyi başlatır, kamerayı açmaz.
 
-Denetleyici arka planda Telefon-PC ağ bağlantısı açmaz. Kullanıcının
-**Pair Phone...** seçmesi, yapılandırılmış relay'e açıkça bağlanır ve iki
-dakikalık eşleştirme QR'ını gösterir. Varsayılan geliştirme relay'i
-`127.0.0.1` olduğundan yalnızca aşağıdaki yerel sahte telefon testiyle
-denenebilir. Açık relay ve mobil PWA henüz yoktur.
+En az bir onaylı telefon kayıtlıysa denetleyici, kamera kapalı kalırken hafif
+bir dışa doğru Telefon-PC alıcısı çalıştırır; bilgisayarda dışarıya açık port
+oluşturmaz. **Pair Phone...** yapılandırılmış relay'e bağlanır ve iki dakikalık
+eşleştirme QR'ını gösterir. Varsayılan geliştirme relay'i `127.0.0.1`'dir;
+üretim paketi açık HTTPS relay adresiyle yapılandırılmalıdır. PWA bu eşleştirme
+QR'ını okuyabilir, PC onayını isteyebilir, kök anahtarı IndexedDB'de dışa
+aktarılamayan CryptoKey olarak tutabilir ve **Send to PC** seçeneğini açabilir.
+PC URL'yi doğrular ve çözer, şifreli teslim alındısı gönderir; adresi açmadan
+önce yine kullanıcıdan onay ister. Açık relay uygulaması kaynakta hazırdır fakat
+internet endpoint'i henüz etkin değildir.
 
 **Scan Screen** farklı QR kodlar bulursa geliştirme sürümü, algılanan kodları
 çerçeveleyen ve yalnızca bellekte tutulan donmuş ekran görüntüsünü gösterir.
@@ -293,6 +301,7 @@ bulunur. Bütünlük kontrolü için ayrıca `SHA256SUMS.txt` üretilir.
   PC alıcısı, sahte telefonlar ve yerel demo
 - `pairing_ui.py`: bellekiçi, iki dakikalık eşleştirme QR penceresi ve geri sayım
 - `relay/`: bellekiçi, yalnızca localhost'ta çalışan FastAPI relay'i
+- `pwa/`: isteğe bağlı kurulabilen mobil web kabuğu, manifest, service worker ve testler
 - `tests/`: otomatik davranış, kamera seçimi ve QR okuyucu testleri
 
 ## Güvenlik
@@ -378,8 +387,16 @@ Ayrıntılı mimari, eşleştirme protokolü, tehdit modeli ve kabul ölçütler
 - [x] İki dakikalık, tek kullanımlık ve şifreli onay/ret içeren pairing HTTP akışı
 - [x] Eşleştirme QR'ını ve varsayılan ret seçili onayı tepsi denetleyicisinden gösterme
 - [x] Onaylanan masaüstü relay ve eşleşme kimlik bilgilerini Windows DPAPI ile koruma
-- [ ] Kalıcı PC alıcısını tepsi denetleyicisine bağlama
-- [ ] PWA, Browser WebCrypto, kamera ve gerçek Android/iOS tarayıcı testleri
+- [x] Mobil uyumlu, isteğe bağlı kurulabilen PWA kabuğu, manifest, ikonlar ve
+  yalnızca statik dosyaları önbellekleyen service worker
+- [x] Kullanıcı eylemiyle kamera izni, cihaz üzerinde QR çözümleme, katı URL
+  doğrulaması ve mobil sonuç ekranı
+- [x] Kalıcı PC alıcısını tepsi denetleyicisine bağlama
+- [x] Browser WebCrypto, gerçek tarayıcı eşleştirmesi ve şifreli **Send to PC**
+- [x] Kısa ömürlü şifreli zarflar, çevrimiçi heartbeat denetimi, replay reddi
+  ve şifreli teslim alındıları için D1 tabanlı HTTPS relay API'si
+- [ ] Açık relay endpoint'ini etkinleştirme ve güvenlik incelemesini tamamlama
+- [ ] Gerçek Android Chrome ve iOS Safari cihaz testlerini tamamlama
 
 ### v0.2.1 — Şifreli kuyruk ve hatırlatmalar
 

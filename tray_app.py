@@ -15,6 +15,7 @@ from bridge_signals import (
     consume_camera_closed,
     consume_open_camera_request,
 )
+from bridge.receiver_service import ReceiverService
 from exit_codes import (
     APPLICATION_EXIT_REQUESTED,
     CONTROL_EXIT_REQUESTED,
@@ -87,21 +88,28 @@ class TrayApplication:
             subprocess.Popen[bytes],
         ] = spawn_application,
         pairing_runner: Callable[[], object] | None = None,
+        receiver_service: ReceiverService | None = None,
     ) -> None:
         self.open_camera_on_start = open_camera_on_start
         self.camera_arguments = tuple(camera_arguments)
         self.process_spawner = process_spawner
         self.pairing_runner = pairing_runner or self._default_pairing_runner
+        self.receiver_service = receiver_service or ReceiverService()
         self._stop_event = threading.Event()
         self._children: set[subprocess.Popen[bytes]] = set()
         self._camera_process: subprocess.Popen[bytes] | None = None
         self._home_process: subprocess.Popen[bytes] | None = None
         self._pairing_thread: threading.Thread | None = None
         self._children_lock = threading.RLock()
+        pairing_status = (
+            "ready"
+            if self.receiver_service.has_paired_phones()
+            else "not paired"
+        )
         self.icon = pystray.Icon(
             TRAY_ICON_NAME,
             create_tray_image(),
-            f"{APPLICATION_NAME} — Phone-to-PC not paired",
+            f"{APPLICATION_NAME} — Phone-to-PC {pairing_status}",
             self._build_menu(),
         )
 
@@ -140,10 +148,12 @@ class TrayApplication:
             self.icon.run(setup=self._setup)
         finally:
             self._stop_event.set()
+            self.receiver_service.stop()
             self._terminate_children()
 
     def _setup(self, icon: pystray.Icon) -> None:
         icon.visible = True
+        self.receiver_service.start()
         threading.Thread(
             target=self._watch_control_requests,
             name="bridge-control",
@@ -205,6 +215,8 @@ class TrayApplication:
             status = getattr(getattr(result, "status", None), "value", "")
             phone_label = getattr(result, "phone_label", None)
             if status == "approved":
+                self.receiver_service.request_refresh()
+                self.icon.title = f"{APPLICATION_NAME} — Phone-to-PC ready"
                 self._notify(
                     f"{phone_label or 'Phone'} was paired securely.",
                     "QR Scanner",

@@ -177,6 +177,7 @@ class ApprovedPairing:
 class ReceivedUrl:
     """A fully authenticated and locally validated URL message."""
 
+    pair_id: str
     message_id: str
     url: str
     hostname_ascii: str
@@ -852,6 +853,7 @@ def decrypt_url_envelope(
         now=int(time.time()) if now is None else now,
     )
     return ReceivedUrl(
+        pair_id=credentials.pair_id,
         message_id=checked["message_id"],
         url=url,
         hostname_ascii=hostname_ascii,

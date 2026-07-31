@@ -5,9 +5,10 @@ Phone-to-PC Bridge planned for Webcam QR Scanner v0.2.
 
 The protocol is not connected to the stable production application yet. Phase
 0 fixed the wire format and deterministic conformance vectors. The current
-`v0.2.0-dev` source now exercises the same contract through a localhost relay,
-an ephemeral HTTP pairing flow, a fake phone, and the desktop receiver. The
-mobile PWA and public relay are still unimplemented.
+`v0.2.0-dev` source exercises the same contract through the localhost relay,
+the production-shaped D1 relay API, the mobile PWA, and the persistent desktop
+receiver. The public endpoint is not enabled and real-device release testing is
+still pending.
 
 ## Compatibility rules
 

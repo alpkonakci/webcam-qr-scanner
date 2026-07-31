@@ -52,4 +52,14 @@ PyInstaller's Bootloader Exception grants permission to embed its compiled
 bootloader in, and distribute it with, applications under other licenses. It
 does not change the license of the application source code.
 
+## Components included in the PWA
+
+- **qr-scanner 1.4.2** — MIT License; camera lifecycle and on-device QR decoding
+- **@types/offscreencanvas 2019.7.3** — MIT License; type declarations used by
+  `qr-scanner`
+
+The complete PWA license texts are stored under `pwa/THIRD_PARTY_LICENSES/`.
+The decoder is bundled with the first-party application assets and is not
+loaded from a CDN at runtime.
+
 This notice is informational and does not replace any included license text.
