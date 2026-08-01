@@ -34,9 +34,12 @@ from bridge.replay import InMemoryReplayGuard
 from native_dialogs import (
     MB_DEFBUTTON2,
     MB_ICONWARNING,
+    MB_SETFOREGROUND,
+    MB_TOPMOST,
     MB_YESNO,
     confirm_phone_pairing,
     confirm_phone_url,
+    show_dialog,
 )
 
 
@@ -350,6 +353,19 @@ class PhoneToPcUrlValidationTests(unittest.TestCase):
 
 
 class PhoneToPcDialogTests(unittest.TestCase):
+    @patch("native_dialogs.ctypes.windll")
+    def test_native_dialog_is_forced_forward_from_background_threads(
+        self,
+        windll,
+    ) -> None:
+        windll.user32.MessageBoxW.return_value = 7
+
+        show_dialog("QR Scanner", "Question", MB_YESNO)
+
+        style = windll.user32.MessageBoxW.call_args.args[3]
+        self.assertTrue(style & MB_SETFOREGROUND)
+        self.assertTrue(style & MB_TOPMOST)
+
     @patch("native_dialogs.show_dialog", return_value=6)
     def test_confirmation_shows_ascii_host_and_defaults_to_no(
         self,

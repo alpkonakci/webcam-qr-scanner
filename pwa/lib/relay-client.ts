@@ -3,6 +3,7 @@ import {
   buildUrlEnvelope,
   createPhonePairingAttempt,
   decryptPairingResult,
+  parsePairingUri,
   verifyDeliveryAck,
   type SenderCredentials,
 } from "./wqrs";
@@ -54,6 +55,29 @@ export async function pairWithPc(
     await delay(POLL_INTERVAL_MS, signal);
   }
   throw new RelayClientError("pairing_expired", "The pairing code expired. Create a new code on the PC.");
+}
+
+export async function notifyPairingOpened(
+  pairingUri: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  const qr = parsePairingTransport(pairingUri);
+  await relayFetch(
+    `${qr.relayOrigin}/v1/pairings/${qr.pairingId}/opened`,
+    qr.pairingToken,
+    { method: "POST", expectedStatus: 202, signal },
+  );
+}
+
+export async function cancelPairingFromPhone(
+  pairingUri: string,
+): Promise<void> {
+  const qr = parsePairingTransport(pairingUri);
+  await relayFetch(
+    `${qr.relayOrigin}/v1/pairings/${qr.pairingId}/phone-cancel`,
+    qr.pairingToken,
+    { method: "POST", expectedStatus: 202 },
+  );
 }
 
 export async function sendUrlToPc(
@@ -158,6 +182,19 @@ function objectField(value: Record<string, unknown>, name: string): Record<strin
     throw new RelayClientError("invalid_relay_response", "The relay returned an invalid response.");
   }
   return field;
+}
+
+function parsePairingTransport(pairingUri: string): {
+  relayOrigin: string;
+  pairingId: string;
+  pairingToken: string;
+} {
+  const qr = parsePairingUri(pairingUri);
+  return {
+    relayOrigin: qr.relayOrigin,
+    pairingId: qr.pairingId,
+    pairingToken: qr.pairingToken,
+  };
 }
 
 function stringField(value: Record<string, unknown>, name: string): string {

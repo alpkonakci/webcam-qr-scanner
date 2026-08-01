@@ -154,6 +154,36 @@ def create_app(relay_state: RelayState | None = None) -> FastAPI:
             _raise_pairing_api_error(error)
         return {"status": "waiting_for_pc", "pairing_id": pairing_id}
 
+    @app.post("/v1/pairings/{pairing_id}/opened", status_code=202)
+    async def mark_pairing_opened(
+        pairing_id: str,
+        request: Request,
+    ) -> dict[str, str]:
+        pairing_token = _bearer_token(request.headers.get("authorization"))
+        try:
+            routes.mark_pairing_opened(
+                pairing_id=pairing_id,
+                pairing_token=pairing_token,
+            )
+        except PairingStateError as error:
+            _raise_pairing_api_error(error)
+        return {"status": "phone_opened", "pairing_id": pairing_id}
+
+    @app.post("/v1/pairings/{pairing_id}/phone-cancel", status_code=202)
+    async def cancel_pairing_from_phone(
+        pairing_id: str,
+        request: Request,
+    ) -> dict[str, str]:
+        pairing_token = _bearer_token(request.headers.get("authorization"))
+        try:
+            routes.cancel_pairing_from_phone(
+                pairing_id=pairing_id,
+                pairing_token=pairing_token,
+            )
+        except PairingStateError as error:
+            _raise_pairing_api_error(error)
+        return {"status": "phone_cancelled", "pairing_id": pairing_id}
+
     @app.get("/v1/pairings/{pairing_id}/request")
     async def get_pairing_request(
         pairing_id: str,
@@ -171,9 +201,13 @@ def create_app(relay_state: RelayState | None = None) -> FastAPI:
         except PairingStateError as error:
             _raise_pairing_api_error(error)
         if envelope is None:
+            status = routes.pairing_phone_status_for_receiver(
+                device_id=device_id,
+                pairing_id=pairing_id,
+            )
             return JSONResponse(
                 {
-                    "status": "waiting_for_phone",
+                    "status": status,
                     "pairing_id": pairing_id,
                 },
                 status_code=202,
@@ -496,6 +530,7 @@ def _raise_pairing_api_error(error: PairingStateError) -> None:
         "pairing_expired": (410, "Pairing session has expired."),
         "pairing_already_used": (409, "Pairing session was already used."),
         "pairing_request_missing": (409, "Pairing request has not arrived."),
+        "pairing_cancelled": (409, "Pairing session was cancelled by the phone."),
         "invalid_request": (400, "Pairing envelope does not match the session."),
     }
     status_code, message = status_and_message.get(

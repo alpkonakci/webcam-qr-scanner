@@ -129,7 +129,9 @@ async function routeRelayRequest(
   if (method === "POST" && path === "/v1/pairings") {
     return createPairing(request, db);
   }
-  const pairingMatch = path.match(/^\/v1\/pairings\/([A-Za-z0-9_-]{22})(?:\/(request|result))?$/);
+  const pairingMatch = path.match(
+    /^\/v1\/pairings\/([A-Za-z0-9_-]{22})(?:\/(request|result|opened|phone-cancel))?$/,
+  );
   if (pairingMatch) {
     const [, pairingId, action] = pairingMatch;
     if (method === "DELETE" && action === undefined) {
@@ -140,6 +142,12 @@ async function routeRelayRequest(
     }
     if (action === "request" && method === "GET") {
       return getPairingRequest(request, db, pairingId);
+    }
+    if (action === "opened" && method === "POST") {
+      return markPairingOpened(request, db, pairingId);
+    }
+    if (action === "phone-cancel" && method === "POST") {
+      return cancelPairingFromPhone(request, db, pairingId);
     }
     if (action === "result" && method === "POST") {
       return submitPairingResult(request, db, pairingId);
@@ -228,14 +236,17 @@ async function submitPairingRequest(
 ): Promise<Response> {
   const pairing = await phonePairing(request, db, pairingId);
   ensurePairingActive(pairing);
-  if (pairing.request_envelope !== null || pairing.status !== "open") {
+  if (
+    pairing.request_envelope !== null ||
+    !["open", "opened"].includes(pairing.status)
+  ) {
     throw new RelayError(409, "pairing_already_used", "Pairing request was already submitted.");
   }
   const envelope = await readJsonObject(request);
   validatePairingEnvelope(envelope, pairing, "pair_request");
   const result = await db
     .prepare(
-      "UPDATE relay_pairings SET request_envelope = ?, status = 'requested' WHERE pairing_id = ? AND status = 'open' AND request_envelope IS NULL",
+      "UPDATE relay_pairings SET request_envelope = ?, status = 'requested' WHERE pairing_id = ? AND status IN ('open', 'opened') AND request_envelope IS NULL",
     )
     .bind(JSON.stringify(envelope), pairingId)
     .run();
@@ -243,6 +254,44 @@ async function submitPairingRequest(
     throw new RelayError(409, "pairing_already_used", "Pairing request was already submitted.");
   }
   return json({ status: "waiting_for_pc", pairing_id: pairingId }, 202);
+}
+
+async function markPairingOpened(
+  request: Request,
+  db: D1Database,
+  pairingId: string,
+): Promise<Response> {
+  const pairing = await phonePairing(request, db, pairingId);
+  ensurePairingActive(pairing);
+  if (pairing.status === "cancelled_by_phone") {
+    throw new RelayError(409, "pairing_cancelled", "Pairing was cancelled by the phone.");
+  }
+  if (pairing.status === "open") {
+    await db
+      .prepare("UPDATE relay_pairings SET status = 'opened' WHERE pairing_id = ? AND status = 'open'")
+      .bind(pairingId)
+      .run();
+  }
+  return json({ status: "phone_opened", pairing_id: pairingId }, 202);
+}
+
+async function cancelPairingFromPhone(
+  request: Request,
+  db: D1Database,
+  pairingId: string,
+): Promise<Response> {
+  const pairing = await phonePairing(request, db, pairingId);
+  ensurePairingActive(pairing);
+  if (pairing.request_envelope !== null || pairing.status === "requested" || pairing.status === "complete") {
+    throw new RelayError(409, "pairing_already_used", "Pairing request was already submitted.");
+  }
+  await db
+    .prepare(
+      "UPDATE relay_pairings SET status = 'cancelled_by_phone' WHERE pairing_id = ? AND status IN ('open', 'opened', 'cancelled_by_phone')",
+    )
+    .bind(pairingId)
+    .run();
+  return json({ status: "phone_cancelled", pairing_id: pairingId }, 202);
 }
 
 async function getPairingRequest(
@@ -253,7 +302,12 @@ async function getPairingRequest(
   const pairing = await receiverPairing(request, db, pairingId);
   ensurePairingActive(pairing);
   if (pairing.request_envelope === null) {
-    return json({ status: "waiting_for_phone", pairing_id: pairingId }, 202);
+    const status = pairing.status === "cancelled_by_phone"
+      ? "phone_cancelled"
+      : pairing.status === "opened"
+        ? "phone_opened"
+        : "waiting_for_phone";
+    return json({ status, pairing_id: pairingId }, 202);
   }
   return json({ envelope: JSON.parse(pairing.request_envelope) });
 }

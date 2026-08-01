@@ -126,6 +126,11 @@ iPhone-to-Windows encrypted transfer has been verified manually. Broader device
 testing and an independent security review are still required before v0.2 is
 considered stable.
 
+Opening the pairing link sends only a short-lived lifecycle signal so the
+desktop can dismiss the QR window; it does not approve the phone. Incoming URL,
+pairing, and full-exit questions are serialized and brought to the foreground
+so a transient application window cannot cover a security decision.
+
 When **Scan Screen** finds different QR codes, the development build shows one
 frozen in-memory preview with every detected code outlined. Moving the pointer
 highlights the nearest code; only a direct click selects it. `Esc` cancels, and

@@ -716,6 +716,8 @@ Kesin OpenAPI dosyası uygulama aşamasında oluşturulacaktır. İlk yüzey:
 | Pairing açma | `POST /v1/pairings` | Receiver bearer token |
 | Pairing isteği | `POST /v1/pairings/{pairing_id}/request` | Pairing bearer token |
 | Pairing isteğini alma | `GET /v1/pairings/{pairing_id}/request` | Receiver bearer token |
+| Telefon sayfası açıldı | `POST /v1/pairings/{pairing_id}/opened` | Pairing bearer token |
+| Telefon pairing ekranını kapattı | `POST /v1/pairings/{pairing_id}/phone-cancel` | Pairing bearer token |
 | Pairing iptali | `DELETE /v1/pairings/{pairing_id}` | Receiver bearer token |
 | Pairing sonucunu yazma | `POST /v1/pairings/{pairing_id}/result` | Receiver bearer token |
 | Pairing sonucunu alma | `GET /v1/pairings/{pairing_id}/result` | Pairing bearer token |
@@ -762,6 +764,9 @@ yerel dile çevirecektir.
 - İzin verilen saat farkı: en fazla 120 saniye
 - PWA teslim alındısı bekleme üst sınırı: 15 saniye
 - Pairing result polling aralığı: 500 ms
+- Telefonun `opened` sinyali yalnızca geçici QR penceresini kapatır; cihazı
+  doğrulamaz ve pairing onayı yerine geçmez. `phone-cancel` yalnızca henüz
+  kullanılmamış kısa ömürlü oturumu iptal eder.
 - PC mesaj/heartbeat polling aralığı: 1 saniye
 - PC çevrimiçi heartbeat eşiği: 15 saniye
 - D1 teslim lease süresi: 8 saniye

@@ -70,11 +70,13 @@ class PairingController:
         store: PairingStore | None = None,
         pc_label: str | None = None,
         cancel_event: threading.Event | None = None,
+        window_closed_event: threading.Event | None = None,
     ) -> None:
         self.relay_origin = normalize_relay_origin(relay_origin)
         self.store = store or PairingStore()
         self.pc_label = _safe_pc_label(pc_label)
         self.cancel_event = cancel_event
+        self.window_closed_event = window_closed_event
 
     def run(self) -> PairingControllerResult:
         return asyncio.run(self._run())
@@ -88,23 +90,24 @@ class PairingController:
             else build_pairing_launch_url(session.pairing_uri)
         )
         request_received = threading.Event()
+        phone_opened = threading.Event()
         stop_waiting = asyncio.Event()
         request_task = asyncio.create_task(
             wait_for_phone_request(
                 session,
                 cancellation_event=stop_waiting,
+                on_phone_opened=phone_opened.set,
             ),
             name="wait-for-phone-pairing-request",
         )
         window_task = asyncio.create_task(
             asyncio.to_thread(
-                show_pairing_qr_window,
+                self._show_pairing_window,
                 pairing_qr_value,
-                expires_at=session.qr.expires_at,
-                request_received=request_received,
-                cancel_requested=self.cancel_event,
-                relay_origin=self.relay_origin,
-                development_mode=development_mode,
+                session,
+                request_received,
+                phone_opened,
+                development_mode,
             ),
             name="pairing-qr-window",
         )
@@ -114,31 +117,50 @@ class PairingController:
         )
         if window_task in done:
             outcome = window_task.result()
-            stop_waiting.set()
-            with contextlib.suppress(
-                PairingWaitCancelled,
-                PairingWaitTimeout,
-                PairingTransportError,
-            ):
-                await request_task
+            if outcome is not PairingWindowOutcome.PHONE_OPENED:
+                stop_waiting.set()
+                with contextlib.suppress(
+                    PairingWaitCancelled,
+                    PairingWaitTimeout,
+                    PairingTransportError,
+                ):
+                    await request_task
+                await _best_effort_cancel_pairing(session)
+                return PairingControllerResult(
+                    status=(
+                        PairingControllerStatus.EXPIRED
+                        if outcome is PairingWindowOutcome.EXPIRED
+                        else PairingControllerStatus.CANCELLED
+                    )
+                )
+
+        try:
+            request = await request_task
+        except PairingWaitCancelled:
+            request_received.set()
+            if not window_task.done():
+                await window_task
             await _best_effort_cancel_pairing(session)
             return PairingControllerResult(
-                status=(
-                    PairingControllerStatus.EXPIRED
-                    if outcome is PairingWindowOutcome.EXPIRED
-                    else PairingControllerStatus.CANCELLED
-                )
+                status=PairingControllerStatus.CANCELLED
             )
-
-        request_received.set()
-        await window_task
-        try:
-            request = request_task.result()
         except PairingWaitTimeout:
+            request_received.set()
+            if not window_task.done():
+                await window_task
             await _best_effort_cancel_pairing(session)
             return PairingControllerResult(
                 status=PairingControllerStatus.EXPIRED
             )
+        except Exception:
+            request_received.set()
+            if not window_task.done():
+                await window_task
+            raise
+
+        request_received.set()
+        if not window_task.done():
+            await window_task
         approved = await asyncio.to_thread(
             confirm_phone_pairing,
             request.phone_label,
@@ -172,6 +194,28 @@ class PairingController:
             ),
             phone_label=decision.phone_label,
         )
+
+    def _show_pairing_window(
+        self,
+        pairing_qr_value: str,
+        session: PcPairingSession,
+        request_received: threading.Event,
+        phone_opened: threading.Event,
+        development_mode: bool,
+    ) -> PairingWindowOutcome:
+        try:
+            return show_pairing_qr_window(
+                pairing_qr_value,
+                expires_at=session.qr.expires_at,
+                request_received=request_received,
+                cancel_requested=self.cancel_event,
+                relay_origin=self.relay_origin,
+                development_mode=development_mode,
+                phone_opened=phone_opened,
+            )
+        finally:
+            if self.window_closed_event is not None:
+                self.window_closed_event.set()
 
     async def _open_session_with_current_device(self) -> PcPairingSession:
         device = self.store.load().device_for(self.relay_origin)

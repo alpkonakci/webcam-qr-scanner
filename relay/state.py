@@ -40,6 +40,8 @@ class PairingRoute:
     expires_at: int
     request_envelope: dict[str, Any] | None = None
     result_envelope: dict[str, Any] | None = None
+    phone_opened: bool = False
+    phone_cancelled: bool = False
 
 
 class PairingStateError(RuntimeError):
@@ -118,6 +120,8 @@ class RelayState:
                 pairing_token=pairing_token,
             )
             self._require_active_pairing(route, current_time)
+            if route.phone_cancelled:
+                raise PairingStateError("pairing_cancelled")
             if route.request_envelope is not None:
                 raise PairingStateError("pairing_already_used")
             if (
@@ -128,6 +132,68 @@ class RelayState:
                 raise PairingStateError("invalid_request")
             route.request_envelope = copy.deepcopy(envelope)
             return route.device_id
+
+    def mark_pairing_opened(
+        self,
+        *,
+        pairing_id: str,
+        pairing_token: str,
+        now: int | None = None,
+    ) -> None:
+        """Record that the QR holder opened the PWA, without approving it."""
+
+        current_time = int(time.time()) if now is None else now
+        with self._lock:
+            route = self._authenticated_pairing(
+                pairing_id=pairing_id,
+                pairing_token=pairing_token,
+            )
+            self._require_active_pairing(route, current_time)
+            if not route.phone_cancelled:
+                route.phone_opened = True
+
+    def cancel_pairing_from_phone(
+        self,
+        *,
+        pairing_id: str,
+        pairing_token: str,
+        now: int | None = None,
+    ) -> None:
+        """Let the QR holder end an unused session without deleting evidence yet."""
+
+        current_time = int(time.time()) if now is None else now
+        with self._lock:
+            route = self._authenticated_pairing(
+                pairing_id=pairing_id,
+                pairing_token=pairing_token,
+            )
+            self._require_active_pairing(route, current_time)
+            if route.request_envelope is not None:
+                raise PairingStateError("pairing_already_used")
+            route.phone_opened = True
+            route.phone_cancelled = True
+
+    def pairing_phone_status_for_receiver(
+        self,
+        *,
+        device_id: str,
+        pairing_id: str,
+        now: int | None = None,
+    ) -> str:
+        """Return only the short-lived browser lifecycle state to its PC."""
+
+        current_time = int(time.time()) if now is None else now
+        with self._lock:
+            route = self._receiver_pairing(
+                device_id=device_id,
+                pairing_id=pairing_id,
+            )
+            self._require_active_pairing(route, current_time)
+            if route.phone_cancelled:
+                return "phone_cancelled"
+            if route.phone_opened:
+                return "phone_opened"
+            return "waiting_for_phone"
 
     def pairing_request_for_receiver(
         self,

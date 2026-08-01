@@ -11,6 +11,7 @@ import uvicorn
 
 from bridge.fake_phone import DeliveryFailed, FakePhone
 from bridge.pairing import (
+    PairingWaitCancelled,
     complete_pc_pairing,
     open_pc_pairing,
     submit_phone_pairing_request,
@@ -134,8 +135,94 @@ class RelayStateTests(unittest.TestCase):
         self.assertEqual(expired.exception.code, "pairing_expired")
         self.assertNotIn(pairing_token, repr(vars(state)))
 
+    def test_phone_open_and_cancel_are_visible_without_approving_pairing(
+        self,
+    ) -> None:
+        state = RelayState(token_pepper=b"p" * 32)
+        device_id, _ = state.create_device()
+        pairing_id, pairing_token, expires_at = state.create_pairing(
+            device_id=device_id,
+            now=1_000,
+        )
+
+        state.mark_pairing_opened(
+            pairing_id=pairing_id,
+            pairing_token=pairing_token,
+            now=1_000,
+        )
+        self.assertEqual(
+            state.pairing_phone_status_for_receiver(
+                device_id=device_id,
+                pairing_id=pairing_id,
+                now=1_000,
+            ),
+            "phone_opened",
+        )
+
+        state.cancel_pairing_from_phone(
+            pairing_id=pairing_id,
+            pairing_token=pairing_token,
+            now=1_000,
+        )
+        self.assertEqual(
+            state.pairing_phone_status_for_receiver(
+                device_id=device_id,
+                pairing_id=pairing_id,
+                now=1_000,
+            ),
+            "phone_cancelled",
+        )
+        with self.assertRaises(PairingStateError) as cancelled:
+            state.submit_pairing_request(
+                pairing_id=pairing_id,
+                pairing_token=pairing_token,
+                envelope={
+                    "device_id": device_id,
+                    "pairing_id": pairing_id,
+                    "expires_at": expires_at,
+                },
+                now=1_000,
+            )
+        self.assertEqual(cancelled.exception.code, "pairing_cancelled")
+
 
 class LocalRelayEndToEndTests(unittest.IsolatedAsyncioTestCase):
+    async def test_browser_lifecycle_closes_qr_and_cancels_without_pairing(
+        self,
+    ) -> None:
+        async with LiveRelay() as live:
+            device_id, receiver_token = live.application.state.relay.create_device()
+            session = await open_pc_pairing(
+                relay_origin=live.origin,
+                device_id=device_id,
+                receiver_token=receiver_token,
+            )
+            opened = asyncio.Event()
+            wait_task = asyncio.create_task(
+                wait_for_phone_request(
+                    session,
+                    timeout_seconds=5,
+                    poll_interval_seconds=0.02,
+                    on_phone_opened=opened.set,
+                )
+            )
+            headers = {"Authorization": f"Bearer {session.qr.pairing_token}"}
+            async with httpx.AsyncClient(base_url=live.origin, timeout=5) as client:
+                response = await client.post(
+                    f"/v1/pairings/{session.qr.pairing_id}/opened",
+                    headers=headers,
+                )
+                self.assertEqual(response.status_code, 202)
+                await asyncio.wait_for(opened.wait(), timeout=2)
+                response = await client.post(
+                    f"/v1/pairings/{session.qr.pairing_id}/phone-cancel",
+                    headers=headers,
+                )
+                self.assertEqual(response.status_code, 202)
+
+            with self.assertRaises(PairingWaitCancelled):
+                await wait_task
+
     async def test_failed_secure_persistence_revokes_approved_route(
         self,
     ) -> None:

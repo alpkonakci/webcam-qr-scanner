@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 import os
+import threading
 
 
 MB_OK = 0x00
@@ -11,7 +12,12 @@ MB_YESNO = 0x04
 MB_ICONERROR = 0x10
 MB_ICONWARNING = 0x30
 MB_DEFBUTTON2 = 0x100
+MB_SETFOREGROUND = 0x10000
+MB_TOPMOST = 0x40000
 IDYES = 6
+
+
+_DIALOG_LOCK = threading.RLock()
 
 
 def show_dialog(title: str, message: str, style: int = MB_OK) -> int:
@@ -19,7 +25,19 @@ def show_dialog(title: str, message: str, style: int = MB_OK) -> int:
 
     if os.name != "nt":
         return 0
-    return int(ctypes.windll.user32.MessageBoxW(0, message, title, style))
+    # These dialogs are often requested by a tray or receiver thread. Without
+    # foreground flags Windows may place an ownerless message box behind the
+    # home or pairing window. Serializing them also prevents an exit question
+    # and an incoming-link question from covering each other.
+    with _DIALOG_LOCK:
+        return int(
+            ctypes.windll.user32.MessageBoxW(
+                0,
+                message,
+                title,
+                style | MB_SETFOREGROUND | MB_TOPMOST,
+            )
+        )
 
 
 def show_error_dialog(title: str, message: str) -> None:

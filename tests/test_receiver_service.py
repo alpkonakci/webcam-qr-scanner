@@ -98,6 +98,27 @@ class ReceiverServiceTests(unittest.TestCase):
 
         opener.assert_not_called()
 
+    def test_transient_windows_are_dismissed_before_url_confirmation(
+        self,
+    ) -> None:
+        order: list[str] = []
+        service = ReceiverService(
+            before_prompt=lambda: order.append("dismiss"),
+            confirmer=lambda *_, **__: order.append("confirm") or False,
+        )
+
+        service._handle_url(
+            ReceivedUrl(
+                pair_id=self.first_pair.pair_id,
+                message_id=random_b64url(16),
+                url="https://example.com/",
+                hostname_ascii="example.com",
+                is_secure=True,
+            )
+        )
+
+        self.assertEqual(order, ["dismiss", "confirm"])
+
 
 if __name__ == "__main__":
     unittest.main()

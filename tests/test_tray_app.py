@@ -110,6 +110,24 @@ class TrayApplicationTests(unittest.TestCase):
             "QR Scanner",
         )
 
+    def test_incoming_security_dialog_cancels_pairing_window_first(self) -> None:
+        application = self._application()
+        closed = Mock()
+        application._pairing_window_closed = closed
+
+        application._prepare_for_foreground_dialog()
+
+        self.assertTrue(application._pairing_cancel_event.is_set())
+        closed.wait.assert_called_once_with(timeout=1.0)
+
+    def test_full_exit_also_cancels_an_active_pairing_window(self) -> None:
+        application = self._application()
+
+        application._stop()
+
+        self.assertTrue(application._pairing_cancel_event.is_set())
+        self.icon.stop.assert_called_once_with()
+
     @patch("tray_app.threading.Thread")
     def test_home_window_is_single_instance(self, thread_type) -> None:
         process = Mock()

@@ -12,6 +12,8 @@ explicit review note linked from the release work.
 - [ ] HTTPS launch links keep pairing material in the URL fragment, and the PWA
   clears that fragment immediately after local consumption.
 - [ ] Pairing relay tokens are sent only in the Authorization header.
+- [ ] Browser-open and phone-cancel lifecycle signals require the short-lived
+  pairing bearer token and never grant pairing approval.
 - [ ] Relay stores only peppered HMAC token digests.
 - [ ] Relay cannot replace either P-256 public key without AEAD failure.
 - [ ] Replayed pairing requests are rejected.

@@ -30,6 +30,7 @@ DEFAULT_SCREEN_SIZE = (1280, 720)
 
 class PairingWindowOutcome(Enum):
     REQUEST_RECEIVED = "request_received"
+    PHONE_OPENED = "phone_opened"
     CANCELLED = "cancelled"
     EXPIRED = "expired"
 
@@ -176,6 +177,7 @@ def show_pairing_qr_window(
     cancel_requested: threading.Event | None,
     relay_origin: str,
     development_mode: bool,
+    phone_opened: threading.Event | None = None,
 ) -> PairingWindowOutcome:
     """Show one QR until a request arrives, the user exits, or it expires."""
 
@@ -198,6 +200,8 @@ def show_pairing_qr_window(
                 return PairingWindowOutcome.CANCELLED
             if request_received.is_set():
                 return PairingWindowOutcome.REQUEST_RECEIVED
+            if phone_opened is not None and phone_opened.is_set():
+                return PairingWindowOutcome.PHONE_OPENED
 
             remaining = pairing_seconds_remaining(expires_at)
             if remaining <= 0:
@@ -221,7 +225,14 @@ def show_pairing_qr_window(
                 return PairingWindowOutcome.CANCELLED
     finally:
         try:
+            cv2.setWindowProperty(WINDOW_TITLE, cv2.WND_PROP_TOPMOST, 0)
+        except cv2.error:
+            pass
+        try:
             cv2.destroyWindow(WINDOW_TITLE)
+            # Pump one final HighGUI event so the native window is destroyed
+            # before a foreground confirmation dialog is created.
+            cv2.waitKey(1)
         except cv2.error:
             pass
 

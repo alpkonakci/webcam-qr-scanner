@@ -125,6 +125,11 @@ etkindir; iPhone'dan Windows'a tam şifreli aktarım elle doğrulanmıştır. v0
 kararlı sayılmadan önce daha geniş cihaz testleri ve bağımsız güvenlik
 incelemesi tamamlanacaktır.
 
+Eşleştirme bağlantısının açılması yalnızca masaüstünün QR penceresini
+kapatabilmesi için kısa ömürlü bir yaşam döngüsü sinyali gönderir; telefonu
+onaylamaz. Gelen URL, eşleştirme ve tam çıkış soruları sıraya alınır ve geçici
+bir uygulama penceresinin güvenlik kararını örtememesi için öne getirilir.
+
 **Scan Screen** farklı QR kodlar bulursa geliştirme sürümü, algılanan kodları
 çerçeveleyen ve yalnızca bellekte tutulan donmuş ekran görüntüsünü gösterir.
 Fare hareketi en yakın kodu vurgular; yalnızca QR sınırına doğrudan tıklamak

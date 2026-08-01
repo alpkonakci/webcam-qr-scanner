@@ -94,8 +94,13 @@ class TrayApplication:
         self.camera_arguments = tuple(camera_arguments)
         self.process_spawner = process_spawner
         self.pairing_runner = pairing_runner or self._default_pairing_runner
-        self.receiver_service = receiver_service or ReceiverService()
         self._stop_event = threading.Event()
+        self._pairing_cancel_event = threading.Event()
+        self._pairing_window_closed = threading.Event()
+        self._pairing_window_closed.set()
+        self.receiver_service = receiver_service or ReceiverService(
+            before_prompt=self._prepare_for_foreground_dialog,
+        )
         self._children: set[subprocess.Popen[bytes]] = set()
         self._camera_process: subprocess.Popen[bytes] | None = None
         self._home_process: subprocess.Popen[bytes] | None = None
@@ -202,12 +207,19 @@ class TrayApplication:
                 )
                 return
             self._dismiss_home_locked()
+            self._pairing_cancel_event.clear()
+            self._pairing_window_closed.clear()
             self._pairing_thread = threading.Thread(
                 target=self._run_pairing,
                 name="phone-pairing",
                 daemon=True,
             )
             self._pairing_thread.start()
+            threading.Thread(
+                target=self._restore_home_after_pairing_window,
+                name="pairing-window-monitor",
+                daemon=True,
+            ).start()
 
     def _run_pairing(self) -> None:
         try:
@@ -238,6 +250,7 @@ class TrayApplication:
                 MB_ICONWARNING,
             )
         finally:
+            self._pairing_window_closed.set()
             with self._children_lock:
                 self._pairing_thread = None
             if not self._stop_event.is_set():
@@ -251,8 +264,20 @@ class TrayApplication:
 
         return PairingController(
             relay_origin=configured_relay_origin(),
-            cancel_event=self._stop_event,
+            cancel_event=self._pairing_cancel_event,
+            window_closed_event=self._pairing_window_closed,
         ).run()
+
+    def _restore_home_after_pairing_window(self) -> None:
+        self._pairing_window_closed.wait()
+        if not self._stop_event.is_set():
+            self._launch_home()
+
+    def _prepare_for_foreground_dialog(self) -> None:
+        """Dismiss a transient pairing window before a security prompt."""
+
+        self._pairing_cancel_event.set()
+        self._pairing_window_closed.wait(timeout=1.0)
 
     def _toggle_startup(
         self,
@@ -419,6 +444,7 @@ class TrayApplication:
         if self._stop_event.is_set():
             return
         self._stop_event.set()
+        self._pairing_cancel_event.set()
         self.icon.stop()
 
     def _terminate_children(self) -> None:

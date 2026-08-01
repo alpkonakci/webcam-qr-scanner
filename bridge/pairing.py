@@ -117,6 +117,7 @@ async def wait_for_phone_request(
     timeout_seconds: float | None = None,
     poll_interval_seconds: float = DEFAULT_POLL_INTERVAL_SECONDS,
     cancellation_event: asyncio.Event | None = None,
+    on_phone_opened: Callable[[], None] | None = None,
 ) -> VerifiedPairingRequest:
     """Poll for the encrypted phone request, then authenticate it locally."""
 
@@ -128,6 +129,7 @@ async def wait_for_phone_request(
         timeout_seconds=timeout_seconds,
         poll_interval_seconds=poll_interval_seconds,
         cancellation_event=cancellation_event,
+        on_phone_opened=on_phone_opened,
     )
     return decrypt_pairing_request(session, body["envelope"])
 
@@ -269,6 +271,7 @@ async def _poll_for_envelope(
     timeout_seconds: float | None,
     poll_interval_seconds: float,
     cancellation_event: asyncio.Event | None = None,
+    on_phone_opened: Callable[[], None] | None = None,
 ) -> dict[str, Any]:
     if poll_interval_seconds <= 0:
         raise ValueError("poll interval must be positive")
@@ -297,6 +300,12 @@ async def _poll_for_envelope(
                 return body
             if response.status_code != 202:
                 _raise_response_error(response)
+            pending = _successful_json(response, expected_status=202)
+            pending_status = pending.get("status")
+            if pending_status == "phone_cancelled":
+                raise PairingWaitCancelled("pairing was cancelled by the phone")
+            if pending_status == "phone_opened" and on_phone_opened is not None:
+                on_phone_opened()
             if time.monotonic() >= deadline:
                 raise PairingWaitTimeout("pairing request timed out")
             sleep_seconds = min(

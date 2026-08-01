@@ -53,6 +53,16 @@ test("D1 relay routes only opaque envelopes and returns an authenticated receipt
   const pairingId = pairing.body.pairing_id as string;
   const pairingToken = pairing.body.pairing_token as string;
   const expiresAt = pairing.body.expires_at as number;
+  const opened = await request(`/v1/pairings/${pairingId}/opened`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${pairingToken}` },
+  });
+  assert.equal(opened.response.status, 202);
+  const observedOpen = await request(`/v1/pairings/${pairingId}/request`, {
+    headers: receiverHeaders,
+  });
+  assert.equal(observedOpen.response.status, 202);
+  assert.equal(observedOpen.body.status, "phone_opened");
   const phonePublicKey = base64Url(65, 4);
   const pairingRequest = {
     protocol: PROTOCOL,
@@ -77,6 +87,28 @@ test("D1 relay routes only opaque envelopes and returns an authenticated receipt
   });
   assert.equal(receivedPairing.response.status, 200);
   assert.deepEqual(receivedPairing.body.envelope, pairingRequest);
+
+  const cancelledPairing = await request("/v1/pairings", {
+    method: "POST",
+    headers: { ...receiverHeaders, "Content-Type": "application/json" },
+    body: JSON.stringify({ protocol: PROTOCOL }),
+  });
+  const cancelledPairingId = cancelledPairing.body.pairing_id as string;
+  const cancelledPairingToken = cancelledPairing.body.pairing_token as string;
+  const phoneCancelled = await request(
+    `/v1/pairings/${cancelledPairingId}/phone-cancel`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${cancelledPairingToken}` },
+    },
+  );
+  assert.equal(phoneCancelled.response.status, 202);
+  const observedCancellation = await request(
+    `/v1/pairings/${cancelledPairingId}/request`,
+    { headers: receiverHeaders },
+  );
+  assert.equal(observedCancellation.response.status, 202);
+  assert.equal(observedCancellation.body.status, "phone_cancelled");
 
   const pairId = base64Url(16, 21);
   const senderToken = base64Url(32, 23);

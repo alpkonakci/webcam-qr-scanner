@@ -21,6 +21,8 @@ The current PWA milestone includes:
 - normal-camera HTTPS pairing links whose one-time material stays in the URL
   fragment and is cleared from the address bar after local consumption;
 - existing-pair detection with an explicit replacement choice;
+- short-lived browser-open and phone-cancel signals that dismiss the desktop
+  QR without granting pairing approval;
 - non-extractable root-key persistence in IndexedDB;
 - end-to-end encrypted **Send to PC** with an authenticated delivery receipt;
 - automatic camera cleanup when the scanner closes or the page is hidden;

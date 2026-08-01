@@ -1,8 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { defaultPhoneLabel, removePair } from "../lib/pair-store";
-import { pairWithPc } from "../lib/relay-client";
+import {
+  cancelPairingFromPhone,
+  notifyPairingOpened,
+  pairWithPc,
+} from "../lib/relay-client";
 import { parsePairingUri, type SenderCredentials } from "../lib/wqrs";
 
 interface PairingViewProps {
@@ -37,6 +41,18 @@ export function PairingView({
       };
     }
   }, [pairingUri]);
+
+  useEffect(() => {
+    if (!preview.ok) return;
+    const controller = new AbortController();
+    void notifyPairingOpened(pairingUri, controller.signal).catch(() => undefined);
+    return () => controller.abort();
+  }, [pairingUri, preview.ok]);
+
+  const cancelUnusedPairing = async () => {
+    await cancelPairingFromPhone(pairingUri).catch(() => undefined);
+    onCancel();
+  };
 
   const beginPairing = async () => {
     if (!preview.ok || state === "waiting" || !pairStoreReady) return;
@@ -95,7 +111,7 @@ export function PairingView({
           </p>
         </div>
         <div className="result-actions">
-          <button type="button" className="result-primary" onClick={onCancel}>
+          <button type="button" className="result-primary" onClick={cancelUnusedPairing}>
             Continue with {existingPair.pcLabel}
           </button>
           <button
@@ -160,7 +176,7 @@ export function PairingView({
           </button>
         )}
         {state !== "paired" && (
-          <button type="button" className="result-text-button" disabled={state === "waiting"} onClick={onCancel}>
+          <button type="button" className="result-text-button" disabled={state === "waiting"} onClick={cancelUnusedPairing}>
             Cancel
           </button>
         )}

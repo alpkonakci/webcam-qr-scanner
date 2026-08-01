@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import tempfile
+import threading
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 from bridge.pairing import (
     submit_phone_pairing_request,
@@ -51,6 +53,58 @@ class PairingConfigurationTests(unittest.TestCase):
 
 
 class PairingControllerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_phone_open_event_closes_qr_before_confirmation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = PairingStore(
+                Path(directory) / "phone-to-pc.dat",
+                protector=XorTestProtector(),
+            )
+            window_closed = threading.Event()
+
+            async def fake_wait(*_, on_phone_opened, **__):
+                on_phone_opened()
+                return SimpleNamespace(phone_label="Lifecycle phone")
+
+            def fake_window(*_, phone_opened, **__):
+                if not phone_opened.wait(timeout=1):
+                    raise TimeoutError("phone-open event did not reach the QR window")
+                return PairingWindowOutcome.PHONE_OPENED
+
+            async with LiveRelay() as live:
+                controller = PairingController(
+                    relay_origin=live.origin,
+                    store=store,
+                    pc_label="Test PC",
+                    window_closed_event=window_closed,
+                )
+                with (
+                    patch(
+                        "bridge.pairing_controller.wait_for_phone_request",
+                        side_effect=fake_wait,
+                    ),
+                    patch(
+                        "bridge.pairing_controller.show_pairing_qr_window",
+                        side_effect=fake_window,
+                    ),
+                    patch(
+                        "bridge.pairing_controller.confirm_phone_pairing",
+                        return_value=False,
+                    ),
+                    patch(
+                        "bridge.pairing_controller.complete_pc_pairing",
+                        new=AsyncMock(
+                            return_value=SimpleNamespace(
+                                approved=False,
+                                phone_label="Lifecycle phone",
+                            )
+                        ),
+                    ),
+                ):
+                    result = await asyncio.to_thread(controller.run)
+
+            self.assertTrue(window_closed.is_set())
+            self.assertEqual(result.status, PairingControllerStatus.REJECTED)
+
     async def test_closing_qr_immediately_revokes_relay_session(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = PairingStore(
