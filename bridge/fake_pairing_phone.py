@@ -9,6 +9,7 @@ from bridge.pairing import (
     submit_phone_pairing_request,
     wait_for_pc_result,
 )
+from bridge.pairing_links import extract_pairing_uri
 from bridge.protocol import create_phone_pairing_attempt
 from qr_reader import QRReader
 from screen_capture import capture_virtual_screen
@@ -18,11 +19,12 @@ def find_visible_pairing_uri() -> str:
     """Capture once and require exactly one visible WQRS pairing QR."""
 
     frame = capture_virtual_screen()
-    values = {
-        result.data
-        for result in QRReader().scan_all(frame)
-        if result.data.startswith("wqrs://pair?")
-    }
+    values = set()
+    for result in QRReader().scan_all(frame):
+        try:
+            values.add(extract_pairing_uri(result.data))
+        except (TypeError, ValueError):
+            continue
     if not values:
         raise RuntimeError(
             "No pairing QR was found. Keep the Pair Phone window visible."

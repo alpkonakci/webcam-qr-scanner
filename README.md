@@ -113,10 +113,15 @@ an inbound port. Choosing **Pair Phone...** explicitly contacts the configured
 relay and displays a two-minute pairing QR. The v0.2 preview defaults to the
 official public HTTPS relay; local and self-hosted development relays remain
 available through the `WQRS_RELAY_ORIGIN` environment variable.
-The PWA can scan that pairing QR, request approval, store a non-extractable root
-key in IndexedDB, and enable **Send to PC**. The PC authenticates and decrypts
-the URL, sends an encrypted delivery receipt, and still asks the user before
-opening the address. The public beta relay and PWA are enabled, and a complete
+The public pairing QR is an HTTPS launch link that the phone's normal camera
+can open. Its single-use pairing material stays after `#`, is never sent in the
+HTTP request, and is removed from the address bar as soon as the PWA consumes
+it. The PWA requests PC approval, stores a non-extractable root key in IndexedDB,
+and enables **Send to PC**. If the browser is already paired, it offers
+**Continue** or an explicit **Replace pairing** action instead of silently
+creating another local credential. The PC authenticates and decrypts the URL,
+sends an encrypted delivery receipt, and still asks the user before opening the
+address. The public beta relay and PWA are enabled, and a complete
 iPhone-to-Windows encrypted transfer has been verified manually. Broader device
 testing and an independent security review are still required before v0.2 is
 considered stable.
@@ -397,6 +402,8 @@ documented in the
 - [x] Add the D1-backed HTTPS relay API with short-lived opaque envelopes,
   online heartbeat checks, replay rejection, and encrypted delivery receipts
 - [x] Enable the public beta relay and verify one real iPhone-to-Windows flow
+- [x] Let the normal phone camera open a fragment-protected HTTPS pairing link
+- [x] Detect an existing browser pairing before offering explicit replacement
 - [ ] Complete broad Android Chrome and iOS Safari device tests
 - [ ] Complete an independent protocol, cryptography, and deployment review
 

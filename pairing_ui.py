@@ -16,15 +16,15 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 
 WINDOW_TITLE = "QR Scanner - Pair Phone"
-WINDOW_WIDTH = 520
-WINDOW_HEIGHT = 680
+WINDOW_WIDTH = 574
+WINDOW_HEIGHT = 720
 WINDOW_BACKGROUND = "#0B1220"
 PANEL_BACKGROUND = "#111C2E"
 PRIMARY_TEXT = "#F8FAFC"
 SECONDARY_TEXT = "#A7B2C4"
 ACCENT = "#2DD4BF"
 WARNING = "#FBBF24"
-QR_SIZE = 360
+QR_SIZE = 414
 DEFAULT_SCREEN_SIZE = (1280, 720)
 
 
@@ -46,25 +46,35 @@ def pairing_seconds_remaining(
 
 
 def generate_pairing_qr_image(
-    pairing_uri: str,
+    pairing_value: str,
     *,
     size: int = QR_SIZE,
 ) -> Image.Image:
-    """Encode the sensitive URI in memory without using files or clipboard."""
+    """Encode the pairing launch value in memory without files or clipboard."""
 
-    if not pairing_uri:
-        raise ValueError("pairing URI must not be empty")
+    if not pairing_value:
+        raise ValueError("pairing value must not be empty")
     if size < 160:
         raise ValueError("pairing QR image is too small")
 
     encoder = cv2.QRCodeEncoder_create()
-    matrix = encoder.encode(pairing_uri)
+    matrix = encoder.encode(pairing_value)
     if matrix is None or matrix.ndim != 2:
         raise RuntimeError("OpenCV could not encode the pairing QR")
     qr = Image.fromarray(matrix).convert("L")
-    quiet_zone = max(4, qr.width // 16)
-    qr = ImageOps.expand(qr, border=quiet_zone, fill=255)
-    return qr.resize((size, size), Image.Resampling.NEAREST).convert("RGB")
+    qr = ImageOps.expand(qr, border=4, fill=255)
+    module_scale = size // qr.width
+    if module_scale < 1:
+        raise ValueError("pairing QR image is too small for its payload")
+    scaled_size = qr.width * module_scale
+    qr = qr.resize(
+        (scaled_size, scaled_size),
+        Image.Resampling.NEAREST,
+    ).convert("RGB")
+    image = Image.new("RGB", (size, size), "white")
+    offset = (size - scaled_size) // 2
+    image.paste(qr, (offset, offset))
+    return image
 
 
 def build_pairing_canvas(
@@ -96,32 +106,32 @@ def build_pairing_canvas(
     )
     draw.text(
         (28, 58),
-        "Open the Phone-to-PC web app and scan this code.",
+        "Scan this code with your phone camera.",
         font=body_font,
         fill=SECONDARY_TEXT,
     )
 
     draw.rounded_rectangle(
-        (28, 92, WINDOW_WIDTH - 28, 524),
+        (28, 92, WINDOW_WIDTH - 28, 566),
         radius=18,
         fill=PANEL_BACKGROUND,
     )
     qr = qr_image.convert("RGB")
     if qr.size != (QR_SIZE, QR_SIZE):
         qr = qr.resize((QR_SIZE, QR_SIZE), Image.Resampling.NEAREST)
-    canvas.paste(qr, ((WINDOW_WIDTH - QR_SIZE) // 2, 112))
+    canvas.paste(qr, ((WINDOW_WIDTH - QR_SIZE) // 2, 108))
 
     countdown = f"Expires in {max(0, remaining_seconds)} seconds"
     countdown_width = draw.textlength(countdown, font=countdown_font)
     draw.text(
-        ((WINDOW_WIDTH - countdown_width) / 2, 486),
+        ((WINDOW_WIDTH - countdown_width) / 2, 532),
         countdown,
         font=countdown_font,
         fill=ACCENT,
     )
 
     draw.text(
-        (28, 548),
+        (28, 580),
         "Keep this window visible while pairing.",
         font=body_bold_font,
         fill=PRIMARY_TEXT,
@@ -132,7 +142,7 @@ def build_pairing_canvas(
             "The code expires after two minutes and can be used only once. "
             "You will still confirm the device before access is granted."
         ),
-        position=(28, 574),
+        position=(28, 606),
         maximum_width=WINDOW_WIDTH - 56,
         font=detail_font,
         fill=SECONDARY_TEXT,
@@ -147,7 +157,7 @@ def build_pairing_canvas(
     _draw_wrapped_text(
         draw,
         relay_text,
-        position=(28, 630),
+        position=(28, 666),
         maximum_width=WINDOW_WIDTH - 56,
         font=detail_font,
         fill=WARNING if development_mode else SECONDARY_TEXT,
@@ -159,7 +169,7 @@ def build_pairing_canvas(
 
 
 def show_pairing_qr_window(
-    pairing_uri: str,
+    pairing_value: str,
     *,
     expires_at: int,
     request_received: threading.Event,
@@ -169,7 +179,7 @@ def show_pairing_qr_window(
 ) -> PairingWindowOutcome:
     """Show one QR until a request arrives, the user exits, or it expires."""
 
-    qr_image = generate_pairing_qr_image(pairing_uri)
+    qr_image = generate_pairing_qr_image(pairing_value)
     cv2.namedWindow(WINDOW_TITLE, cv2.WINDOW_AUTOSIZE)
     screen_width, screen_height = _primary_screen_size()
     cv2.moveWindow(

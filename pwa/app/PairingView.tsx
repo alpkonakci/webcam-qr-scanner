@@ -1,22 +1,31 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { defaultPhoneLabel } from "../lib/pair-store";
+import { defaultPhoneLabel, removePair } from "../lib/pair-store";
 import { pairWithPc } from "../lib/relay-client";
 import { parsePairingUri, type SenderCredentials } from "../lib/wqrs";
 
 interface PairingViewProps {
   pairingUri: string;
+  existingPair: SenderCredentials | null;
+  pairStoreReady: boolean;
   onPaired(credentials: SenderCredentials): void;
   onCancel(): void;
 }
 
 type PairingState = "ready" | "waiting" | "paired" | "error";
 
-export function PairingView({ pairingUri, onPaired, onCancel }: PairingViewProps) {
+export function PairingView({
+  pairingUri,
+  existingPair,
+  pairStoreReady,
+  onPaired,
+  onCancel,
+}: PairingViewProps) {
   const [phoneLabel, setPhoneLabel] = useState(defaultPhoneLabel);
   const [state, setState] = useState<PairingState>("ready");
   const [message, setMessage] = useState("");
+  const [replaceExisting, setReplaceExisting] = useState(false);
   const preview = useMemo(() => {
     try {
       const qr = parsePairingUri(pairingUri);
@@ -30,11 +39,14 @@ export function PairingView({ pairingUri, onPaired, onCancel }: PairingViewProps
   }, [pairingUri]);
 
   const beginPairing = async () => {
-    if (!preview.ok || state === "waiting") return;
+    if (!preview.ok || state === "waiting" || !pairStoreReady) return;
     setState("waiting");
     setMessage("Approve this phone on your PC while the pairing code is still visible.");
     try {
       const credentials = await pairWithPc(pairingUri, phoneLabel.trim());
+      if (existingPair && existingPair.pairId !== credentials.pairId) {
+        await removePair(existingPair.pairId).catch(() => undefined);
+      }
       onPaired(credentials);
       setState("paired");
       setMessage(`Paired securely with ${credentials.pcLabel}.`);
@@ -54,6 +66,46 @@ export function PairingView({ pairingUri, onPaired, onCancel }: PairingViewProps
           <p className="result-note">No credential was created or stored.</p>
         </div>
         <button type="button" className="result-primary" onClick={onCancel}>Scan again</button>
+      </section>
+    );
+  }
+
+  if (!pairStoreReady) {
+    return (
+      <section className="result-section pairing-section" aria-live="polite">
+        <div className="result-pill pairing-pill">Checking pairing</div>
+        <h1>Preparing secure storage.</h1>
+        <p className="pairing-status">Checking this browser for an existing PC pairing…</p>
+      </section>
+    );
+  }
+
+  if (existingPair && !replaceExisting) {
+    return (
+      <section className="result-section pairing-section" aria-live="polite">
+        <div className="result-pill result-pill-success">Already paired</div>
+        <h1>This browser is already connected.</h1>
+        <div className="result-card pairing-card">
+          <p className="result-label">PAIRED PC</p>
+          <p className="result-hostname">{existingPair.pcLabel}</p>
+          <p className="result-note">
+            Continue using the existing secure pairing. Replace it only if the
+            old connection no longer works or you intend to connect this
+            browser to another PC.
+          </p>
+        </div>
+        <div className="result-actions">
+          <button type="button" className="result-primary" onClick={onCancel}>
+            Continue with {existingPair.pcLabel}
+          </button>
+          <button
+            type="button"
+            className="result-text-button"
+            onClick={() => setReplaceExisting(true)}
+          >
+            Replace pairing
+          </button>
+        </div>
       </section>
     );
   }
@@ -81,6 +133,11 @@ export function PairingView({ pairingUri, onPaired, onCancel }: PairingViewProps
         <p className="result-note">
           The relay sees encrypted data only. Your PC still asks before opening every link.
         </p>
+        {replaceExisting && existingPair && (
+          <p className="pairing-status pairing-status-error">
+            Replacing {existingPair.pcLabel} requires a new approval on the PC.
+          </p>
+        )}
       </div>
 
       {message && (

@@ -6,6 +6,8 @@ import {
   canonicalJson,
   createPhonePairingAttempt,
   decodeBase64Url,
+  encodeBase64Url,
+  pairingUriFromLaunchFragment,
   parsePairingUri,
   verifyDeliveryAck,
   type SenderCredentials,
@@ -34,6 +36,64 @@ test("production pairing parser and crypto accept the committed contract", async
   assert.equal(attempt.requestEnvelope.type, "pair_request");
   assert.equal(attempt.rootKey.extractable, false);
   assert.deepEqual(attempt.rootKey.usages, ["deriveKey"]);
+});
+
+test("HTTPS launch fragments expose only the embedded WQRS value", () => {
+  assert.equal(
+    pairingUriFromLaunchFragment(
+      `#${vector.derived.pairing_uri}`,
+      "https://relay.example",
+    ),
+    vector.derived.pairing_uri,
+  );
+  const rawPublicKey = decodeBase64Url(
+    vector.derived.pairing_transcript.pc_public_key,
+    65,
+    "PC public key",
+  );
+  const compressedPublicKey = new Uint8Array(33);
+  compressedPublicKey[0] = 2 | (rawPublicKey[64] & 1);
+  compressedPublicKey.set(rawPublicKey.slice(1, 33), 1);
+  const compactBytes = new Uint8Array(138);
+  compactBytes[0] = 1;
+  compactBytes.set(decodeBase64Url(vector.inputs.device_id, 16, "device"), 1);
+  compactBytes.set(decodeBase64Url(vector.inputs.pairing_id, 16, "pairing"), 17);
+  compactBytes.set(
+    decodeBase64Url(vector.inputs.pairing_relay_token, 32, "pairing token"),
+    33,
+  );
+  compactBytes.set(compressedPublicKey, 65);
+  compactBytes.set(
+    decodeBase64Url(vector.inputs.pairing_secret, 32, "pairing secret"),
+    98,
+  );
+  new DataView(compactBytes.buffer).setBigUint64(
+    130,
+    BigInt(vector.derived.pairing_transcript.expires_at),
+    false,
+  );
+  const compact = `#p1.${encodeBase64Url(compactBytes)}`;
+  assert.deepEqual(
+    parsePairingUri(
+      pairingUriFromLaunchFragment(compact, "https://relay.example")!,
+      vector.derived.pairing_transcript.expires_at - 60,
+    ),
+    parsePairingUri(
+      vector.derived.pairing_uri,
+      vector.derived.pairing_transcript.expires_at - 60,
+    ),
+  );
+  assert.equal(
+    pairingUriFromLaunchFragment("#not-a-pairing", "https://relay.example"),
+    null,
+  );
+  assert.equal(
+    pairingUriFromLaunchFragment(
+      vector.derived.pairing_uri,
+      "https://relay.example",
+    ),
+    null,
+  );
 });
 
 test("production acknowledgement verifier authenticates the vector", async () => {

@@ -34,6 +34,7 @@ export async function listPairs(): Promise<SenderCredentials[]> {
       .sort((left, right) => right.pairedAt - left.pairedAt)
       .map((record) => ({
         relayOrigin: record.relayOrigin,
+        ...(record.deviceId ? { deviceId: record.deviceId } : {}),
         pairId: record.pairId,
         senderToken: record.senderToken,
         rootKey: record.rootKey,
@@ -114,6 +115,7 @@ function isValidStoredPair(value: unknown): value is StoredPairRecord {
     isBase64Url(record.senderToken, 43) &&
     typeof record.relayOrigin === "string" &&
     record.relayOrigin.startsWith("https://") &&
+    (record.deviceId === undefined || isBase64Url(record.deviceId, 22)) &&
     typeof record.pcLabel === "string" &&
     record.pcLabel.length > 0 &&
     record.pcLabel.length <= 80 &&

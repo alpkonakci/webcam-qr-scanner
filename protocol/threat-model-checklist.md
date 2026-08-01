@@ -9,6 +9,8 @@ explicit review note linked from the release work.
 - [ ] Pairing IDs, secrets, and relay tokens come from the OS CSPRNG.
 - [ ] Pairing QR expires after two minutes and is single-use.
 - [ ] The pairing secret is never sent to or logged by the relay.
+- [ ] HTTPS launch links keep pairing material in the URL fragment, and the PWA
+  clears that fragment immediately after local consumption.
 - [ ] Pairing relay tokens are sent only in the Authorization header.
 - [ ] Relay stores only peppered HMAC token digests.
 - [ ] Relay cannot replace either P-256 public key without AEAD failure.

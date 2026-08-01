@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from bridge.fake_pairing_phone import find_visible_pairing_uri
+from bridge.pairing_links import PUBLIC_SERVICE_ORIGIN
 
 
 class FakePairingPhoneTests(unittest.TestCase):
@@ -38,6 +39,25 @@ class FakePairingPhoneTests(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "Multiple"):
             find_visible_pairing_uri()
+
+    @patch("bridge.fake_pairing_phone.QRReader")
+    @patch("bridge.fake_pairing_phone.capture_virtual_screen")
+    def test_extracts_wqrs_data_from_official_https_fragment(
+        self,
+        capture,
+        reader_type,
+    ) -> None:
+        capture.return_value = Mock()
+        reader_type.return_value.scan_all.return_value = [
+            SimpleNamespace(
+                data=f"{PUBLIC_SERVICE_ORIGIN}/#wqrs://pair?test=one"
+            )
+        ]
+
+        self.assertEqual(
+            find_visible_pairing_uri(),
+            "wqrs://pair?test=one",
+        )
 
 
 if __name__ == "__main__":

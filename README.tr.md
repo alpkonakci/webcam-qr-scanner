@@ -112,13 +112,18 @@ bir dışa doğru Telefon-PC alıcısı çalıştırır; bilgisayarda dışarıy
 oluşturmaz. **Pair Phone...** yapılandırılmış relay'e bağlanır ve iki dakikalık
 eşleştirme QR'ını gösterir. v0.2 önizlemesi varsayılan olarak resmî açık HTTPS
 relay'i kullanır; yerel ve self-hosted geliştirme relay'leri
-`WQRS_RELAY_ORIGIN` ortam değişkeniyle kullanılmaya devam edebilir. PWA bu eşleştirme
-QR'ını okuyabilir, PC onayını isteyebilir, kök anahtarı IndexedDB'de dışa
-aktarılamayan CryptoKey olarak tutabilir ve **Send to PC** seçeneğini açabilir.
-PC URL'yi doğrular ve çözer, şifreli teslim alındısı gönderir; adresi açmadan
-önce yine kullanıcıdan onay ister. Açık beta relay ve PWA etkindir; iPhone'dan
-Windows'a tam şifreli aktarım elle doğrulanmıştır. v0.2 kararlı sayılmadan önce
-daha geniş cihaz testleri ve bağımsız güvenlik incelemesi tamamlanacaktır.
+`WQRS_RELAY_ORIGIN` ortam değişkeniyle kullanılmaya devam edebilir. Açık
+eşleştirme QR'ı, telefonun normal kamerasının açabildiği bir HTTPS bağlantısıdır.
+Tek kullanımlık eşleştirme verisi `#` sonrasında kalır, HTTP isteğiyle sunucuya
+gitmez ve PWA tarafından alındığı anda adres çubuğundan temizlenir. PWA PC
+onayını ister, kök anahtarı IndexedDB'de dışa aktarılamayan CryptoKey olarak
+tutar ve **Send to PC** seçeneğini açar. Tarayıcı zaten eşleştirilmişse sessizce
+ikinci yerel kayıt oluşturmak yerine **Continue** veya açık **Replace pairing**
+seçimi sunulur. PC URL'yi doğrular ve çözer, şifreli teslim alındısı gönderir;
+adresi açmadan önce yine kullanıcıdan onay ister. Açık beta relay ve PWA
+etkindir; iPhone'dan Windows'a tam şifreli aktarım elle doğrulanmıştır. v0.2
+kararlı sayılmadan önce daha geniş cihaz testleri ve bağımsız güvenlik
+incelemesi tamamlanacaktır.
 
 **Scan Screen** farklı QR kodlar bulursa geliştirme sürümü, algılanan kodları
 çerçeveleyen ve yalnızca bellekte tutulan donmuş ekran görüntüsünü gösterir.
@@ -398,6 +403,8 @@ Ayrıntılı mimari, eşleştirme protokolü, tehdit modeli ve kabul ölçütler
 - [x] Kısa ömürlü şifreli zarflar, çevrimiçi heartbeat denetimi, replay reddi
   ve şifreli teslim alındıları için D1 tabanlı HTTPS relay API'si
 - [x] Açık beta relay'i etkinleştirme ve gerçek bir iPhone-Windows akışını doğrulama
+- [x] Normal telefon kamerasının fragment korumalı HTTPS eşleştirme bağlantısını açması
+- [x] Açık değiştirme seçeneğinden önce mevcut tarayıcı eşleşmesini algılama
 - [ ] Geniş Android Chrome ve iOS Safari cihaz testlerini tamamlama
 - [ ] Bağımsız protokol, kriptografi ve dağıtım incelemesini tamamlama
 

@@ -97,6 +97,14 @@ Query values use UTF-8 percent encoding. The `pairing_secret` and pairing relay
 token are different random values even though both are transported inside the
 short-lived QR.
 
+The public desktop preview wraps this URI in a compact HTTPS launch link so a
+phone's normal camera can open the install-free PWA. The compact representation
+contains the same values and reconstructs the exact validated WQRS fields in
+the browser. All pairing material remains after the URL fragment marker (`#`),
+which browsers do not send to the web server, and the PWA removes the fragment
+from the address bar immediately after consuming it. Local protocol tests may
+continue to render the direct `wqrs://` form.
+
 The deterministic URI in `test-vectors/wqrs-1.json` fixes parameter names,
 ordering, percent encoding, and value encoding for cross-language tests.
 

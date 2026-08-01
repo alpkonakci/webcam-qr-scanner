@@ -18,6 +18,9 @@ The current PWA milestone includes:
 - on-device QR decoding with a pinned, locally bundled decoder;
 - strict HTTP/HTTPS URL validation and a result confirmation screen;
 - WQRS/1 pairing with browser-native P-256, HKDF-SHA-256 and AES-256-GCM;
+- normal-camera HTTPS pairing links whose one-time material stays in the URL
+  fragment and is cleared from the address bar after local consumption;
+- existing-pair detection with an explicit replacement choice;
 - non-extractable root-key persistence in IndexedDB;
 - end-to-end encrypted **Send to PC** with an authenticated delivery receipt;
 - automatic camera cleanup when the scanner closes or the page is hidden;

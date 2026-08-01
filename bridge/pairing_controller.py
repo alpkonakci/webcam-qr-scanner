@@ -22,6 +22,10 @@ from bridge.pairing import (
     open_pc_pairing,
     wait_for_phone_request,
 )
+from bridge.pairing_links import (
+    PUBLIC_SERVICE_ORIGIN,
+    build_pairing_launch_url,
+)
 from bridge.protocol import (
     PROTOCOL,
     PcPairingSession,
@@ -38,7 +42,7 @@ from native_dialogs import confirm_phone_pairing
 from pairing_ui import PairingWindowOutcome, show_pairing_qr_window
 
 
-PUBLIC_RELAY_ORIGIN = "https://webcam-qr-scanner-pwa.alpkon.chatgpt.site"
+PUBLIC_RELAY_ORIGIN = PUBLIC_SERVICE_ORIGIN
 LOCAL_DEVELOPMENT_RELAY_ORIGIN = "http://127.0.0.1:8765"
 RELAY_ENVIRONMENT_VARIABLE = "WQRS_RELAY_ORIGIN"
 
@@ -77,6 +81,12 @@ class PairingController:
 
     async def _run(self) -> PairingControllerResult:
         session = await self._open_session_with_current_device()
+        development_mode = _is_loopback_origin(self.relay_origin)
+        pairing_qr_value = (
+            session.pairing_uri
+            if development_mode
+            else build_pairing_launch_url(session.pairing_uri)
+        )
         request_received = threading.Event()
         stop_waiting = asyncio.Event()
         request_task = asyncio.create_task(
@@ -89,12 +99,12 @@ class PairingController:
         window_task = asyncio.create_task(
             asyncio.to_thread(
                 show_pairing_qr_window,
-                session.pairing_uri,
+                pairing_qr_value,
                 expires_at=session.qr.expires_at,
                 request_received=request_received,
                 cancel_requested=self.cancel_event,
                 relay_origin=self.relay_origin,
-                development_mode=_is_loopback_origin(self.relay_origin),
+                development_mode=development_mode,
             ),
             name="pairing-qr-window",
         )

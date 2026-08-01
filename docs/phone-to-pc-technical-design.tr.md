@@ -1146,6 +1146,15 @@ Not: 1 Ağustos 2026'da bir iPhone ile QR tarama, eşleştirme ve **Send to PC**
 akışı başarıyla tamamlandı. Yukarıdaki maddeler tek başarılı örnek yerine geniş
 tarayıcı/sürüm matrisini ifade ettiği için henüz tamamlandı olarak işaretlenmedi.
 
+Gerçek cihaz kabul testinde iPhone'un normal Kamera uygulamasının özel
+`wqrs://` şemasını açmadığı görüldü. Açık beta bu nedenle eşleştirme verisini
+kompakt bir HTTPS bağlantısının fragment bölümünde taşır. Fragment HTTP
+isteğine ve relay loglarına gönderilmez; PWA veriyi aldıktan hemen sonra adres
+çubuğundan temizler ve standart `wqrs/1` alanlarını bellekte yeniden kurup katı
+biçimde doğrular. Aynı tarayıcıda kayıtlı PC varsa yeni kimlik bilgisi sessizce
+oluşturulmaz; kullanıcı mevcut bağlantıyla devam eder veya açıkça değiştirmeyi
+seçer.
+
 QR çözümleme için `qr-scanner` 1.4.2 sabit sürümü first-party PWA paketi içinde
 dağıtılır; çalışma anında CDN kullanılmaz. Kütüphane desteklenen tarayıcılarda
 yerleşik `BarcodeDetector` yolunu, diğerlerinde Web Worker tabanlı çözümleyiciyi

@@ -4,7 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { parseWebUrl } from "../lib/url-policy.mjs";
 import type { WebUrlResult } from "../lib/url-policy.mjs";
 import { getMostRecentPair } from "../lib/pair-store";
-import { isPairingUri, type SenderCredentials } from "../lib/wqrs";
+import {
+  isPairingUri,
+  pairingUriFromLaunchFragment,
+  type SenderCredentials,
+} from "../lib/wqrs";
 import { PairingView } from "./PairingView";
 import { QrResultView } from "./QrResultView";
 import { QrScannerView } from "./QrScannerView";
@@ -33,8 +37,10 @@ export function PwaHome() {
   const [scanResult, setScanResult] = useState<WebUrlResult | null>(null);
   const [pairingUri, setPairingUri] = useState<string | null>(null);
   const [pairedPc, setPairedPc] = useState<SenderCredentials | null>(null);
+  const [pairStoreReady, setPairStoreReady] = useState(false);
 
   useEffect(() => {
+    let active = true;
     const handleInstallPrompt = (event: Event) => {
       event.preventDefault();
       setInstallPrompt(event as InstallPromptEvent);
@@ -56,9 +62,28 @@ export function PwaHome() {
         .catch(() => setServiceWorkerReady(false));
     }
 
-    getMostRecentPair().then(setPairedPc).catch(() => setPairedPc(null));
+    getMostRecentPair()
+      .then(setPairedPc)
+      .catch(() => setPairedPc(null))
+      .finally(() => setPairStoreReady(true));
+
+    const launchPairingUri = pairingUriFromLaunchFragment(
+      window.location.hash,
+      window.location.origin,
+    );
+    if (launchPairingUri) {
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${window.location.pathname}${window.location.search}`,
+      );
+      queueMicrotask(() => {
+        if (active) setPairingUri(launchPairingUri);
+      });
+    }
 
     return () => {
+      active = false;
       window.removeEventListener("beforeinstallprompt", handleInstallPrompt);
       window.removeEventListener("appinstalled", handleInstalled);
     };
@@ -117,6 +142,8 @@ export function PwaHome() {
         {pairingUri ? (
           <PairingView
             pairingUri={pairingUri}
+            existingPair={pairedPc}
+            pairStoreReady={pairStoreReady}
             onPaired={setPairedPc}
             onCancel={() => setPairingUri(null)}
           />

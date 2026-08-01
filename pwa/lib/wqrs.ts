@@ -4,6 +4,11 @@ const PAIRING_TTL_SECONDS = 120;
 const MESSAGE_TTL_SECONDS = 300;
 const ACK_TTL_SECONDS = 10;
 const MAX_CLOCK_SKEW_SECONDS = 120;
+const COMPACT_PAIRING_BYTES = 138;
+const P256_PRIME =
+  (1n << 256n) - (1n << 224n) + (1n << 192n) + (1n << 96n) - 1n;
+const P256_B =
+  0x5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604bn;
 
 const PAIRING_QUERY_FIELDS = new Set([
   "v",
@@ -62,6 +67,7 @@ export interface PairingAttempt {
 
 export interface SenderCredentials {
   relayOrigin: string;
+  deviceId?: string;
   pairId: string;
   senderToken: string;
   rootKey: CryptoKey;
@@ -77,6 +83,52 @@ export interface BuiltUrlMessage {
 
 export function isPairingUri(value: string): boolean {
   return value.startsWith("wqrs://pair?");
+}
+
+export function pairingUriFromLaunchFragment(
+  fragment: string,
+  launchOrigin: string,
+): string | null {
+  if (!fragment.startsWith("#")) return null;
+  const value = fragment.slice(1);
+  if (isPairingUri(value)) return value;
+  if (!value.startsWith("p1.")) return null;
+  let relayOrigin: string;
+  let payload: Uint8Array;
+  try {
+    relayOrigin = normalizeRelayOrigin(launchOrigin);
+    payload = decodeBase64Url(
+      value.slice(3),
+      COMPACT_PAIRING_BYTES,
+      "compact pairing payload",
+    );
+  } catch {
+    return null;
+  }
+  if (payload[0] !== 1) return null;
+  let pcPublicKey: Uint8Array;
+  try {
+    pcPublicKey = decompressP256Point(payload.slice(65, 98));
+  } catch {
+    return null;
+  }
+  const expiresValue = new DataView(
+    payload.buffer,
+    payload.byteOffset + 130,
+    8,
+  ).getBigUint64(0, false);
+  if (expiresValue > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  const parameters = new URLSearchParams([
+    ["v", "1"],
+    ["relay", relayOrigin],
+    ["device", encodeBase64Url(payload.slice(1, 17))],
+    ["pairing", encodeBase64Url(payload.slice(17, 33))],
+    ["pairing_token", encodeBase64Url(payload.slice(33, 65))],
+    ["pc_key", encodeBase64Url(pcPublicKey)],
+    ["secret", encodeBase64Url(payload.slice(98, 130))],
+    ["expires", expiresValue.toString()],
+  ]);
+  return `wqrs://pair?${parameters.toString()}`;
 }
 
 export function parsePairingUri(value: string, now = unixTime()): PairingQrData {
@@ -235,6 +287,7 @@ export async function decryptPairingResult(
   }
   return {
     relayOrigin: attempt.qr.relayOrigin,
+    deviceId: attempt.qr.deviceId,
     pairId: checkedBase64Url(payload.pair_id, 16, "pair ID"),
     senderToken: checkedBase64Url(payload.sender_token, 32, "sender token"),
     rootKey: attempt.rootKey,
@@ -535,6 +588,55 @@ export function decodeBase64Url(
   if (minimumBytes !== undefined && bytes.length < minimumBytes) fail(`${field} is too short.`);
   if (encodeBase64Url(bytes) !== value) fail(`${field} is not canonical.`);
   return bytes;
+}
+
+function decompressP256Point(point: Uint8Array): Uint8Array {
+  if (point.length !== 33 || (point[0] !== 2 && point[0] !== 3)) {
+    fail("Compressed P-256 public key is invalid.");
+  }
+  const x = bytesToBigInt(point.slice(1));
+  if (x >= P256_PRIME) fail("Compressed P-256 public key is invalid.");
+  const rightSide = modulo(x ** 3n - 3n * x + P256_B, P256_PRIME);
+  let y = modularPower(rightSide, (P256_PRIME + 1n) / 4n, P256_PRIME);
+  if (modulo(y * y, P256_PRIME) !== rightSide) {
+    fail("Compressed P-256 public key is invalid.");
+  }
+  if (Number(y & 1n) !== (point[0] & 1)) y = P256_PRIME - y;
+  return concatenate(new Uint8Array([4]), point.slice(1), bigIntToBytes(y, 32));
+}
+
+function bytesToBigInt(value: Uint8Array): bigint {
+  let result = 0n;
+  for (const byte of value) result = (result << 8n) | BigInt(byte);
+  return result;
+}
+
+function bigIntToBytes(value: bigint, length: number): Uint8Array {
+  const result = new Uint8Array(length);
+  let remaining = value;
+  for (let index = length - 1; index >= 0; index -= 1) {
+    result[index] = Number(remaining & 0xffn);
+    remaining >>= 8n;
+  }
+  if (remaining !== 0n) fail("Protocol integer is too large.");
+  return result;
+}
+
+function modularPower(base: bigint, exponent: bigint, modulus: bigint): bigint {
+  let result = 1n;
+  let factor = modulo(base, modulus);
+  let power = exponent;
+  while (power > 0n) {
+    if (power & 1n) result = (result * factor) % modulus;
+    factor = (factor * factor) % modulus;
+    power >>= 1n;
+  }
+  return result;
+}
+
+function modulo(value: bigint, modulus: bigint): bigint {
+  const result = value % modulus;
+  return result >= 0n ? result : result + modulus;
 }
 
 function checkedBase64Url(value: unknown, bytes: number, field: string): string {
