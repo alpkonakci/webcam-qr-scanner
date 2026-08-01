@@ -92,7 +92,7 @@ Mevcut kaynak kod ve yerel olarak oluşturulan `v0.2.0-dev` paketi yine tek bir
 - Hafif masaüstü denetleyicisi Windows sistem tepsisinde görünür kalır.
 - Kamera yalnızca kullanıcı istediğinde, ayrı bir süreçte açılır.
 - `Esc`, kamera penceresinin kapatma düğmesi veya başarılı okuma yalnızca
-  kamerayı kapatır ve sade kontrol ekranını açar. Denetleyici kamerayı
+  kamerayı kapatır ve sade kontrol ekranını öne getirir. Denetleyici kamerayı
   kullanmadan çalışmaya devam eder.
 - Kontrol ekranı, gizli tepsi simgesini bulmayı gerektirmeden **Scan with
   Camera**, **Scan Computer Screen** ve **Pair a Phone** seçeneklerini sunar.
@@ -110,13 +110,15 @@ Mevcut kaynak kod ve yerel olarak oluşturulan `v0.2.0-dev` paketi yine tek bir
 En az bir onaylı telefon kayıtlıysa denetleyici, kamera kapalı kalırken hafif
 bir dışa doğru Telefon-PC alıcısı çalıştırır; bilgisayarda dışarıya açık port
 oluşturmaz. **Pair Phone...** yapılandırılmış relay'e bağlanır ve iki dakikalık
-eşleştirme QR'ını gösterir. Varsayılan geliştirme relay'i `127.0.0.1`'dir;
-üretim paketi açık HTTPS relay adresiyle yapılandırılmalıdır. PWA bu eşleştirme
+eşleştirme QR'ını gösterir. v0.2 önizlemesi varsayılan olarak resmî açık HTTPS
+relay'i kullanır; yerel ve self-hosted geliştirme relay'leri
+`WQRS_RELAY_ORIGIN` ortam değişkeniyle kullanılmaya devam edebilir. PWA bu eşleştirme
 QR'ını okuyabilir, PC onayını isteyebilir, kök anahtarı IndexedDB'de dışa
 aktarılamayan CryptoKey olarak tutabilir ve **Send to PC** seçeneğini açabilir.
 PC URL'yi doğrular ve çözer, şifreli teslim alındısı gönderir; adresi açmadan
-önce yine kullanıcıdan onay ister. Açık relay uygulaması kaynakta hazırdır fakat
-internet endpoint'i henüz etkin değildir.
+önce yine kullanıcıdan onay ister. Açık beta relay ve PWA etkindir; iPhone'dan
+Windows'a tam şifreli aktarım elle doğrulanmıştır. v0.2 kararlı sayılmadan önce
+daha geniş cihaz testleri ve bağımsız güvenlik incelemesi tamamlanacaktır.
 
 **Scan Screen** farklı QR kodlar bulursa geliştirme sürümü, algılanan kodları
 çerçeveleyen ve yalnızca bellekte tutulan donmuş ekran görüntüsünü gösterir.
@@ -363,14 +365,14 @@ alan adını kontrol edin.
 
 ### v0.2 — Kurulum gerektirmeyen PWA ile Telefon-PC köprüsü
 
-Kısa süre geçerli QR kod ve bilgisayarda tek seferlik onay ile hesapsız
-eşleştirme planlanıyor. Kullanıcı telefona native uygulama kurmadan HTTPS
-üzerinden mobil PWA'yı açabilecek; isterse ana ekranına ekleyebilecek. PWA QR'ı
-cihazda çözüp **Open on this phone** ve **Send to PC** seçeneklerini gösterecek.
-URL tarayıcının yerleşik WebCrypto API'siyle uçtan uca şifrelenecek ve içeriği
-okuyamayan internet relay'i üzerinden iletilecek. Yerel ağ veya konum izni
-gerekmeyecek. Bilgisayar içeriği doğrulayacak ve varsayılan olarak açmadan önce
-kullanıcıdan onay isteyecek.
+v0.2 önizlemesi kısa süre geçerli QR kod ve bilgisayarda tek seferlik onay ile
+hesapsız eşleştirme sunuyor. Kullanıcı telefona native uygulama kurmadan mobil
+PWA'yı HTTPS üzerinden açabilir; isterse ana ekranına ekleyebilir. PWA QR'ı
+cihazda çözüp **Open on this phone** ve **Send to PC** seçeneklerini gösterir.
+URL tarayıcının yerleşik WebCrypto API'siyle uçtan uca şifrelenir ve içeriği
+okuyamayan internet relay'i üzerinden iletilir. Yerel ağ veya konum izni
+gerekmez. Bilgisayar içeriği doğrular ve varsayılan olarak açmadan önce
+kullanıcıdan onay ister.
 
 Ayrıntılı mimari, eşleştirme protokolü, tehdit modeli ve kabul ölçütleri:
 [v0.2 teknik tasarım belgesi](docs/phone-to-pc-technical-design.tr.md).
@@ -395,8 +397,9 @@ Ayrıntılı mimari, eşleştirme protokolü, tehdit modeli ve kabul ölçütler
 - [x] Browser WebCrypto, gerçek tarayıcı eşleştirmesi ve şifreli **Send to PC**
 - [x] Kısa ömürlü şifreli zarflar, çevrimiçi heartbeat denetimi, replay reddi
   ve şifreli teslim alındıları için D1 tabanlı HTTPS relay API'si
-- [ ] Açık relay endpoint'ini etkinleştirme ve güvenlik incelemesini tamamlama
-- [ ] Gerçek Android Chrome ve iOS Safari cihaz testlerini tamamlama
+- [x] Açık beta relay'i etkinleştirme ve gerçek bir iPhone-Windows akışını doğrulama
+- [ ] Geniş Android Chrome ve iOS Safari cihaz testlerini tamamlama
+- [ ] Bağımsız protokol, kriptografi ve dağıtım incelemesini tamamlama
 
 ### v0.2.1 — Şifreli kuyruk ve hatırlatmalar
 

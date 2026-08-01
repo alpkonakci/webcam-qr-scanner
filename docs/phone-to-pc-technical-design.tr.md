@@ -1125,7 +1125,9 @@ yapmıyordu. 1 Ağustos 2026 tarihli ikinci dilim, kullanıcı eylemiyle açıla
 kamera taramasını ve cihaz üzerinde URL doğrulamasını ekledi. Aynı günkü üçüncü
 dilim gerçek `wqrs/1` pairing, dışa aktarılamayan IndexedDB kök anahtarı,
 şifreli **Send to PC**, ACK doğrulaması ve Miniflare/D1 relay bütünleşme testini
-ekledi. Açık endpoint ve gerçek telefon testleri hâlâ beklemektedir.
+ekledi. Aynı gün açık beta endpoint etkinleştirildi ve gerçek bir iPhone'dan
+Windows PC'ye eşleştirme ile şifreli URL teslimi elle doğrulandı. Geniş cihaz
+matrisi ve bağımsız güvenlik incelemesi hâlâ beklemektedir.
 
 Çıkış ölçütü: PWA, localhost üzerinde manuel URL'yi relay üzerinden PC'ye
 uçtan uca şifreli gönderir ve tarayıcı test vektörlerinin tamamını geçer.
@@ -1140,6 +1142,10 @@ uçtan uca şifreli gönderir ve tarayıcı test vektörlerinin tamamını geçe
 - [ ] Gerçek iOS Safari testi
 - [ ] Ana ekrana ekleme ve tarayıcı içi kullanım testi
 
+Not: 1 Ağustos 2026'da bir iPhone ile QR tarama, eşleştirme ve **Send to PC**
+akışı başarıyla tamamlandı. Yukarıdaki maddeler tek başarılı örnek yerine geniş
+tarayıcı/sürüm matrisini ifade ettiği için henüz tamamlandı olarak işaretlenmedi.
+
 QR çözümleme için `qr-scanner` 1.4.2 sabit sürümü first-party PWA paketi içinde
 dağıtılır; çalışma anında CDN kullanılmaz. Kütüphane desteklenen tarayıcılarda
 yerleşik `BarcodeDetector` yolunu, diğerlerinde Web Worker tabanlı çözümleyiciyi
@@ -1152,14 +1158,14 @@ olmadan evde açık PC'ye URL gönderilir.
 
 ### Aşama 5 — İnternet relay ve PWA dağıtımı
 
-- [x] Yönetilen TLS ve private önizleme dağıtımı
+- [x] Yönetilen TLS ve açık beta dağıtımı
 - [x] D1 şeması ve sürümlü Drizzle migration
 - [x] Hız, gövde boyutu, süre ve çevrimiçi heartbeat sınırları
 - [x] Relay token'larını yalnızca SHA-256 özetleriyle saklama
 - [x] Veri içermeyen sağlık kontrolü
 - [x] URL gövdesini loglamayan relay hata yüzeyi
 - [x] HTTPS, CSP/izin başlıkları ve sürümlü asset isimleri
-- [ ] Hesapsız kullanım için açık endpoint'i etkinleştirme
+- [x] Hesapsız kullanım için açık beta endpoint'ini etkinleştirme
 - [ ] Production gözlemleme, yedekleme ve bağımsız güvenlik incelemesi
 
 Çıkış ölçütü: Relay URL'yi bilmeden internet üzerinden güvenilir teslim yapar.

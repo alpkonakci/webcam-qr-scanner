@@ -338,7 +338,7 @@ def create_pc_pairing_session(
     _validate_pairing_expiry(
         expires_at,
         current_time=current_time,
-        allow_clock_skew=False,
+        allow_clock_skew=True,
     )
     b64url_decode(device_id, expected_length=16)
     b64url_decode(receiver_token, expected_length=32)

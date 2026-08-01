@@ -27,9 +27,10 @@ The current PWA milestone includes:
   cache-policy and security-header tests.
 
 **Open on this phone**, browser pairing, and encrypted **Send to PC** are
-implemented in source. The public relay endpoint is not enabled yet; until it
-is enabled and the PWA passes real Android Chrome and iOS Safari tests, this
-directory remains a development preview rather than a stable public service.
+available through the public beta endpoint. One complete iPhone-to-Windows
+pairing and encrypted URL delivery has been verified manually. Broad Android
+Chrome and iOS Safari testing plus an independent security review are still
+required, so this remains a preview rather than a stable public service.
 
 ## Local development
 

@@ -124,7 +124,7 @@ class TrayApplication:
             pystray.MenuItem("Scan Screen", self._scan_screen),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
-                "Phone-to-PC: v0.2 development",
+                "Phone-to-PC: v0.2 preview",
                 lambda *_: None,
                 enabled=False,
             ),
@@ -441,10 +441,9 @@ def _pairing_error_message(error: Exception) -> str:
     if error.__class__.__module__.startswith(("httpx", "httpcore")):
         return (
             "The Phone-to-PC relay could not be reached.\n\n"
-            "This development build uses the local relay by default. Start it "
-            "with:\n\n"
-            "python -m relay.server\n\n"
-            "The public relay and mobile PWA are not available yet."
+            "Check your internet connection and try again. If you explicitly "
+            "configured a local or self-hosted relay, verify "
+            "WQRS_RELAY_ORIGIN."
         )
     code = getattr(error, "code", None)
     if code == "unauthorized":

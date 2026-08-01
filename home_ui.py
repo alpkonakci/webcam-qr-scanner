@@ -60,7 +60,7 @@ ACTION_CARDS = (
         HomeAction.PAIR_PHONE,
         (32, 324, 588, 414),
         "Pair a Phone",
-        "Connect a mobile browser securely. v0.2 development",
+        "Connect a mobile browser securely. v0.2 preview",
         WARNING,
     ),
 )
@@ -201,11 +201,15 @@ def show_home_window() -> HomeAction:
     )
 
     try:
+        first_frame = True
         while state.selected_action is None:
             cv2.imshow(
                 WINDOW_TITLE,
                 build_home_canvas(hover_action=state.hover_action),
             )
+            if first_frame:
+                _bring_home_window_to_front()
+                first_frame = False
             if cv2.waitKey(16) & 0xFF == 27:
                 return HomeAction.BACKGROUND
             if (
@@ -262,3 +266,24 @@ def _primary_screen_size() -> tuple[int, int]:
     except (AttributeError, OSError):
         pass
     return DEFAULT_SCREEN_SIZE
+
+
+def _bring_home_window_to_front() -> None:
+    """Keep the short-lived control center visible after a scanner closes."""
+
+    try:
+        cv2.setWindowProperty(WINDOW_TITLE, cv2.WND_PROP_TOPMOST, 1)
+    except cv2.error:
+        pass
+
+    if os.name != "nt":
+        return
+    try:
+        user32 = ctypes.windll.user32
+        window_handle = user32.FindWindowW(None, WINDOW_TITLE)
+        if window_handle:
+            user32.ShowWindow(window_handle, 9)  # SW_RESTORE
+            user32.BringWindowToTop(window_handle)
+            user32.SetForegroundWindow(window_handle)
+    except (AttributeError, OSError):
+        pass

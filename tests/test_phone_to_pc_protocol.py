@@ -7,6 +7,8 @@ from unittest.mock import patch
 
 from bridge.protocol import (
     AuthenticationFailed,
+    MAX_CLOCK_SKEW_SECONDS,
+    PAIRING_TTL_SECONDS,
     ProtocolViolation,
     ReplayDetected,
     ReceiverCredentials,
@@ -207,6 +209,39 @@ class PhoneToPcPairingProtocolTests(unittest.TestCase):
             phone_label="My iPhone",
             now=self.now,
         )
+
+    def test_relay_pairing_accepts_bounded_clock_skew(self) -> None:
+        session = create_pc_pairing_session(
+            relay_origin="https://relay.example",
+            device_id=random_b64url(16),
+            receiver_token=random_b64url(32),
+            pairing_id=random_b64url(16),
+            pairing_token=random_b64url(32),
+            expires_at=self.now + PAIRING_TTL_SECONDS + 1,
+            now=self.now,
+        )
+
+        self.assertEqual(
+            session.qr.expires_at,
+            self.now + PAIRING_TTL_SECONDS + 1,
+        )
+
+    def test_relay_pairing_rejects_excessive_lifetime(self) -> None:
+        with self.assertRaisesRegex(ProtocolViolation, "too long"):
+            create_pc_pairing_session(
+                relay_origin="https://relay.example",
+                device_id=random_b64url(16),
+                receiver_token=random_b64url(32),
+                pairing_id=random_b64url(16),
+                pairing_token=random_b64url(32),
+                expires_at=(
+                    self.now
+                    + PAIRING_TTL_SECONDS
+                    + MAX_CLOCK_SKEW_SECONDS
+                    + 1
+                ),
+                now=self.now,
+            )
 
     def test_approved_pairing_derives_matching_credentials(self) -> None:
         request = decrypt_pairing_request(

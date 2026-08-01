@@ -92,8 +92,8 @@ one `QR-Scanner.exe`, but the executable starts separate internal modes:
 - A lightweight controller stays visible in the Windows system tray.
 - The camera opens only after a user action and runs in a separate process.
 - `Esc`, the camera window's close button, or a successful scan closes only the
-  camera and opens a calm control center. The controller stays available
-  without using the camera.
+  camera and brings a calm control center to the foreground. The controller
+  stays available without using the camera.
 - The control center offers **Scan with Camera**, **Scan Computer Screen**, and
   **Pair a Phone** without requiring the user to find a hidden tray icon.
 - Closing the control center keeps the app available in the tray. Its explicit
@@ -110,13 +110,16 @@ one `QR-Scanner.exe`, but the executable starts separate internal modes:
 If at least one approved phone is stored, the controller keeps a lightweight
 outbound Phone-to-PC receiver alive while the camera stays off. It never opens
 an inbound port. Choosing **Pair Phone...** explicitly contacts the configured
-relay and displays a two-minute pairing QR. The default development relay is
-`127.0.0.1`; a production build must be configured with the public HTTPS relay.
+relay and displays a two-minute pairing QR. The v0.2 preview defaults to the
+official public HTTPS relay; local and self-hosted development relays remain
+available through the `WQRS_RELAY_ORIGIN` environment variable.
 The PWA can scan that pairing QR, request approval, store a non-extractable root
 key in IndexedDB, and enable **Send to PC**. The PC authenticates and decrypts
 the URL, sends an encrypted delivery receipt, and still asks the user before
-opening the address. The public relay implementation is present but its
-internet endpoint is not enabled yet.
+opening the address. The public beta relay and PWA are enabled, and a complete
+iPhone-to-Windows encrypted transfer has been verified manually. Broader device
+testing and an independent security review are still required before v0.2 is
+considered stable.
 
 When **Scan Screen** finds different QR codes, the development build shows one
 frozen in-memory preview with every detected code outlined. Moving the pointer
@@ -360,14 +363,14 @@ dialog before opening a screen QR link.
 
 ### v0.2 — Install-free PWA Phone-to-PC bridge
 
-Planned account-free pairing with a short-lived QR code and one-time approval
-on the computer. Users will open the mobile PWA over HTTPS without installing a
-native app and may optionally add it to the Home Screen. The PWA will decode QR
-codes on-device and offer **Open on this phone** or **Send to PC**. URLs will be
-end-to-end encrypted with built-in Browser WebCrypto and delivered through an
-internet relay that cannot read their contents. No local-network or location
-permission will be required. The computer will validate the payload and request
-confirmation before opening it by default.
+The v0.2 preview now provides account-free pairing with a short-lived QR code
+and one-time approval on the computer. Users open the mobile PWA over HTTPS
+without installing a native app and may optionally add it to the Home Screen.
+The PWA decodes QR codes on-device and offers **Open on this phone** or **Send
+to PC**. URLs are end-to-end encrypted with built-in Browser WebCrypto and
+delivered through an internet relay that cannot read their contents. No
+local-network or location permission is required. The computer validates the
+payload and requests confirmation before opening it by default.
 
 Architecture, pairing protocol, threat model, and acceptance criteria are
 documented in the
@@ -393,8 +396,9 @@ documented in the
 - [x] Add Browser WebCrypto, real browser pairing, and encrypted **Send to PC**
 - [x] Add the D1-backed HTTPS relay API with short-lived opaque envelopes,
   online heartbeat checks, replay rejection, and encrypted delivery receipts
-- [ ] Enable and security-review the public relay endpoint
-- [ ] Complete real Android Chrome and iOS Safari device tests
+- [x] Enable the public beta relay and verify one real iPhone-to-Windows flow
+- [ ] Complete broad Android Chrome and iOS Safari device tests
+- [ ] Complete an independent protocol, cryptography, and deployment review
 
 ### v0.2.1 — Encrypted queue and reminders
 

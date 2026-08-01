@@ -11,7 +11,8 @@ from bridge.pairing import (
     wait_for_pc_result,
 )
 from bridge.pairing_controller import (
-    DEVELOPMENT_RELAY_ORIGIN,
+    LOCAL_DEVELOPMENT_RELAY_ORIGIN,
+    PUBLIC_RELAY_ORIGIN,
     PairingController,
     PairingControllerStatus,
     configured_relay_origin,
@@ -31,8 +32,16 @@ class XorTestProtector:
 
 
 class PairingConfigurationTests(unittest.TestCase):
-    def test_loopback_relay_is_the_explicit_development_default(self) -> None:
-        self.assertEqual(configured_relay_origin({}), DEVELOPMENT_RELAY_ORIGIN)
+    def test_public_beta_relay_is_the_default(self) -> None:
+        self.assertEqual(configured_relay_origin({}), PUBLIC_RELAY_ORIGIN)
+
+    def test_loopback_relay_remains_an_explicit_development_option(self) -> None:
+        self.assertEqual(
+            configured_relay_origin(
+                {"WQRS_RELAY_ORIGIN": LOCAL_DEVELOPMENT_RELAY_ORIGIN}
+            ),
+            LOCAL_DEVELOPMENT_RELAY_ORIGIN,
+        )
 
     def test_non_loopback_http_relay_is_rejected(self) -> None:
         with self.assertRaises(ValueError):

@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
+import cv2
 import numpy as np
 
 from home_ui import (
     WINDOW_HEIGHT,
     WINDOW_WIDTH,
     HomeAction,
+    _bring_home_window_to_front,
     action_at_point,
     build_home_canvas,
+    show_home_window,
 )
 
 
@@ -27,6 +31,34 @@ class HomeUiTests(unittest.TestCase):
         self.assertEqual(canvas.shape, (WINDOW_HEIGHT, WINDOW_WIDTH, 3))
         self.assertEqual(canvas.dtype, np.uint8)
         self.assertGreater(int(canvas.max()), int(canvas.min()))
+
+    def test_control_center_is_brought_forward_after_first_frame(self) -> None:
+        with (
+            patch("home_ui.cv2.namedWindow"),
+            patch("home_ui.cv2.setMouseCallback"),
+            patch("home_ui.cv2.moveWindow"),
+            patch("home_ui.cv2.imshow"),
+            patch("home_ui.cv2.waitKey", return_value=27),
+            patch("home_ui.cv2.destroyWindow"),
+            patch("home_ui._bring_home_window_to_front") as bring_forward,
+        ):
+            result = show_home_window()
+
+        self.assertIs(result, HomeAction.BACKGROUND)
+        bring_forward.assert_called_once_with()
+
+    def test_foreground_helper_requests_an_always_visible_window(self) -> None:
+        with (
+            patch("home_ui.cv2.setWindowProperty") as set_property,
+            patch("home_ui.os.name", "posix"),
+        ):
+            _bring_home_window_to_front()
+
+        set_property.assert_called_once_with(
+            "QR Scanner",
+            cv2.WND_PROP_TOPMOST,
+            1,
+        )
 
 
 if __name__ == "__main__":

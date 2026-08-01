@@ -38,7 +38,8 @@ from native_dialogs import confirm_phone_pairing
 from pairing_ui import PairingWindowOutcome, show_pairing_qr_window
 
 
-DEVELOPMENT_RELAY_ORIGIN = "http://127.0.0.1:8765"
+PUBLIC_RELAY_ORIGIN = "https://webcam-qr-scanner-pwa.alpkon.chatgpt.site"
+LOCAL_DEVELOPMENT_RELAY_ORIGIN = "http://127.0.0.1:8765"
 RELAY_ENVIRONMENT_VARIABLE = "WQRS_RELAY_ORIGIN"
 
 
@@ -223,11 +224,11 @@ class PairingController:
 def configured_relay_origin(
     environment: dict[str, str] | None = None,
 ) -> str:
-    """Use an explicit HTTPS relay or the loopback development relay."""
+    """Use an explicit relay override or the official public beta relay."""
 
     source = os.environ if environment is None else environment
     return normalize_relay_origin(
-        source.get(RELAY_ENVIRONMENT_VARIABLE, DEVELOPMENT_RELAY_ORIGIN)
+        source.get(RELAY_ENVIRONMENT_VARIABLE, PUBLIC_RELAY_ORIGIN)
     )
 
 
