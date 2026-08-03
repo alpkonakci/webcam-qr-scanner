@@ -4,57 +4,47 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 
-async function render() {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
-
-  return worker.fetch(
-    new Request("http://localhost/", {
-      headers: { accept: "text/html" },
-    }),
-    {
-      ASSETS: {
-        fetch: async () => new Response("Not found", { status: 404 }),
-      },
-    },
-    {
-      waitUntil() {},
-      passThroughOnException() {},
-    },
+test("keeps the QR Scanner mobile PWA shell in the Vercel build", async () => {
+  const [layout, home] = await Promise.all([
+    readFile(new URL("app/layout.tsx", root), "utf8"),
+    readFile(new URL("app/PwaHome.tsx", root), "utf8"),
+  ]);
+  assert.match(layout, /QR Scanner/);
+  assert.match(home, /Scan here\. Continue on your PC\./);
+  assert.match(home, /Camera scanner ready/);
+  assert.match(home, /Scan a web link or PC pairing code/);
+  assert.doesNotMatch(home, /Install app|Added to Home Screen/);
+  assert.match(home, /No location access/);
+  assert.doesNotMatch(`${layout}\n${home}`, /Coming next/);
+  assert.doesNotMatch(
+    `${layout}\n${home}`,
+    /codex-preview|react-loading-skeleton|Your site is taking shape/i,
   );
-}
-
-test("renders the QR Scanner mobile PWA shell", async () => {
-  const response = await render();
-  assert.equal(response.status, 200);
-  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
-
-  const html = await response.text();
-  assert.match(html, /<title>QR Scanner — Phone-to-PC<\/title>/i);
-  assert.match(html, /Scan here\. Continue on your PC\./);
-  assert.match(html, /Camera scanner ready/);
-  assert.match(html, /Scan a web link or PC pairing code/);
-  assert.match(html, /Install app/);
-  assert.match(html, /No location access/);
-  assert.doesNotMatch(html, /Coming next/);
-  assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
 });
 
 test("applies privacy and embedding security headers", async () => {
-  const response = await render();
-  const csp = response.headers.get("content-security-policy") ?? "";
+  const {
+    buildContentSecurityPolicy,
+    default: nextConfig,
+  } = await import("../next.config.ts");
+  const entries = await nextConfig.headers();
+  const headers = new Map(
+    entries[0].headers.map(({ key, value }) => [key.toLowerCase(), value]),
+  );
+  const csp = headers.get("content-security-policy") ?? "";
 
   assert.match(csp, /default-src 'self'/);
   assert.match(csp, /frame-ancestors 'none'/);
   assert.match(csp, /connect-src 'self'/);
   assert.match(csp, /worker-src 'self' blob:/);
+  assert.doesNotMatch(buildContentSecurityPolicy(false), /'unsafe-eval'/);
+  assert.match(buildContentSecurityPolicy(true), /'unsafe-eval'/);
   assert.equal(
-    response.headers.get("permissions-policy"),
+    headers.get("permissions-policy"),
     "camera=(self), geolocation=(), microphone=()",
   );
-  assert.equal(response.headers.get("referrer-policy"), "no-referrer");
-  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(headers.get("referrer-policy"), "no-referrer");
+  assert.equal(headers.get("x-content-type-options"), "nosniff");
 });
 
 test("ships an installable manifest without privileged capabilities", async () => {
@@ -91,9 +81,26 @@ test("camera scanner is local, throttled and destroyed when closed", async () =>
   assert.match(home, /scannerOpen &&/);
   assert.match(scanner, /maxScansPerSecond:\s*10/);
   assert.match(scanner, /document\.visibilityState === "hidden"/);
+  assert.match(scanner, /event\.key !== "Escape"/);
+  assert.match(scanner, /addEventListener\("keydown", closeOnEscape\)/);
+  assert.match(scanner, /removeEventListener\("keydown", closeOnEscape\)/);
+  assert.match(scanner, /aria-keyshortcuts="Escape"/);
   assert.match(scanner, /scannerRef\.current\?\.destroy\(\)/);
   assert.doesNotMatch(scanner, /\bfetch\(|XMLHttpRequest|WebSocket|geolocation/);
   assert.match(styles, /\.result-secondary small\s*\{[^}]*color:\s*var\(--quiet\)/s);
   assert.match(styles, /\.http-warning\s*\{[^}]*color:\s*#ffd98a/s);
   assert.match(notices, /qr-scanner 1\.4\.2/);
+});
+
+test("opens decoded links without replacing the QR Scanner page", async () => {
+  const resultView = await readFile(new URL("app/QrResultView.tsx", root), "utf8");
+
+  assert.match(resultView, /Open link in new tab/);
+  assert.match(resultView, /window\.open\(result\.href, "_blank", "noopener,noreferrer"\)/);
+  assert.match(resultView, /onClick=\{openInNewTab\}/);
+  assert.doesNotMatch(resultView, /window\.location\.(?:assign|replace)/);
+  assert.doesNotMatch(resultView, /Open on this phone/);
+  assert.match(resultView, /Scan the pairing QR shown on your PC/);
+  assert.match(resultView, /isMobileClient/);
+  assert.doesNotMatch(resultView, /Pair a PC first/);
 });

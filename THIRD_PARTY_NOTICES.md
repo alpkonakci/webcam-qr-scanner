@@ -25,6 +25,8 @@ remain subject to their own licenses and are not relicensed under MIT.
 - **PyInstaller 6.21.0 bootloader and run-time hooks** — GPL-2.0-or-later with
   the PyInstaller Bootloader Exception, plus Apache-2.0-licensed run-time hooks
 
+- **websockets 16.1.1** — BSD 3-Clause License
+
 The distributable ZIP contains the complete license material copied from the
 exact Python environment used to build the executable:
 
@@ -45,7 +47,8 @@ THIRD_PARTY_LICENSES/
 |-- Python/
 |-- pystray/
 |-- six/
-`-- typing_extensions/
+|-- typing_extensions/
+`-- websockets/
 ```
 
 PyInstaller's Bootloader Exception grants permission to embed its compiled

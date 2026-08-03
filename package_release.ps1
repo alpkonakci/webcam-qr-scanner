@@ -111,7 +111,8 @@ Copy-Item -LiteralPath `
     @("httpcore-1.0.9.dist-info", "httpcore"),
     @("httpx-0.28.1.dist-info", "HTTPX"),
     @("idna-3.18.dist-info", "idna"),
-    @("typing_extensions-4.16.0.dist-info", "typing_extensions")
+    @("typing_extensions-4.16.0.dist-info", "typing_extensions"),
+    @("websockets-16.1.1.dist-info", "websockets")
 ) | ForEach-Object {
     Copy-LicenseTree -DistributionDirectory $_[0] -DestinationName $_[1]
 }

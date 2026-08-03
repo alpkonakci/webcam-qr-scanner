@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+import time
 from unittest.mock import patch
 
 import httpx
@@ -12,6 +13,7 @@ from bridge.protocol import (
     random_b64url,
 )
 from bridge.receiver import PcReceiver
+from bridge.realtime import RealtimeConfig, RealtimeSession
 
 
 class _FakeHttpClient:
@@ -44,6 +46,36 @@ class _FakeHttpClient:
             json={"status": "delivered"},
             request=httpx.Request("POST", f"https://relay.example{path}"),
         )
+
+
+class _FallbackHttpClient(_FakeHttpClient):
+    def __init__(self, event: dict[str, object]) -> None:
+        super().__init__(event)
+        self.get_count = 0
+
+    async def get(self, path: str) -> httpx.Response:
+        self.get_count += 1
+        if self.get_count == 1:
+            return httpx.Response(
+                204,
+                request=httpx.Request(
+                    "GET",
+                    f"https://relay.example{path}",
+                ),
+            )
+        return await super().get(path)
+
+
+class _IdleRealtimeClient:
+    def __init__(self, **_):
+        import asyncio
+
+        self.connected = asyncio.Event()
+
+    async def run(self) -> None:
+        import asyncio
+
+        await asyncio.Event().wait()
 
 
 class HttpReceiverTests(unittest.IsolatedAsyncioTestCase):
@@ -89,7 +121,10 @@ class HttpReceiverTests(unittest.IsolatedAsyncioTestCase):
             on_url=received.append,
         )
 
-        with patch("bridge.receiver.httpx.AsyncClient", return_value=client):
+        with (
+            patch("bridge.receiver.fetch_realtime_config", return_value=None),
+            patch("bridge.receiver.httpx.AsyncClient", return_value=client),
+        ):
             await receiver.run(stop_after=1)
 
         self.assertTrue(receiver.connected.is_set())
@@ -98,6 +133,67 @@ class HttpReceiverTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(client.posts), 1)
         self.assertEqual(client.posts[0][1]["event"], "delivery_ack")
         self.assertEqual(client.posts[0][1]["delivery_id"], delivery_id)
+
+    async def test_realtime_transport_keeps_five_second_recovery_poll(
+        self,
+    ) -> None:
+        device_id = random_b64url(16)
+        root_key = b"r" * 32
+        credentials = ReceiverCredentials(
+            device_id=device_id,
+            receiver_token=random_b64url(32),
+            pair_id=random_b64url(16),
+            root_key=root_key,
+        )
+        envelope = build_url_envelope(
+            SenderCredentials(
+                pair_id=credentials.pair_id,
+                sender_token=random_b64url(32),
+                root_key=root_key,
+            ),
+            "https://example.com/recovered",
+        )
+        client = _FallbackHttpClient(
+            {
+                "event": "url_message",
+                "delivery_id": random_b64url(16),
+                "envelope": envelope,
+            }
+        )
+        session = RealtimeSession(
+            access_token="a" * 80,
+            refresh_token="r" * 48,
+            expires_at=int(time.time()) + 3600,
+            user_id="3f25129c-8558-4bdf-a37d-e70b650e25b1",
+        )
+        receiver = PcReceiver(
+            relay_origin="https://relay.example",
+            credentials=credentials,
+            on_url=lambda _: None,
+            realtime_session=session,
+        )
+        config = RealtimeConfig(
+            supabase_url="https://project.supabase.co",
+            publishable_key="sb_publishable_" + "p" * 32,
+            # Keep the unit test fast; production config is fixed at 5 seconds.
+            fallback_poll_seconds=0.01,
+        )
+
+        with (
+            patch(
+                "bridge.receiver.fetch_realtime_config",
+                return_value=config,
+            ),
+            patch(
+                "bridge.receiver.RealtimeWakeupClient",
+                _IdleRealtimeClient,
+            ),
+            patch("bridge.receiver.httpx.AsyncClient", return_value=client),
+        ):
+            await receiver.run(stop_after=1)
+
+        self.assertEqual(client.get_count, 2)
+        self.assertEqual(len(client.posts), 1)
 
 
 if __name__ == "__main__":

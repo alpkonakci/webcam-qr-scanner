@@ -6,9 +6,9 @@ import base64
 import ctypes
 import json
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from app_settings import settings_directory
 from bridge.protocol import (
@@ -18,6 +18,9 @@ from bridge.protocol import (
     b64url_encode,
     normalize_relay_origin,
 )
+
+if TYPE_CHECKING:
+    from bridge.realtime import RealtimeSession
 
 
 STORE_VERSION = 1
@@ -44,6 +47,10 @@ class RelayDevice:
     relay_origin: str
     device_id: str
     receiver_token: str
+    realtime_access_token: str | None = None
+    realtime_refresh_token: str | None = None
+    realtime_expires_at: int | None = None
+    realtime_user_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,6 +215,28 @@ class PairingStore:
         self.save(updated)
         return updated
 
+    def update_realtime_session(
+        self,
+        relay_origin: str,
+        session: RealtimeSession,
+    ) -> PairingStoreSnapshot:
+        """Rotate only the DPAPI-protected Supabase session for one device."""
+
+        current = self.load()
+        device = current.device_for(relay_origin)
+        if device is None:
+            raise SecureStorageError(
+                "cannot store a Realtime session without its relay device"
+            )
+        updated_device = replace(
+            device,
+            realtime_access_token=session.access_token,
+            realtime_refresh_token=session.refresh_token,
+            realtime_expires_at=session.expires_at,
+            realtime_user_id=session.user_id,
+        )
+        return self.replace_device(updated_device, clear_pairs=False)
+
 
 class _DataBlob(ctypes.Structure):
     _fields_ = [
@@ -355,10 +384,20 @@ def _pair_to_mapping(pair: StoredPair) -> dict[str, object]:
 
 
 def _device_from_mapping(value: object) -> RelayDevice:
-    if not isinstance(value, dict) or set(value) != {
+    legacy_fields = {
         "relay_origin",
         "device_id",
         "receiver_token",
+    }
+    realtime_fields = legacy_fields | {
+        "realtime_access_token",
+        "realtime_refresh_token",
+        "realtime_expires_at",
+        "realtime_user_id",
+    }
+    if not isinstance(value, dict) or frozenset(value) not in {
+        frozenset(legacy_fields),
+        frozenset(realtime_fields),
     }:
         raise ValueError("stored relay device fields are invalid")
     return _validated_device(
@@ -366,6 +405,10 @@ def _device_from_mapping(value: object) -> RelayDevice:
             relay_origin=value["relay_origin"],
             device_id=value["device_id"],
             receiver_token=value["receiver_token"],
+            realtime_access_token=value.get("realtime_access_token"),
+            realtime_refresh_token=value.get("realtime_refresh_token"),
+            realtime_expires_at=value.get("realtime_expires_at"),
+            realtime_user_id=value.get("realtime_user_id"),
         )
     )
 
@@ -396,11 +439,55 @@ def _validated_device(device: RelayDevice) -> RelayDevice:
     origin = normalize_relay_origin(device.relay_origin)
     b64url_decode(device.device_id, expected_length=16)
     b64url_decode(device.receiver_token, expected_length=32)
+    realtime_values = (
+        device.realtime_access_token,
+        device.realtime_refresh_token,
+        device.realtime_expires_at,
+        device.realtime_user_id,
+    )
+    if any(value is not None for value in realtime_values):
+        if not all(value is not None for value in realtime_values):
+            raise ProtocolViolation(
+                "stored Realtime session must be complete"
+            )
+        if (
+            not _valid_stored_token(device.realtime_access_token)
+            or not _valid_stored_token(device.realtime_refresh_token)
+            or type(device.realtime_expires_at) is not int
+            or device.realtime_expires_at <= 0
+            or not _valid_stored_uuid(device.realtime_user_id)
+        ):
+            raise ProtocolViolation("stored Realtime session is invalid")
     return RelayDevice(
         relay_origin=origin,
         device_id=device.device_id,
         receiver_token=device.receiver_token,
+        realtime_access_token=device.realtime_access_token,
+        realtime_refresh_token=device.realtime_refresh_token,
+        realtime_expires_at=device.realtime_expires_at,
+        realtime_user_id=device.realtime_user_id,
     )
+
+
+def _valid_stored_token(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and 20 <= len(value) <= 4096
+        and not any(character.isspace() for character in value)
+    )
+
+
+def _valid_stored_uuid(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    groups = value.split("-")
+    if [len(group) for group in groups] != [8, 4, 4, 4, 12]:
+        return False
+    try:
+        int("".join(groups), 16)
+    except ValueError:
+        return False
+    return True
 
 
 def _validated_pair(pair: StoredPair) -> StoredPair:

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 from bridge.protocol import ReceivedUrl, ReceiverCredentials
 from bridge.receiver import PcReceiver
+from bridge.realtime import RealtimeSession
 from bridge.secure_storage import (
     PairingStore,
     PairingStoreSnapshot,
@@ -27,6 +28,7 @@ class ReceiverGroup:
     device_id: str
     credentials: tuple[ReceiverCredentials, ...]
     phone_labels: dict[str, str]
+    realtime_session: RealtimeSession | None = None
 
 
 class ReceiverService:
@@ -112,11 +114,20 @@ class ReceiverService:
 
     async def _run_group(self, group: ReceiverGroup) -> None:
         attempt = 0
+        current_realtime_session = group.realtime_session
+
+        def persist_realtime_session(session: RealtimeSession) -> None:
+            nonlocal current_realtime_session
+            self.store.update_realtime_session(group.relay_origin, session)
+            current_realtime_session = session
+
         while not self._stop_event.is_set() and not self._refresh_event.is_set():
             receiver = self.receiver_factory(
                 relay_origin=group.relay_origin,
                 credentials=group.credentials,
                 on_url=self._handle_url,
+                realtime_session=current_realtime_session,
+                on_realtime_session=persist_realtime_session,
             )
             try:
                 await receiver.run()
@@ -196,6 +207,19 @@ def receiver_groups(snapshot: PairingStoreSnapshot) -> tuple[ReceiverGroup, ...]
                 phone_labels={
                     pair.pair_id: pair.phone_label for pair in pairs
                 },
+                realtime_session=(
+                    RealtimeSession(
+                        access_token=device.realtime_access_token,
+                        refresh_token=device.realtime_refresh_token,
+                        expires_at=device.realtime_expires_at,
+                        user_id=device.realtime_user_id,
+                    )
+                    if device.realtime_access_token is not None
+                    and device.realtime_refresh_token is not None
+                    and device.realtime_expires_at is not None
+                    and device.realtime_user_id is not None
+                    else None
+                ),
             )
         )
     return tuple(groups)

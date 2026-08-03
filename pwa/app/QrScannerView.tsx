@@ -45,6 +45,12 @@ export function QrScannerView({ onCancel, onDecoded }: QrScannerViewProps) {
       if (document.visibilityState === "hidden") onCancel();
     };
 
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onCancel();
+    };
+
     const startScanner = async () => {
       try {
         if (!window.isSecureContext) throw new DOMException("Insecure context", "SecurityError");
@@ -84,12 +90,14 @@ export function QrScannerView({ onCancel, onDecoded }: QrScannerViewProps) {
     };
 
     document.addEventListener("visibilitychange", closeWhenHidden);
+    document.addEventListener("keydown", closeOnEscape);
     window.addEventListener("pagehide", onCancel);
     void startScanner();
 
     return () => {
       cancelled = true;
       document.removeEventListener("visibilitychange", closeWhenHidden);
+      document.removeEventListener("keydown", closeOnEscape);
       window.removeEventListener("pagehide", onCancel);
       scannerRef.current?.destroy();
       scannerRef.current = null;
@@ -119,7 +127,13 @@ export function QrScannerView({ onCancel, onDecoded }: QrScannerViewProps) {
           <p className="eyebrow">ON-DEVICE SCANNING</p>
           <h2>Point at a QR code</h2>
         </div>
-        <button type="button" className="scanner-close" onClick={onCancel}>
+        <button
+          type="button"
+          className="scanner-close"
+          onClick={onCancel}
+          aria-keyshortcuts="Escape"
+          title="Close scanner (Esc)"
+        >
           Close
         </button>
       </header>

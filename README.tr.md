@@ -20,11 +20,13 @@ varsayılan tarayıcıda açılır ve QR Scanner otomatik olarak kapanır.
 > **No** seçilidir ve onaylanan masaüstü bilgileri Windows DPAPI ile korunur.
 > İsteğe bağlı kurulabilen PWA, QR'ı cihazda çözer, aynı Browser WebCrypto
 > eşleştirmesini uygular, kök anahtarı dışa aktarılamayan CryptoKey olarak saklar
-> ve kalıcı tepsi alıcısına uçtan uca şifreli URL gönderebilir. D1 relay yalnızca
-> kısa ömürlü şifreli zarfları yönlendirir ve PC çevrimdışıyken gönderiyi kabul
-> etmez. Açık internet endpoint'i henüz etkinleştirilmedi; gerçek Android Chrome
-> ve iOS Safari sürüm testleri de bekliyor. Bu nedenle özellik kararlı sürüme
-> hazır değildir.
+> ve kalıcı tepsi alıcısına uçtan uca şifreli URL gönderebilir. Mevcut Sites/D1
+> açık betası bir iPhone-Windows testini geçti. `codex/vercel-supabase` geçiş
+> dalında Vercel API, Supabase Postgres şeması, özel Realtime bildirim yolu ve
+> beş saniyelik kurtarma sorgusu yerel olarak doğrulandı; henüz üretim endpoint'i
+> değildir. Gerçek iPhone ve Android geçiş testleri tamamlanana kadar eski yayın
+> açık kalacaktır. Ayrıntılar için
+> [Vercel + Supabase geçiş planına](docs/vercel-supabase-migration.tr.md) bakın.
 
 ## Özellikler
 

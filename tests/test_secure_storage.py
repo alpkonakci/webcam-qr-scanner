@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import os
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
 from bridge.protocol import random_b64url
+from bridge.realtime import RealtimeSession
 from bridge.secure_storage import (
     DpapiProtector,
     PairingStore,
@@ -103,6 +105,28 @@ class PairingStoreTests(unittest.TestCase):
         snapshot = self.store.replace_device(replacement, clear_pairs=True)
         self.assertEqual(snapshot.devices, (replacement,))
         self.assertEqual(snapshot.pairs, ())
+
+    def test_realtime_session_is_rotated_inside_protected_store(self) -> None:
+        self.store.replace_device(self.device, clear_pairs=False)
+        session = RealtimeSession(
+            access_token="a" * 80,
+            refresh_token="r" * 48,
+            expires_at=int(time.time()) + 3600,
+            user_id="3f25129c-8558-4bdf-a37d-e70b650e25b1",
+        )
+
+        snapshot = self.store.update_realtime_session(
+            self.device.relay_origin,
+            session,
+        )
+
+        stored = snapshot.device_for(self.device.relay_origin)
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored.realtime_access_token, session.access_token)
+        self.assertEqual(stored.realtime_refresh_token, session.refresh_token)
+        protected = self.path.read_bytes()
+        self.assertNotIn(session.access_token.encode("ascii"), protected)
+        self.assertNotIn(session.refresh_token.encode("ascii"), protected)
 
 
 @unittest.skipUnless(os.name == "nt", "Windows DPAPI test")

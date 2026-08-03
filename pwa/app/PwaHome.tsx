@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { isLikelyMobileBrowser } from "../lib/device-kind";
 import { parseWebUrl } from "../lib/url-policy.mjs";
 import type { WebUrlResult } from "../lib/url-policy.mjs";
 import { getMostRecentPair } from "../lib/pair-store";
@@ -13,47 +14,24 @@ import { PairingView } from "./PairingView";
 import { QrResultView } from "./QrResultView";
 import { QrScannerView } from "./QrScannerView";
 
-interface InstallPromptEvent extends Event {
-  prompt(): Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
-
-function isStandalone(): boolean {
-  if (typeof window === "undefined") return false;
-  const iosNavigator = navigator as Navigator & { standalone?: boolean };
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    iosNavigator.standalone === true
-  );
-}
+const subscribeToStaticDeviceKind = () => () => {};
+const getServerDeviceKind = () => false;
 
 export function PwaHome() {
-  const [installPrompt, setInstallPrompt] =
-    useState<InstallPromptEvent | null>(null);
-  const [showInstallHelp, setShowInstallHelp] = useState(false);
-  const [installed, setInstalled] = useState(isStandalone);
   const [serviceWorkerReady, setServiceWorkerReady] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scanResult, setScanResult] = useState<WebUrlResult | null>(null);
   const [pairingUri, setPairingUri] = useState<string | null>(null);
   const [pairedPc, setPairedPc] = useState<SenderCredentials | null>(null);
   const [pairStoreReady, setPairStoreReady] = useState(false);
+  const isMobileClient = useSyncExternalStore(
+    subscribeToStaticDeviceKind,
+    isLikelyMobileBrowser,
+    getServerDeviceKind,
+  );
 
   useEffect(() => {
     let active = true;
-    const handleInstallPrompt = (event: Event) => {
-      event.preventDefault();
-      setInstallPrompt(event as InstallPromptEvent);
-    };
-
-    const handleInstalled = () => {
-      setInstalled(true);
-      setInstallPrompt(null);
-      setShowInstallHelp(false);
-    };
-
-    window.addEventListener("beforeinstallprompt", handleInstallPrompt);
-    window.addEventListener("appinstalled", handleInstalled);
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
@@ -84,8 +62,6 @@ export function PwaHome() {
 
     return () => {
       active = false;
-      window.removeEventListener("beforeinstallprompt", handleInstallPrompt);
-      window.removeEventListener("appinstalled", handleInstalled);
     };
   }, []);
 
@@ -94,7 +70,6 @@ export function PwaHome() {
   const handleDecoded = useCallback((value: string) => {
     setScannerOpen(false);
     if (isPairingUri(value)) {
-      setScanResult(null);
       setPairingUri(value);
       return;
     }
@@ -108,18 +83,9 @@ export function PwaHome() {
     setScannerOpen(true);
   };
 
-  const requestInstall = async () => {
-    if (installed) return;
-
-    if (!installPrompt) {
-      setShowInstallHelp(true);
-      return;
-    }
-
-    await installPrompt.prompt();
-    const choice = await installPrompt.userChoice;
-    setInstallPrompt(null);
-    if (choice.outcome === "accepted") setInstalled(true);
+  const startPairingScanner = () => {
+    setPairingUri(null);
+    setScannerOpen(true);
   };
 
   return (
@@ -148,7 +114,13 @@ export function PwaHome() {
             onCancel={() => setPairingUri(null)}
           />
         ) : scanResult ? (
-          <QrResultView result={scanResult} pairedPc={pairedPc} onScanAgain={startScanner} />
+          <QrResultView
+            result={scanResult}
+            pairedPc={pairedPc}
+            isMobileClient={isMobileClient}
+            onPairPc={startPairingScanner}
+            onScanAgain={startScanner}
+          />
         ) : (
           <>
             <div className="hero-copy">
@@ -180,15 +152,6 @@ export function PwaHome() {
                 <span className="action-arrow" aria-hidden="true">→</span>
               </button>
 
-              <button
-                className="secondary-action"
-                type="button"
-                onClick={requestInstall}
-                disabled={installed}
-              >
-                <span>{installed ? "Added to Home Screen" : "Install app"}</span>
-                <span aria-hidden="true">{installed ? "✓" : "↓"}</span>
-              </button>
             </section>
 
             <section className="privacy-panel" aria-labelledby="privacy-title">
@@ -218,28 +181,6 @@ export function PwaHome() {
         <QrScannerView onCancel={closeScanner} onDecoded={handleDecoded} />
       )}
 
-      {showInstallHelp && (
-        <div className="sheet-backdrop" role="presentation">
-          <section
-            className="install-sheet"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="install-title"
-          >
-            <div className="sheet-handle" aria-hidden="true" />
-            <p className="section-kicker">INSTALL OPTIONAL</p>
-            <h2 id="install-title">Add QR Scanner to your Home Screen</h2>
-            <p>
-              On iPhone, open the Share menu and choose <strong>Add to Home
-              Screen</strong>. On Android, open the browser menu and choose
-              <strong> Install app</strong> or <strong>Add to Home screen</strong>.
-            </p>
-            <button type="button" onClick={() => setShowInstallHelp(false)}>
-              Got it
-            </button>
-          </section>
-        </div>
-      )}
     </main>
   );
 }

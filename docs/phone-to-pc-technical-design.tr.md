@@ -1263,3 +1263,24 @@ gerçek uçtan uca eşleştirme ve gönderim testlerini tamamlamaktır.**
 - [Microsoft DPAPI `CryptProtectData`](https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata)
 - [OWASP MASVS](https://mas.owasp.org/MASVS/)
 - [OWASP API resource and rate limits](https://owasp.org/API-Security/editions/2019/en/0xa4-lack-of-resources-and-rate-limiting/)
+
+## 25. Vercel + Supabase geçiş kararı
+
+3 Ağustos 2026'da üretim adayı barındırma hedefi Vercel + Supabase olarak
+seçildi. PWA ve aynı-origin `/v1` API standart Next.js ile Vercel'de; kısa
+ömürlü opaque relay durumu Supabase Postgres'te tutulacaktır. Supabase Realtime
+özel cihaz kanalı birincil wake-up yoludur. Realtime mesajı yalnızca rastgele
+`delivery_id` taşır; PC şifreli zarfı mevcut bearer-token API'sinden alır.
+WebSocket bildirimi kaybolursa beş saniyelik polling kurtarma yolu devreye girer.
+
+PC özel kanala e-posta veya telefon istemeyen anonim Supabase Auth oturumuyla
+bağlanır. Oturum token'ları mevcut DPAPI korumalı credential dosyasında saklanır
+ve yenilenirken döndürülür. Supabase secret key yalnızca Vercel server ortamında
+bulunur ve yeni anahtar modeline uygun olarak `apikey` başlığında kullanılır;
+PWA veya EXE içine gömülmez.
+
+Geçiş kesintisizdir: mevcut Sites/D1 endpoint'i, yeni Vercel Production origin'i
+gerçek iPhone ve Android uçtan uca testlerini geçene kadar kaldırılmaz. Origin
+değişimi nedeniyle kullanıcı bir kez yeniden eşleştirme yapar. Ayrıntılı işlem
+sırası ve geri dönüş planı
+[`vercel-supabase-migration.tr.md`](vercel-supabase-migration.tr.md) belgesindedir.

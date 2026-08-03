@@ -33,6 +33,10 @@ from bridge.protocol import (
     b64url_decode,
     normalize_relay_origin,
 )
+from bridge.realtime import (
+    create_anonymous_session,
+    fetch_realtime_config,
+)
 from bridge.secure_storage import (
     PairingStore,
     RelayDevice,
@@ -87,7 +91,10 @@ class PairingController:
         pairing_qr_value = (
             session.pairing_uri
             if development_mode
-            else build_pairing_launch_url(session.pairing_uri)
+            else build_pairing_launch_url(
+                session.pairing_uri,
+                pwa_origin=self.relay_origin,
+            )
         )
         request_received = threading.Event()
         phone_opened = threading.Event()
@@ -238,11 +245,22 @@ class PairingController:
         )
 
     async def _register_device(self, *, clear_old_pairs: bool) -> RelayDevice:
+        realtime_config = await fetch_realtime_config(self.relay_origin)
+        realtime_session = (
+            await create_anonymous_session(realtime_config)
+            if realtime_config is not None
+            else None
+        )
+        headers = (
+            {"Authorization": f"Bearer {realtime_session.access_token}"}
+            if realtime_session is not None
+            else None
+        )
         async with httpx.AsyncClient(
             base_url=self.relay_origin,
             timeout=5,
         ) as client:
-            response = await client.post("/v1/devices")
+            response = await client.post("/v1/devices", headers=headers)
         if response.status_code != 201:
             raise PairingTransportError(
                 status_code=response.status_code,
@@ -267,6 +285,26 @@ class PairingController:
             relay_origin=self.relay_origin,
             device_id=body["device_id"],
             receiver_token=body["receiver_token"],
+            realtime_access_token=(
+                realtime_session.access_token
+                if realtime_session is not None
+                else None
+            ),
+            realtime_refresh_token=(
+                realtime_session.refresh_token
+                if realtime_session is not None
+                else None
+            ),
+            realtime_expires_at=(
+                realtime_session.expires_at
+                if realtime_session is not None
+                else None
+            ),
+            realtime_user_id=(
+                realtime_session.user_id
+                if realtime_session is not None
+                else None
+            ),
         )
         self.store.replace_device(
             device,

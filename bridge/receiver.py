@@ -21,10 +21,18 @@ from bridge.protocol import (
     normalize_relay_origin,
 )
 from bridge.replay import InMemoryReplayGuard
+from bridge.realtime import (
+    RealtimeConfig,
+    RealtimeSession,
+    RealtimeTransportError,
+    RealtimeWakeupClient,
+    fetch_realtime_config,
+)
 
 
 UrlCallback = Callable[[ReceivedUrl], None | Awaitable[None]]
-POLL_INTERVAL_SECONDS = 1.0
+SessionCallback = Callable[[RealtimeSession], None | Awaitable[None]]
+LEGACY_POLL_INTERVAL_SECONDS = 1.0
 
 
 class PcReceiver:
@@ -37,6 +45,8 @@ class PcReceiver:
         credentials: ReceiverCredentials | Sequence[ReceiverCredentials],
         on_url: UrlCallback,
         replay_guard: InMemoryReplayGuard | None = None,
+        realtime_session: RealtimeSession | None = None,
+        on_realtime_session: SessionCallback | None = None,
     ) -> None:
         self.relay_origin = normalize_relay_origin(relay_origin)
         credential_items = (
@@ -65,6 +75,8 @@ class PcReceiver:
         }
         self.on_url = on_url
         self.replay_guard = replay_guard or InMemoryReplayGuard()
+        self.realtime_session = realtime_session
+        self.on_realtime_session = on_realtime_session
         self.connected = asyncio.Event()
 
     async def run(self, *, stop_after: int | None = None) -> None:
@@ -74,7 +86,21 @@ class PcReceiver:
         if hostname in {"127.0.0.1", "::1", "localhost"}:
             await self._run_websocket(stop_after=stop_after)
             return
-        await self._run_polling(stop_after=stop_after)
+        realtime_config = await fetch_realtime_config(self.relay_origin)
+        if realtime_config is None:
+            await self._run_polling(
+                stop_after=stop_after,
+                poll_interval_seconds=LEGACY_POLL_INTERVAL_SECONDS,
+            )
+            return
+        if self.realtime_session is None:
+            raise RealtimeTransportError(
+                "The paired device has no Realtime session"
+            )
+        await self._run_realtime_with_fallback(
+            realtime_config=realtime_config,
+            stop_after=stop_after,
+        )
 
     async def _run_websocket(self, *, stop_after: int | None) -> None:
         websocket_url = _websocket_url(
@@ -116,7 +142,12 @@ class PcReceiver:
                 if stop_after is not None and delivered >= stop_after:
                     return
 
-    async def _run_polling(self, *, stop_after: int | None) -> None:
+    async def _run_polling(
+        self,
+        *,
+        stop_after: int | None,
+        poll_interval_seconds: float,
+    ) -> None:
         delivered = 0
         headers = {
             "Authorization": f"Bearer {self.credentials.receiver_token}"
@@ -128,44 +159,107 @@ class PcReceiver:
             headers=headers,
         ) as client:
             while True:
-                response = await client.get(path)
-                if response.status_code == 204:
-                    self.connected.set()
-                    await asyncio.sleep(POLL_INTERVAL_SECONDS)
+                handled = await self._poll_once(client, path)
+                if handled:
+                    delivered += 1
+                    if stop_after is not None and delivered >= stop_after:
+                        return
                     continue
-                response.raise_for_status()
-                self.connected.set()
-                raw_event: object = response.json()
-                try:
-                    event = _parse_delivery_event(raw_event)
-                    received, acknowledgement = self._decrypt_event(event)
-                except (ProtocolViolation, ValueError, json.JSONDecodeError):
-                    delivery_id = _best_effort_delivery_id(raw_event)
-                    if delivery_id is not None:
-                        await client.post(
-                            f"/v1/devices/{self.credentials.device_id}"
-                            f"/deliveries/{delivery_id}",
-                            json={
-                                "event": "delivery_error",
-                                "delivery_id": delivery_id,
-                            },
-                        )
-                    continue
+                await asyncio.sleep(poll_interval_seconds)
 
-                acknowledgement_response = await client.post(
+    async def _run_realtime_with_fallback(
+        self,
+        *,
+        realtime_config: RealtimeConfig,
+        stop_after: int | None,
+    ) -> None:
+        wakeup = asyncio.Event()
+        connection_changed = asyncio.Event()
+        realtime = RealtimeWakeupClient(
+            config=realtime_config,
+            session=self.realtime_session,
+            device_id=self.credentials.device_id,
+            on_wakeup=wakeup.set,
+            on_session=self.on_realtime_session,
+            on_connection_change=lambda _: connection_changed.set(),
+        )
+        realtime_task = asyncio.create_task(
+            realtime.run(),
+            name=f"realtime-{self.credentials.device_id[:8]}",
+        )
+        delivered = 0
+        headers = {
+            "Authorization": f"Bearer {self.credentials.receiver_token}"
+        }
+        path = f"/v1/devices/{self.credentials.device_id}/messages"
+        try:
+            async with httpx.AsyncClient(
+                base_url=self.relay_origin,
+                timeout=8,
+                headers=headers,
+            ) as client:
+                while True:
+                    wakeup.clear()
+                    connection_changed.clear()
+                    handled = await self._poll_once(client, path)
+                    if handled:
+                        delivered += 1
+                        if stop_after is not None and delivered >= stop_after:
+                            return
+                        continue
+                    timeout = (
+                        realtime_config.connected_resync_seconds
+                        if realtime.connected.is_set()
+                        else realtime_config.fallback_poll_seconds
+                    )
+                    await _wait_for_any_event(
+                        (wakeup, connection_changed),
+                        timeout=timeout,
+                    )
+        finally:
+            realtime_task.cancel()
+            await asyncio.gather(realtime_task, return_exceptions=True)
+
+    async def _poll_once(
+        self,
+        client: httpx.AsyncClient,
+        path: str,
+    ) -> bool:
+        response = await client.get(path)
+        if response.status_code == 204:
+            self.connected.set()
+            return False
+        response.raise_for_status()
+        self.connected.set()
+        raw_event: object = response.json()
+        try:
+            event = _parse_delivery_event(raw_event)
+            received, acknowledgement = self._decrypt_event(event)
+        except (ProtocolViolation, ValueError, json.JSONDecodeError):
+            delivery_id = _best_effort_delivery_id(raw_event)
+            if delivery_id is not None:
+                await client.post(
                     f"/v1/devices/{self.credentials.device_id}"
-                    f"/deliveries/{event['delivery_id']}",
+                    f"/deliveries/{delivery_id}",
                     json={
-                        "event": "delivery_ack",
-                        "delivery_id": event["delivery_id"],
-                        "envelope": acknowledgement,
+                        "event": "delivery_error",
+                        "delivery_id": delivery_id,
                     },
                 )
-                acknowledgement_response.raise_for_status()
-                await _run_callback(self.on_url, received)
-                delivered += 1
-                if stop_after is not None and delivered >= stop_after:
-                    return
+            return False
+
+        acknowledgement_response = await client.post(
+            f"/v1/devices/{self.credentials.device_id}"
+            f"/deliveries/{event['delivery_id']}",
+            json={
+                "event": "delivery_ack",
+                "delivery_id": event["delivery_id"],
+                "envelope": acknowledgement,
+            },
+        )
+        acknowledgement_response.raise_for_status()
+        await _run_callback(self.on_url, received)
+        return True
 
     def _decrypt_event(
         self,
@@ -245,3 +339,21 @@ async def _run_callback(callback: UrlCallback, received: ReceivedUrl) -> None:
     result = await asyncio.to_thread(callback, received)
     if inspect.isawaitable(result):
         await result
+
+
+async def _wait_for_any_event(
+    events: Sequence[asyncio.Event],
+    *,
+    timeout: float,
+) -> None:
+    waiters = [asyncio.create_task(event.wait()) for event in events]
+    try:
+        await asyncio.wait(
+            waiters,
+            timeout=timeout,
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+    finally:
+        for waiter in waiters:
+            waiter.cancel()
+        await asyncio.gather(*waiters, return_exceptions=True)

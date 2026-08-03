@@ -1,8 +1,14 @@
 # QR Scanner Phone-to-PC PWA
 
 This directory contains the install-optional mobile web companion for Webcam QR
-Scanner. It is intentionally isolated from the Python desktop application and
-relay service.
+Scanner and the Vercel-hosted relay API. The WQRS/1 cryptographic contract stays
+shared with the Python desktop application while deployment-specific code stays
+inside this directory.
+
+> **Migration status:** `codex/vercel-supabase` contains the tested first
+> Vercel + Supabase migration slice. The existing Sites/Cloudflare beta remains
+> live until the replacement passes real-device tests; this branch is not the
+> production endpoint yet.
 
 ## Current scope
 
@@ -11,7 +17,7 @@ The current PWA milestone includes:
 - a responsive mobile application shell;
 - an installable web manifest and platform icons;
 - optional Home Screen installation guidance;
-- a minimal service worker that caches only public static branding assets;
+- a minimal service worker that caches no URL, token, key or relay response;
 - first-party-only runtime resources;
 - restrictive security and permissions headers;
 - a camera scanner started only by an explicit user action;
@@ -26,16 +32,18 @@ The current PWA milestone includes:
 - non-extractable root-key persistence in IndexedDB;
 - end-to-end encrypted **Send to PC** with an authenticated delivery receipt;
 - automatic camera cleanup when the scanner closes or the page is hidden;
-- a D1-backed relay API that stores only short-lived opaque envelopes and
-  refuses messages when the PC receiver is offline;
-- automated render, URL-policy, protocol-vector, D1 relay, manifest,
-  cache-policy and security-header tests.
+- a Supabase Postgres relay schema that stores only short-lived opaque
+  envelopes and refuses messages when the PC receiver is offline;
+- private Supabase Realtime device wake-ups with a five-second recovery poll;
+- anonymous, device-only Realtime authentication with no email or phone number;
+- automated shell, URL-policy, protocol-vector, D1 compatibility, Vercel relay,
+  manifest, cache-policy and security-header tests.
 
-**Open on this phone**, browser pairing, and encrypted **Send to PC** are
-available through the public beta endpoint. One complete iPhone-to-Windows
-pairing and encrypted URL delivery has been verified manually. Broad Android
-Chrome and iOS Safari testing plus an independent security review are still
-required, so this remains a preview rather than a stable public service.
+**Open link in new tab**, browser pairing, and encrypted **Send to PC** remain
+available through the existing public beta endpoint. The Vercel + Supabase
+replacement is locally built and automatically tested but is not live yet.
+Broad Android Chrome and iOS Safari testing plus an independent security review
+are still required, so this remains a preview rather than a stable service.
 
 ## Local development
 
@@ -51,6 +59,12 @@ npm test
 npm run lint
 ```
 
+Relay endpoints additionally require the values documented in `.env.example`.
+Never put a real `SUPABASE_SECRET_KEY` in source control or client code. The
+Supabase schema is in
+`../supabase/migrations/202608030001_phone_to_pc_relay.sql`; the Turkish cutover
+runbook is in `../docs/vercel-supabase-migration.tr.md`.
+
 ## Privacy boundary
 
 The camera permission is requested only after the user presses **Scan QR** and
@@ -64,5 +78,8 @@ The PWA never requests microphone, location, photo-library, Bluetooth or
 local-network access. It has no analytics, advertising or third-party runtime
 scripts. The service worker never intercepts application requests and never
 caches URLs, relay responses, tokens or cryptographic keys. Pair credentials
-are stored only in IndexedDB; the root key is a non-extractable CryptoKey. See
+are stored only in IndexedDB; the root key is a non-extractable CryptoKey.
+Supabase's anonymous device session requests no email, phone number or profile.
+Hosting providers may still process standard connection metadata such as IP
+addresses under their own infrastructure policies. See
 `THIRD_PARTY_NOTICES.md` for the bundled decoder license.

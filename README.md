@@ -21,10 +21,12 @@ default browser, and closes the scanner automatically.
 > The install-optional PWA decodes QR codes on-device, performs the matching
 > Browser WebCrypto pairing, stores its root key as a non-extractable CryptoKey,
 > and can send an end-to-end encrypted URL to the persistent tray receiver.
-> The included D1 relay routes only short-lived opaque envelopes and rejects
-> sends while the PC is offline. The public endpoint has not been enabled and
-> real Android Chrome/iOS Safari release tests are still pending, so this is not
-> a stable release yet.
+> The existing Sites/D1 public beta has completed one iPhone-to-Windows test.
+> The `codex/vercel-supabase` migration branch now contains the locally tested
+> Vercel API, Supabase Postgres schema, private Realtime wake-up path and
+> five-second recovery poll. It is not the production endpoint yet; the old
+> deployment stays available until real iPhone and Android cutover tests pass.
+> See the [Turkish migration runbook](docs/vercel-supabase-migration.tr.md).
 
 ## Features
 

@@ -8,12 +8,20 @@ import type { WebUrlResult } from "../lib/url-policy.mjs";
 interface QrResultViewProps {
   result: WebUrlResult;
   pairedPc: SenderCredentials | null;
+  isMobileClient: boolean;
+  onPairPc(): void;
   onScanAgain(): void;
 }
 
 type DeliveryState = "idle" | "sending" | "delivered" | "error";
 
-export function QrResultView({ result, pairedPc, onScanAgain }: QrResultViewProps) {
+export function QrResultView({
+  result,
+  pairedPc,
+  isMobileClient,
+  onPairPc,
+  onScanAgain,
+}: QrResultViewProps) {
   const [deliveryState, setDeliveryState] = useState<DeliveryState>("idle");
   const [deliveryMessage, setDeliveryMessage] = useState("");
   if (!result.ok) {
@@ -32,8 +40,8 @@ export function QrResultView({ result, pairedPc, onScanAgain }: QrResultViewProp
     );
   }
 
-  const openOnPhone = () => {
-    window.location.assign(result.href);
+  const openInNewTab = () => {
+    window.open(result.href, "_blank", "noopener,noreferrer");
   };
 
   const sendToPc = async () => {
@@ -66,18 +74,34 @@ export function QrResultView({ result, pairedPc, onScanAgain }: QrResultViewProp
       </div>
 
       <div className="result-actions">
-        <button type="button" className="result-primary" onClick={openOnPhone}>
-          Open on this phone
-        </button>
         <button
           type="button"
-          className={`result-secondary ${pairedPc ? "result-secondary-enabled" : ""}`}
-          disabled={!pairedPc || deliveryState === "sending" || deliveryState === "delivered"}
-          onClick={sendToPc}
+          className="result-primary"
+          onClick={openInNewTab}
         >
-          <span>{deliveryState === "sending" ? "Sending..." : "Send to PC"}</span>
-          <small>{pairedPc ? pairedPc.pcLabel : "Pair a PC first"}</small>
+          Open link in new tab
         </button>
+        {isMobileClient &&
+          (pairedPc ? (
+            <button
+              type="button"
+              className="result-secondary result-secondary-enabled"
+              disabled={deliveryState === "sending" || deliveryState === "delivered"}
+              onClick={sendToPc}
+            >
+              <span>{deliveryState === "sending" ? "Sending..." : "Send to PC"}</span>
+              <small>{pairedPc.pcLabel}</small>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="result-secondary result-secondary-enabled"
+              onClick={onPairPc}
+            >
+              <span>Pair a PC</span>
+              <small>Scan the pairing QR shown on your PC</small>
+            </button>
+          ))}
         {deliveryMessage && (
           <p
             className={`delivery-status delivery-status-${deliveryState}`}

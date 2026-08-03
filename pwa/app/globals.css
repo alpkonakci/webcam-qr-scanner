@@ -158,8 +158,7 @@ h1 {
   gap: 12px;
 }
 
-.primary-action,
-.secondary-action {
+.primary-action {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -226,27 +225,6 @@ h1 {
   font-weight: 500;
 }
 
-.secondary-action {
-  min-height: 54px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 18px;
-  cursor: pointer;
-  color: #bff7f3;
-  background: linear-gradient(90deg, rgba(50, 215, 204, 0.13), rgba(50, 215, 204, 0.06));
-  transition: border-color 160ms ease, background 160ms ease;
-}
-
-.secondary-action:hover,
-.secondary-action:focus-visible {
-  border-color: rgba(50, 215, 204, 0.55);
-  background: rgba(50, 215, 204, 0.17);
-  outline: none;
-}
-
-.secondary-action:disabled { cursor: default; color: #9ce8c1; }
-
 .privacy-panel {
   margin-top: 16px;
   border: 1px solid rgba(28, 49, 73, 0.72);
@@ -255,8 +233,7 @@ h1 {
   background: rgba(8, 17, 31, 0.72);
 }
 
-.privacy-panel h2,
-.install-sheet h2 {
+.privacy-panel h2 {
   margin: 5px 0 0;
   font-size: 1rem;
   letter-spacing: -0.015em;
@@ -402,9 +379,14 @@ footer {
 }
 
 .result-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   color: #031313;
   background: var(--accent);
+  text-align: center;
+  text-decoration: none;
 }
 
 .result-primary:hover,
@@ -674,53 +656,6 @@ footer {
   color: #061414;
   background: var(--accent);
   font-weight: 760;
-  cursor: pointer;
-}
-
-.sheet-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  display: grid;
-  align-items: end;
-  padding: 16px;
-  background: rgba(1, 6, 12, 0.72);
-  backdrop-filter: blur(9px);
-}
-
-.install-sheet {
-  width: min(100%, 480px);
-  margin: 0 auto;
-  border: 1px solid var(--line);
-  border-radius: 24px;
-  padding: 12px 22px max(22px, env(safe-area-inset-bottom));
-  background: #0d1929;
-  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.48);
-}
-
-.sheet-handle {
-  width: 42px;
-  height: 4px;
-  margin: 0 auto 22px;
-  border-radius: 999px;
-  background: #35445a;
-}
-
-.install-sheet > p:not(.section-kicker) {
-  margin: 14px 0 22px;
-  color: var(--muted);
-  font-size: 0.9rem;
-  line-height: 1.6;
-}
-
-.install-sheet button {
-  width: 100%;
-  min-height: 50px;
-  border: 0;
-  border-radius: 14px;
-  color: #041313;
-  background: var(--accent);
-  font-weight: 800;
   cursor: pointer;
 }
 
