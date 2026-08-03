@@ -88,14 +88,15 @@ def run_home() -> int:
     """Show the lightweight control center in its own GUI process."""
 
     from home_ui import HomeAction, show_home_window
+    from native_dialogs import confirm_application_exit
 
-    action = show_home_window()
+    action = show_home_window(confirm_exit=confirm_application_exit)
     return {
         HomeAction.BACKGROUND: 0,
         HomeAction.SCAN_CAMERA: CONTROL_SCAN_CAMERA,
         HomeAction.SCAN_SCREEN: CONTROL_SCAN_SCREEN,
         HomeAction.PAIR_PHONE: CONTROL_PAIR_PHONE,
-        HomeAction.EXIT: CONTROL_EXIT_REQUESTED,
+        HomeAction.EXIT: APPLICATION_EXIT_REQUESTED,
     }[action]
 
 

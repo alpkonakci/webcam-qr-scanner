@@ -100,12 +100,15 @@ class TrayApplication:
         self._pairing_window_closed.set()
         self.receiver_service = receiver_service or ReceiverService(
             before_prompt=self._prepare_for_foreground_dialog,
+            after_prompt=self._finish_foreground_dialog,
         )
         self._children: set[subprocess.Popen[bytes]] = set()
         self._camera_process: subprocess.Popen[bytes] | None = None
         self._home_process: subprocess.Popen[bytes] | None = None
         self._pairing_thread: threading.Thread | None = None
         self._children_lock = threading.RLock()
+        self._exit_prompt_lock = threading.Lock()
+        self._foreground_dialog_count = 0
         pairing_status = (
             "ready"
             if self.receiver_service.has_paired_phones()
@@ -215,11 +218,6 @@ class TrayApplication:
                 daemon=True,
             )
             self._pairing_thread.start()
-            threading.Thread(
-                target=self._restore_home_after_pairing_window,
-                name="pairing-window-monitor",
-                daemon=True,
-            ).start()
 
     def _run_pairing(self) -> None:
         try:
@@ -268,16 +266,31 @@ class TrayApplication:
             window_closed_event=self._pairing_window_closed,
         ).run()
 
-    def _restore_home_after_pairing_window(self) -> None:
-        self._pairing_window_closed.wait()
-        if not self._stop_event.is_set():
-            self._launch_home()
-
     def _prepare_for_foreground_dialog(self) -> None:
-        """Dismiss a transient pairing window before a security prompt."""
+        """Remove transient UI before a modal security decision appears."""
 
+        with self._children_lock:
+            self._foreground_dialog_count += 1
         self._pairing_cancel_event.set()
         self._pairing_window_closed.wait(timeout=1.0)
+        process = self._dismiss_home()
+        self._wait_for_child_exit(process)
+
+    def _finish_foreground_dialog(self, opened_external_window: bool) -> None:
+        """Restore the control center only when no browser took focus."""
+
+        with self._children_lock:
+            self._foreground_dialog_count = max(
+                0,
+                self._foreground_dialog_count - 1,
+            )
+            should_restore = (
+                self._foreground_dialog_count == 0
+                and not opened_external_window
+                and not self._stop_event.is_set()
+            )
+        if should_restore:
+            self._launch_home()
 
     def _toggle_startup(
         self,
@@ -300,8 +313,7 @@ class TrayApplication:
         _: pystray.Icon,
         __: pystray.MenuItem,
     ) -> None:
-        if confirm_application_exit():
-            self._stop()
+        self._request_full_exit()
 
     def _launch_camera(
         self,
@@ -341,7 +353,7 @@ class TrayApplication:
 
     def _launch_home(self) -> None:
         with self._children_lock:
-            if self._stop_event.is_set():
+            if self._stop_event.is_set() or self._foreground_dialog_count > 0:
                 return
             if (
                 self._home_process is not None
@@ -407,18 +419,50 @@ class TrayApplication:
             self._start_pairing()
             return
         if return_code == CONTROL_EXIT_REQUESTED:
-            if confirm_application_exit():
-                self._stop()
-            else:
-                self._launch_home()
+            self._request_full_exit()
 
-    def _dismiss_home_locked(self) -> None:
+    def _request_full_exit(self) -> None:
+        """Serialize full-exit requests and keep their question accessible."""
+
+        if not self._exit_prompt_lock.acquire(blocking=False):
+            return
+        approved = False
+        try:
+            self._prepare_for_foreground_dialog()
+            approved = confirm_application_exit()
+            if approved:
+                self._stop()
+        finally:
+            self._finish_foreground_dialog(approved)
+            self._exit_prompt_lock.release()
+
+    def _dismiss_home(self) -> subprocess.Popen[bytes] | None:
+        with self._children_lock:
+            return self._dismiss_home_locked()
+
+    def _dismiss_home_locked(self) -> subprocess.Popen[bytes] | None:
         process = self._home_process
         if process is None:
-            return
+            return None
         self._home_process = None
         if process.poll() is None:
             process.terminate()
+        return process
+
+    @staticmethod
+    def _wait_for_child_exit(
+        process: subprocess.Popen[bytes] | None,
+    ) -> None:
+        if process is None or process.poll() is not None:
+            return
+        try:
+            process.wait(timeout=CHILD_EXIT_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            try:
+                process.wait(timeout=CHILD_EXIT_TIMEOUT_SECONDS)
+            except subprocess.TimeoutExpired:
+                pass
 
     def _notify(self, message: str, title: str) -> bool:
         if not self.icon.HAS_NOTIFICATION:

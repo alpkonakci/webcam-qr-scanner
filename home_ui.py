@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -175,7 +176,10 @@ def build_home_canvas(
     return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
 
 
-def show_home_window() -> HomeAction:
+def show_home_window(
+    *,
+    confirm_exit: Callable[[], bool] | None = None,
+) -> HomeAction:
     """Show the control center; Escape and window close keep the tray alive."""
 
     state = HomeWindowState()
@@ -202,7 +206,7 @@ def show_home_window() -> HomeAction:
 
     try:
         first_frame = True
-        while state.selected_action is None:
+        while True:
             cv2.imshow(
                 WINDOW_TITLE,
                 build_home_canvas(hover_action=state.hover_action),
@@ -220,7 +224,17 @@ def show_home_window() -> HomeAction:
                 < 1
             ):
                 return HomeAction.BACKGROUND
-        return state.selected_action
+            if state.selected_action is None:
+                continue
+            if (
+                state.selected_action is HomeAction.EXIT
+                and confirm_exit is not None
+                and not confirm_exit()
+            ):
+                state.selected_action = None
+                state.hover_action = None
+                continue
+            return state.selected_action
     finally:
         try:
             cv2.destroyWindow(WINDOW_TITLE)
@@ -269,21 +283,28 @@ def _primary_screen_size() -> tuple[int, int]:
 
 
 def _bring_home_window_to_front() -> None:
-    """Keep the short-lived control center visible after a scanner closes."""
+    """Raise the control center once without leaving it always on top."""
 
     try:
         cv2.setWindowProperty(WINDOW_TITLE, cv2.WND_PROP_TOPMOST, 1)
     except cv2.error:
         pass
 
-    if os.name != "nt":
-        return
     try:
-        user32 = ctypes.windll.user32
-        window_handle = user32.FindWindowW(None, WINDOW_TITLE)
-        if window_handle:
-            user32.ShowWindow(window_handle, 9)  # SW_RESTORE
-            user32.BringWindowToTop(window_handle)
-            user32.SetForegroundWindow(window_handle)
-    except (AttributeError, OSError):
+        if os.name == "nt":
+            user32 = ctypes.windll.user32
+            find_window = user32.FindWindowW
+            find_window.argtypes = (ctypes.c_wchar_p, ctypes.c_wchar_p)
+            find_window.restype = ctypes.c_void_p
+            window_handle = find_window(None, WINDOW_TITLE)
+            if window_handle:
+                user32.ShowWindow(window_handle, 9)  # SW_RESTORE
+                user32.BringWindowToTop(window_handle)
+                user32.SetForegroundWindow(window_handle)
+    except (AttributeError, OSError, TypeError, ValueError):
         pass
+    finally:
+        try:
+            cv2.setWindowProperty(WINDOW_TITLE, cv2.WND_PROP_TOPMOST, 0)
+        except cv2.error:
+            pass

@@ -37,6 +37,15 @@ class LauncherTests(unittest.TestCase):
 
         self.assertEqual(result, CONTROL_PAIR_PHONE)
 
+    def test_confirmed_home_exit_requests_full_application_shutdown(self) -> None:
+        with patch(
+            "home_ui.show_home_window",
+            return_value=HomeAction.EXIT,
+        ):
+            result = launcher.main(["--home-process"])
+
+        self.assertEqual(result, APPLICATION_EXIT_REQUESTED)
+
     def test_self_test_does_not_emit_camera_lifecycle_signal(self) -> None:
         with patch("launcher.run_camera", return_value=0) as run_camera:
             result = launcher.main(["--self-test"])

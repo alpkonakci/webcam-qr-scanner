@@ -104,6 +104,7 @@ class ReceiverServiceTests(unittest.TestCase):
         order: list[str] = []
         service = ReceiverService(
             before_prompt=lambda: order.append("dismiss"),
+            after_prompt=lambda opened: order.append(f"restore:{opened}"),
             confirmer=lambda *_, **__: order.append("confirm") or False,
         )
 
@@ -117,7 +118,27 @@ class ReceiverServiceTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(order, ["dismiss", "confirm"])
+        self.assertEqual(order, ["dismiss", "confirm", "restore:False"])
+
+    def test_prompt_cleanup_knows_when_browser_was_opened(self) -> None:
+        outcomes: list[bool] = []
+        service = ReceiverService(
+            confirmer=Mock(return_value=True),
+            url_opener=Mock(return_value=True),
+            after_prompt=outcomes.append,
+        )
+
+        service._handle_url(
+            ReceivedUrl(
+                pair_id=self.first_pair.pair_id,
+                message_id=random_b64url(16),
+                url="https://example.com/",
+                hostname_ascii="example.com",
+                is_secure=True,
+            )
+        )
+
+        self.assertEqual(outcomes, [True])
 
 
 if __name__ == "__main__":

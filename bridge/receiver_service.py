@@ -40,12 +40,14 @@ class ReceiverService:
         confirmer: Callable[..., bool] = confirm_phone_url,
         url_opener: Callable[[str], bool] = open_web_url,
         before_prompt: Callable[[], None] | None = None,
+        after_prompt: Callable[[bool], None] | None = None,
     ) -> None:
         self.store = store or PairingStore()
         self.receiver_factory = receiver_factory
         self.confirmer = confirmer
         self.url_opener = url_opener
         self.before_prompt = before_prompt
+        self.after_prompt = after_prompt
         self._stop_event = threading.Event()
         self._refresh_event = threading.Event()
         self._thread: threading.Thread | None = None
@@ -151,14 +153,19 @@ class ReceiverService:
         # one security decision at a time and dismiss transient scanner UI
         # before asking it so the question cannot be hidden behind that UI.
         with self._prompt_lock:
-            if self.before_prompt is not None:
-                self.before_prompt()
-            if self.confirmer(
-                received.url,
-                received.hostname_ascii,
-                phone_label=phone_label,
-            ):
-                self.url_opener(received.url)
+            opened = False
+            try:
+                if self.before_prompt is not None:
+                    self.before_prompt()
+                if self.confirmer(
+                    received.url,
+                    received.hostname_ascii,
+                    phone_label=phone_label,
+                ):
+                    opened = self.url_opener(received.url)
+            finally:
+                if self.after_prompt is not None:
+                    self.after_prompt(opened)
 
 
 def receiver_groups(snapshot: PairingStoreSnapshot) -> tuple[ReceiverGroup, ...]:

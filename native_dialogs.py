@@ -18,9 +18,16 @@ IDYES = 6
 
 
 _DIALOG_LOCK = threading.RLock()
+DEFAULT_OWNER_TITLE = "QR Scanner"
 
 
-def show_dialog(title: str, message: str, style: int = MB_OK) -> int:
+def show_dialog(
+    title: str,
+    message: str,
+    style: int = MB_OK,
+    *,
+    owner_title: str | None = DEFAULT_OWNER_TITLE,
+) -> int:
     """Show a native Windows message box and return the selected button."""
 
     if os.name != "nt":
@@ -30,14 +37,38 @@ def show_dialog(title: str, message: str, style: int = MB_OK) -> int:
     # home or pairing window. Serializing them also prevents an exit question
     # and an incoming-link question from covering each other.
     with _DIALOG_LOCK:
+        user32 = ctypes.windll.user32
+        owner_handle = _find_window_handle(user32, owner_title)
+        message_box = user32.MessageBoxW
+        message_box.argtypes = (
+            ctypes.c_void_p,
+            ctypes.c_wchar_p,
+            ctypes.c_wchar_p,
+            ctypes.c_uint,
+        )
+        message_box.restype = ctypes.c_int
         return int(
-            ctypes.windll.user32.MessageBoxW(
-                0,
+            message_box(
+                owner_handle,
                 message,
                 title,
                 style | MB_SETFOREGROUND | MB_TOPMOST,
             )
         )
+
+
+def _find_window_handle(user32: object, title: str | None) -> int:
+    """Return a full-width HWND so a dialog is modal to the visible app."""
+
+    if not title:
+        return 0
+    try:
+        find_window = user32.FindWindowW  # type: ignore[attr-defined]
+        find_window.argtypes = (ctypes.c_wchar_p, ctypes.c_wchar_p)
+        find_window.restype = ctypes.c_void_p
+        return int(find_window(None, title) or 0)
+    except (AttributeError, OSError, TypeError, ValueError):
+        return 0
 
 
 def show_error_dialog(title: str, message: str) -> None:

@@ -359,10 +359,12 @@ class PhoneToPcDialogTests(unittest.TestCase):
         windll,
     ) -> None:
         windll.user32.MessageBoxW.return_value = 7
+        windll.user32.FindWindowW.return_value = 0x1234
 
         show_dialog("QR Scanner", "Question", MB_YESNO)
 
         style = windll.user32.MessageBoxW.call_args.args[3]
+        self.assertEqual(windll.user32.MessageBoxW.call_args.args[0], 0x1234)
         self.assertTrue(style & MB_SETFOREGROUND)
         self.assertTrue(style & MB_TOPMOST)
 

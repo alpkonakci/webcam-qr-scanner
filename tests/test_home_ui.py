@@ -47,18 +47,56 @@ class HomeUiTests(unittest.TestCase):
         self.assertIs(result, HomeAction.BACKGROUND)
         bring_forward.assert_called_once_with()
 
-    def test_foreground_helper_requests_an_always_visible_window(self) -> None:
+    def test_foreground_helper_does_not_leave_window_always_on_top(self) -> None:
         with (
             patch("home_ui.cv2.setWindowProperty") as set_property,
             patch("home_ui.os.name", "posix"),
         ):
             _bring_home_window_to_front()
 
-        set_property.assert_called_once_with(
-            "QR Scanner",
-            cv2.WND_PROP_TOPMOST,
-            1,
+        self.assertEqual(
+            set_property.call_args_list,
+            [
+                unittest.mock.call("QR Scanner", cv2.WND_PROP_TOPMOST, 1),
+                unittest.mock.call("QR Scanner", cv2.WND_PROP_TOPMOST, 0),
+            ],
         )
+
+    def test_cancelled_exit_keeps_control_center_open(self) -> None:
+        mouse_callback = None
+
+        def remember_callback(_: str, callback) -> None:
+            nonlocal mouse_callback
+            mouse_callback = callback
+
+        wait_count = 0
+
+        def click_exit_then_escape(_: int) -> int:
+            nonlocal wait_count
+            wait_count += 1
+            if wait_count == 1 and mouse_callback is not None:
+                mouse_callback(cv2.EVENT_LBUTTONUP, 500, 490, 0, None)
+                return -1
+            return 27
+
+        with (
+            patch("home_ui.cv2.namedWindow"),
+            patch("home_ui.cv2.setMouseCallback", side_effect=remember_callback),
+            patch("home_ui.cv2.moveWindow"),
+            patch("home_ui.cv2.imshow"),
+            patch(
+                "home_ui.cv2.waitKey",
+                side_effect=click_exit_then_escape,
+            ),
+            patch("home_ui.cv2.getWindowProperty", return_value=1),
+            patch("home_ui.cv2.destroyWindow"),
+            patch("home_ui._bring_home_window_to_front"),
+        ):
+            confirm_exit = unittest.mock.Mock(return_value=False)
+            result = show_home_window(confirm_exit=confirm_exit)
+
+        self.assertIs(result, HomeAction.BACKGROUND)
+        confirm_exit.assert_called_once_with()
 
 
 if __name__ == "__main__":

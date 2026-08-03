@@ -76,9 +76,15 @@ class TrayApplicationTests(unittest.TestCase):
     def test_cancelled_exit_keeps_tray_running(self, confirm) -> None:
         application = self._application()
 
-        application._exit_from_menu(self.icon, Mock())
+        with (
+            patch.object(application, "_prepare_for_foreground_dialog") as prepare,
+            patch.object(application, "_finish_foreground_dialog") as finish,
+        ):
+            application._exit_from_menu(self.icon, Mock())
 
         confirm.assert_called_once_with()
+        prepare.assert_called_once_with()
+        finish.assert_called_once_with(False)
         self.icon.stop.assert_not_called()
 
     def test_approved_pairing_notifies_with_verified_phone_label(self) -> None:
@@ -115,10 +121,34 @@ class TrayApplicationTests(unittest.TestCase):
         closed = Mock()
         application._pairing_window_closed = closed
 
-        application._prepare_for_foreground_dialog()
+        with (
+            patch.object(application, "_dismiss_home") as dismiss_home,
+            patch.object(application, "_wait_for_child_exit") as wait_for_exit,
+        ):
+            dismiss_home.return_value = Mock()
+            application._prepare_for_foreground_dialog()
 
         self.assertTrue(application._pairing_cancel_event.is_set())
         closed.wait.assert_called_once_with(timeout=1.0)
+        wait_for_exit.assert_called_once_with(dismiss_home.return_value)
+
+    def test_rejected_security_dialog_restores_home(self) -> None:
+        application = self._application()
+        application._foreground_dialog_count = 1
+
+        with patch.object(application, "_launch_home") as launch_home:
+            application._finish_foreground_dialog(False)
+
+        launch_home.assert_called_once_with()
+
+    def test_opened_browser_does_not_cover_it_with_home(self) -> None:
+        application = self._application()
+        application._foreground_dialog_count = 1
+
+        with patch.object(application, "_launch_home") as launch_home:
+            application._finish_foreground_dialog(True)
+
+        launch_home.assert_not_called()
 
     def test_full_exit_also_cancels_an_active_pairing_window(self) -> None:
         application = self._application()
