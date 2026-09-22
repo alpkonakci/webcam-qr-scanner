@@ -14,19 +14,16 @@ varsayılan tarayıcıda açılır ve QR Scanner otomatik olarak kapanır.
 
 ![Webcam QR Scanner kullanım videosu](docs/assets/webcam-qr-scanner-demo.gif)
 
-> **Geliştirme durumu:** Güncel kararlı GitHub sürümü `v0.1.1`'dir. Mevcut
-> kaynak kod `v0.2.0-dev` Telefon-PC uygulamasını da içerir. **Pair Phone...**
-> iki dakikalık ve tek kullanımlık bir QR açar; PC onayı varsayılan olarak
-> **No** seçilidir ve onaylanan masaüstü bilgileri Windows DPAPI ile korunur.
-> İsteğe bağlı kurulabilen PWA, QR'ı cihazda çözer, aynı Browser WebCrypto
-> eşleştirmesini uygular, kök anahtarı dışa aktarılamayan CryptoKey olarak saklar
-> ve kalıcı tepsi alıcısına uçtan uca şifreli URL gönderebilir. Mevcut Sites/D1
-> açık betası bir iPhone-Windows testini geçti. `codex/vercel-supabase` geçiş
-> dalında Vercel API, Supabase Postgres şeması, özel Realtime bildirim yolu ve
-> beş saniyelik kurtarma sorgusu yerel olarak doğrulandı; henüz üretim endpoint'i
-> değildir. Gerçek iPhone ve Android geçiş testleri tamamlanana kadar eski yayın
-> açık kalacaktır. Ayrıntılar için
-> [Vercel + Supabase geçiş planına](docs/vercel-supabase-migration.tr.md) bakın.
+> **Geliştirme durumu:** Güncel kararlı GitHub sürümü `v0.1.1`'dir. Mevcut dal
+> kararlı sürüm değil, `v0.2.0-beta.1` Telefon-PC adayıdır. İki dakikalık tek
+> kullanımlık eşleştirme, varsayılan **No** PC onayı, Windows DPAPI koruması,
+> eşleşmiş telefon yönetimi ve URL'yi WebCrypto ile uçtan uca şifreleyen,
+> kurulum gerektirmeyen tarayıcı PWA'sı hazırdır. Vercel API, Supabase Postgres
+> şeması, özel Realtime bildirim yolu, beş saniyelik kurtarma sorgusu ve 60
+> saniyelik güvenlik eşitlemesi yerel olarak doğrulandı. Vercel endpoint'i ile
+> tam iPhone/Android geçişi henüz tamamlanmadığı için mevcut Sites/D1 betasına
+> dokunulmadı. Ayrıntılar için [geçiş planına](docs/vercel-supabase-migration.tr.md)
+> ve [beta yayın kontrol listesine](docs/v0.2-beta-release-checklist.tr.md) bakın.
 
 ## Özellikler
 
@@ -86,9 +83,9 @@ Tek dosyalı paket, içindeki dosyaları hazırladığı için ilk açılış bi
 daha uzun sürebilir. İnternetten indirilen imzasız EXE'ler için Windows
 SmartScreen uyarı gösterebilir.
 
-### Güncel geliştirme paketi: arka plan davranışı
+### v0.2.0-beta.1 adayı: arka plan davranışı
 
-Mevcut kaynak kod ve yerel olarak oluşturulan `v0.2.0-dev` paketi yine tek bir
+Mevcut kaynak kod ve yerel olarak oluşturulan `v0.2.0-beta.1` paketi yine tek bir
 `QR-Scanner.exe` dağıtır; EXE kendi içinde ayrı çalışma kipleri başlatır:
 
 - Hafif masaüstü denetleyicisi Windows sistem tepsisinde görünür kalır.
@@ -97,7 +94,8 @@ Mevcut kaynak kod ve yerel olarak oluşturulan `v0.2.0-dev` paketi yine tek bir
   kamerayı kapatır ve sade kontrol ekranını öne getirir. Denetleyici kamerayı
   kullanmadan çalışmaya devam eder.
 - Kontrol ekranı, gizli tepsi simgesini bulmayı gerektirmeden **Scan with
-  Camera**, **Scan Computer Screen** ve **Pair a Phone** seçeneklerini sunar.
+  Camera**, **Scan Computer Screen** ve duruma göre **Pair a Phone** veya
+  **Manage Paired Phones (N)** seçeneklerini sunar.
 - Kontrol ekranını kapatmak uygulamayı tepside çalışır bırakır. Ekrandaki
   **Exit** işlemi tam kapanmadan önce mevcut onayı korur.
 - Tepsi menüsünde **Open QR Scanner**, doğrudan tarama/eşleştirme işlemleri,
@@ -112,8 +110,8 @@ Mevcut kaynak kod ve yerel olarak oluşturulan `v0.2.0-dev` paketi yine tek bir
 En az bir onaylı telefon kayıtlıysa denetleyici, kamera kapalı kalırken hafif
 bir dışa doğru Telefon-PC alıcısı çalıştırır; bilgisayarda dışarıya açık port
 oluşturmaz. **Pair Phone...** yapılandırılmış relay'e bağlanır ve iki dakikalık
-eşleştirme QR'ını gösterir. v0.2 önizlemesi varsayılan olarak resmî açık HTTPS
-relay'i kullanır; yerel ve self-hosted geliştirme relay'leri
+eşleştirme QR'ını gösterir. Geçiş doğrulanana kadar bu dal varsayılan olarak
+eski açık HTTPS betasını kullanır; yerel ve self-hosted geliştirme relay'leri
 `WQRS_RELAY_ORIGIN` ortam değişkeniyle kullanılmaya devam edebilir. Açık
 eşleştirme QR'ı, telefonun normal kamerasının açabildiği bir HTTPS bağlantısıdır.
 Tek kullanımlık eşleştirme verisi `#` sonrasında kalır, HTTP isteğiyle sunucuya
@@ -122,10 +120,10 @@ onayını ister, kök anahtarı IndexedDB'de dışa aktarılamayan CryptoKey ola
 tutar ve **Send to PC** seçeneğini açar. Tarayıcı zaten eşleştirilmişse sessizce
 ikinci yerel kayıt oluşturmak yerine **Continue** veya açık **Replace pairing**
 seçimi sunulur. PC URL'yi doğrular ve çözer, şifreli teslim alındısı gönderir;
-adresi açmadan önce yine kullanıcıdan onay ister. Açık beta relay ve PWA
-etkindir; iPhone'dan Windows'a tam şifreli aktarım elle doğrulanmıştır. v0.2
-kararlı sayılmadan önce daha geniş cihaz testleri ve bağımsız güvenlik
-incelemesi tamamlanacaktır.
+adresi açmadan önce yine kullanıcıdan onay ister. Eski açık beta ile
+iPhone'dan Windows'a bir tam şifreli aktarım elle doğrulanmıştır.
+Vercel/Supabase adayı için önizleme dağıtımı, iPhone ve Android geçiş testleri
+ile bağımsız güvenlik incelemesi tamamlanmadan v0.2 kararlı sayılmayacaktır.
 
 Eşleştirme bağlantısının açılması yalnızca masaüstünün QR penceresini
 kapatabilmesi için kısa ömürlü bir yaşam döngüsü sinyali gönderir; telefonu
@@ -285,7 +283,7 @@ Self-test, kamera açmadan OpenCV yüklemesini ve QR çözümlemeyi doğrular.
 Build sonunda terminal göstermeyen EXE ile dağıtıma hazır arşiv oluşturulur:
 
 ```text
-dist\Webcam-QR-Scanner-v0.2.0-dev-windows-x64.zip
+dist\Webcam-QR-Scanner-v0.2.0-beta.1-windows-x64.zip
 ```
 
 ZIP içinde `QR-Scanner.exe`, `Scan Screen.vbs` başlatıcısı, proje MIT lisansı,
@@ -315,7 +313,8 @@ bulunur. Bütünlük kontrolü için ayrıca `SHA256SUMS.txt` üretilir.
   PC alıcısı, sahte telefonlar ve yerel demo
 - `pairing_ui.py`: bellekiçi, iki dakikalık eşleştirme QR penceresi ve geri sayım
 - `relay/`: bellekiçi, yalnızca localhost'ta çalışan FastAPI relay'i
-- `pwa/`: isteğe bağlı kurulabilen mobil web kabuğu, manifest, service worker ve testler
+- `pwa/`: kurulum gerektirmeyen tarayıcı arayüzü, isteğe bağlı PWA metadatası,
+  Vercel API ve testler
 - `tests/`: otomatik davranış, kamera seçimi ve QR okuyucu testleri
 
 ## Güvenlik
@@ -325,8 +324,8 @@ açılır. `javascript:` veya `file:` gibi şemalar çalıştırılmaz. QR kod k
 tutulduğunda sürekli yeni tarayıcı sekmeleri açılmaz.
 
 Kamera kareleri yalnızca bilgisayar belleğinde yerel olarak işlenir; kaydedilmez
-ve bilgisayar dışına gönderilmez. Uygulama konum bilgisi istemez; analiz,
-telemetri veya cihaz kimliği toplamaz. Geçerli bir URL açıldıktan sonra hedef
+ve bilgisayar dışına gönderilmez. Yerel kamera ve ekran taraması konum bilgisi
+istemez; analiz veya telemetri toplamaz. Geçerli bir URL açıldıktan sonra hedef
 site varsayılan tarayıcı tarafından işlenir ve tarayıcının gizlilik ayarlarına
 tabidir.
 
@@ -345,14 +344,23 @@ açık kullanıcı eylemi **Pair Phone...** seçeneğidir. Ayrı geliştirici re
 yalnızca komutu çalışırken `127.0.0.1` adresine bağlanır; token'ların HMAC
 özetleriyle yönlendirme kimliklerini tutar, URL veya mesaj geçmişi tutmaz.
 
+Telefon-PC özelliği rastgele yönlendirme/cihaz kimlikleri ve hesap ekranı
+oluşturmayan anonim Supabase cihaz oturumu üretir; e-posta, telefon, profil veya
+konum istemez. Vercel ve Supabase, kendi politikaları kapsamında IP adresi gibi
+standart ağ metadatasını işleyebilir. QR görüntüsü cihazda kalır, açık URL
+aktarılmadan önce uçtan uca şifrelenir; uygulama loglarında URL, Authorization
+başlığı, token, anahtar, QR görüntüsü veya ciphertext gövdesi bulunmamalıdır.
+
 Eşleştirme QR'ı bellekte üretilir, iki dakika sonra geçersiz olur ve yalnızca bir
 kez kullanılabilir. Pencere kapatılırsa tamamlanmamış relay oturumu anında
 geçersizleştirilir. PC onayı telefon etiketini ve relay'i gösterir, varsayılan
 olarak **No** seçilidir ve ret halinde gönderici kimlik bilgisi oluşturulmaz.
 Onaylanan relay ve eşleşme kimlik bilgileri yalnızca mevcut kullanıcıya bağlı
 Windows DPAPI korumalı dosyada saklanır; uygulamanın düz metin geri dönüşü
-yoktur. Gelecekteki açık relay HTTPS kullanmak zorundadır; loopback dışındaki
-düz HTTP relay adresleri reddedilir.
+yoktur. Açık relay origin'leri HTTPS kullanmak zorundadır; loopback dışındaki
+düz HTTP adresleri reddedilir. Telefon erişimi kaldırılırken önce relay rotası
+iptal edilir, ardından yerel DPAPI kaydı silinir; ağ hatasında kayıt korunur ve
+işlem güvenle yeniden denenebilir.
 
 Uygulama URL şemasını doğrular ancak bir sitenin güvenilir veya zararlı olduğunu
 belirleyemez. Ekrandaki QR bağlantısını açmadan önce onay penceresinde gösterilen
@@ -375,12 +383,13 @@ alan adını kontrol edin.
 - [x] Farklı QR içerikleri bulunan belirsiz taramaları engelleme
 - [x] Otomatik testleri ve bağımsız Windows paketini hazırlama
 
-### v0.2 — Kurulum gerektirmeyen PWA ile Telefon-PC köprüsü
+### v0.2.0-beta.1 — Kurulum gerektirmeyen PWA ile Telefon-PC köprüsü
 
-v0.2 önizlemesi kısa süre geçerli QR kod ve bilgisayarda tek seferlik onay ile
+v0.2 beta adayı kısa süre geçerli QR kod ve bilgisayarda tek seferlik onay ile
 hesapsız eşleştirme sunuyor. Kullanıcı telefona native uygulama kurmadan mobil
-PWA'yı HTTPS üzerinden açabilir; isterse ana ekranına ekleyebilir. PWA QR'ı
-cihazda çözüp **Open on this phone** ve **Send to PC** seçeneklerini gösterir.
+PWA'yı HTTPS üzerinden açabilir. Tarayıcı teknik olarak ana ekrana ekleme
+sunabilir ancak arayüz kurulumu teşvik etmez. PWA QR'ı cihazda çözüp **Open link
+in new tab** ve **Send to PC** seçeneklerini gösterir.
 URL tarayıcının yerleşik WebCrypto API'siyle uçtan uca şifrelenir ve içeriği
 okuyamayan internet relay'i üzerinden iletilir. Yerel ağ veya konum izni
 gerekmez. Bilgisayar içeriği doğrular ve varsayılan olarak açmadan önce
@@ -401,17 +410,23 @@ Ayrıntılı mimari, eşleştirme protokolü, tehdit modeli ve kabul ölçütler
 - [x] İki dakikalık, tek kullanımlık ve şifreli onay/ret içeren pairing HTTP akışı
 - [x] Eşleştirme QR'ını ve varsayılan ret seçili onayı tepsi denetleyicisinden gösterme
 - [x] Onaylanan masaüstü relay ve eşleşme kimlik bilgilerini Windows DPAPI ile koruma
-- [x] Mobil uyumlu, isteğe bağlı kurulabilen PWA kabuğu, manifest, ikonlar ve
-  yalnızca statik dosyaları önbellekleyen service worker
+- [x] Mobil uyumlu, kurulum gerektirmeyen tarayıcı arayüzü, isteğe bağlı PWA
+  metadatası, ikonlar ve yalnızca statik dosyaları önbellekleyen service worker
 - [x] Kullanıcı eylemiyle kamera izni, cihaz üzerinde QR çözümleme, katı URL
   doğrulaması ve mobil sonuç ekranı
 - [x] Kalıcı PC alıcısını tepsi denetleyicisine bağlama
 - [x] Browser WebCrypto, gerçek tarayıcı eşleştirmesi ve şifreli **Send to PC**
 - [x] Kısa ömürlü şifreli zarflar, çevrimiçi heartbeat denetimi, replay reddi
-  ve şifreli teslim alındıları için D1 tabanlı HTTPS relay API'si
+  ve şifreli teslim alındıları için eski D1 tabanlı HTTPS relay API'si
 - [x] Açık beta relay'i etkinleştirme ve gerçek bir iPhone-Windows akışını doğrulama
 - [x] Normal telefon kamerasının fragment korumalı HTTPS eşleştirme bağlantısını açması
 - [x] Açık değiştirme seçeneğinden önce mevcut tarayıcı eşleşmesini algılama
+- [x] Vercel API, Supabase Postgres/RLS şeması, özel Realtime bildirimi, beş
+  saniyelik kurtarma sorgusu ve 60 saniyelik güvenlik eşitlemesi
+- [x] Relay'de önce iptal, ağ hatasında fail-closed davranış ve PWA
+  `pair_revoked` temizliğiyle masaüstü eşleşmiş telefon yönetimi
+- [ ] Vercel önizlemesini gerçek iPhone ve Android cihazlarla dağıtıp doğrulama
+- [ ] Beta ZIP'i temiz Windows ortamında test edip GitHub pre-release yayımlama
 - [ ] Geniş Android Chrome ve iOS Safari cihaz testlerini tamamlama
 - [ ] Bağımsız protokol, kriptografi ve dağıtım incelemesini tamamlama
 

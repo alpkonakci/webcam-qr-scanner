@@ -128,6 +128,74 @@ class PairingStoreTests(unittest.TestCase):
         self.assertNotIn(session.access_token.encode("ascii"), protected)
         self.assertNotIn(session.refresh_token.encode("ascii"), protected)
 
+    def test_removing_one_pair_preserves_device_session_and_other_pairs(
+        self,
+    ) -> None:
+        self.store.replace_device(self.device, clear_pairs=False)
+        session = RealtimeSession(
+            access_token="a" * 80,
+            refresh_token="r" * 48,
+            expires_at=int(time.time()) + 3600,
+            user_id="3f25129c-8558-4bdf-a37d-e70b650e25b1",
+        )
+        self.store.update_realtime_session(self.device.relay_origin, session)
+        removed = StoredPair(
+            relay_origin=self.device.relay_origin,
+            device_id=self.device.device_id,
+            pair_id=random_b64url(16),
+            root_key=os.urandom(32),
+            phone_label="Old phone",
+        )
+        retained = StoredPair(
+            relay_origin=self.device.relay_origin,
+            device_id=self.device.device_id,
+            pair_id=random_b64url(16),
+            root_key=os.urandom(32),
+            phone_label="Current phone",
+        )
+        other_device = RelayDevice(
+            relay_origin="https://second-relay.example",
+            device_id=random_b64url(16),
+            receiver_token=random_b64url(32),
+        )
+        other_pair = StoredPair(
+            relay_origin=other_device.relay_origin,
+            device_id=other_device.device_id,
+            pair_id=random_b64url(16),
+            root_key=os.urandom(32),
+            phone_label="Other relay phone",
+        )
+        self.store.add_pair(removed)
+        self.store.add_pair(retained)
+        self.store.replace_device(other_device, clear_pairs=False)
+        self.store.add_pair(other_pair)
+        device_before = self.store.load().device_for(
+            self.device.relay_origin
+        )
+
+        snapshot = self.store.remove_pair(
+            self.device.relay_origin,
+            removed.pair_id,
+        )
+
+        self.assertEqual(snapshot.devices, (device_before, other_device))
+        self.assertEqual(snapshot.pairs, (retained, other_pair))
+        self.assertEqual(
+            snapshot.device_for(self.device.relay_origin),
+            device_before,
+        )
+
+    def test_removing_an_absent_pair_is_idempotent(self) -> None:
+        self.store.replace_device(self.device, clear_pairs=False)
+
+        snapshot = self.store.remove_pair(
+            self.device.relay_origin,
+            random_b64url(16),
+        )
+
+        self.assertEqual(snapshot.devices, (self.device,))
+        self.assertEqual(snapshot.pairs, ())
+
 
 @unittest.skipUnless(os.name == "nt", "Windows DPAPI test")
 class DpapiProtectorTests(unittest.TestCase):

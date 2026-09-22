@@ -2,7 +2,14 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from exit_codes import CONTROL_SCAN_SCREEN
+from bridge.pair_management import PairedPhoneSummary
+from bridge.pairing import PairRevocationError
+from exit_codes import (
+    CONTROL_MANAGE_PHONES,
+    CONTROL_REMOVE_PHONE,
+    CONTROL_SCAN_SCREEN,
+)
+from paired_phone_ipc import RemovePhoneRequest
 from tray_app import ChildRole, TrayApplication, create_tray_image
 
 
@@ -18,12 +25,22 @@ class TrayApplicationTests(unittest.TestCase):
         self,
         process_spawner=None,
         pairing_runner=None,
+        pair_manager=None,
+        receiver_service=None,
     ) -> TrayApplication:
         process_spawner = process_spawner or Mock()
+        if pair_manager is None:
+            pair_manager = Mock()
+            pair_manager.list_pairs.return_value = ()
+        if receiver_service is None:
+            receiver_service = Mock()
+            receiver_service.has_paired_phones.return_value = False
         with patch("tray_app.pystray.Icon", return_value=self.icon):
             return TrayApplication(
                 process_spawner=process_spawner,
                 pairing_runner=pairing_runner,
+                pair_manager=pair_manager,
+                receiver_service=receiver_service,
             )
 
     def test_generated_icon_has_expected_size_and_visible_content(self) -> None:
@@ -31,6 +48,16 @@ class TrayApplicationTests(unittest.TestCase):
 
         self.assertEqual(image.size, (64, 64))
         self.assertIsNotNone(image.getbbox())
+
+    def test_phone_menu_switches_to_management_with_current_count(self) -> None:
+        pair_manager = Mock()
+        pair_manager.list_pairs.return_value = (Mock(), Mock())
+        application = self._application(pair_manager=pair_manager)
+
+        self.assertEqual(
+            application._phone_menu_text(Mock()),
+            "Manage Paired Phones (2)...",
+        )
 
     @patch("tray_app.threading.Thread")
     def test_repeated_camera_action_does_not_open_second_process(
@@ -122,15 +149,20 @@ class TrayApplicationTests(unittest.TestCase):
         application._pairing_window_closed = closed
 
         with (
-            patch.object(application, "_dismiss_home") as dismiss_home,
+            patch.object(
+                application,
+                "_dismiss_control_windows",
+                return_value=(Mock(),),
+            ) as dismiss_windows,
             patch.object(application, "_wait_for_child_exit") as wait_for_exit,
         ):
-            dismiss_home.return_value = Mock()
             application._prepare_for_foreground_dialog()
 
         self.assertTrue(application._pairing_cancel_event.is_set())
         closed.wait.assert_called_once_with(timeout=1.0)
-        wait_for_exit.assert_called_once_with(dismiss_home.return_value)
+        wait_for_exit.assert_called_once_with(
+            dismiss_windows.return_value[0]
+        )
 
     def test_rejected_security_dialog_restores_home(self) -> None:
         application = self._application()
@@ -168,7 +200,9 @@ class TrayApplicationTests(unittest.TestCase):
         application._launch_home()
         application._launch_home()
 
-        spawner.assert_called_once_with(["--home-process"])
+        spawner.assert_called_once_with(
+            ["--home-process", "--paired-phone-count", "0"]
+        )
         thread_type.return_value.start.assert_called_once_with()
 
     def test_camera_process_return_reopens_home(self) -> None:
@@ -184,6 +218,21 @@ class TrayApplicationTests(unittest.TestCase):
         launch_home.assert_called_once_with()
         self.assertIsNone(application._camera_process)
 
+    def test_dismissed_manager_does_not_reopen_home_over_another_mode(
+        self,
+    ) -> None:
+        process = Mock()
+        process.wait.return_value = -15
+        application = self._application()
+        application._children.add(process)
+        application._paired_phones_process = process
+
+        with patch.object(application, "_launch_home") as launch_home:
+            application._monitor_child(process, ChildRole.PAIRED_PHONES)
+
+        launch_home.assert_not_called()
+        self.assertIsNone(application._paired_phones_process)
+
     def test_home_screen_action_starts_one_shot_screen_scan(self) -> None:
         application = self._application()
 
@@ -191,6 +240,157 @@ class TrayApplicationTests(unittest.TestCase):
             application._handle_home_action(CONTROL_SCAN_SCREEN)
 
         launch_screen.assert_called_once_with()
+
+    @patch("tray_app.threading.Thread")
+    @patch("tray_app.write_paired_phones_snapshot")
+    def test_home_management_action_opens_single_sanitized_manager_window(
+        self,
+        write_snapshot,
+        thread_type,
+    ) -> None:
+        summary = PairedPhoneSummary(
+            relay_origin="https://relay.example",
+            pair_id="abcDEF0123456789-_xyZA",
+            short_pair_id="abcDEF…xyZA",
+            phone_label="My iPhone",
+        )
+        pair_manager = Mock()
+        pair_manager.list_pairs.return_value = (summary,)
+        process = Mock()
+        process.poll.return_value = None
+        spawner = Mock(return_value=process)
+        application = self._application(
+            spawner,
+            pair_manager=pair_manager,
+        )
+
+        application._handle_home_action(CONTROL_MANAGE_PHONES)
+        application._launch_paired_phones()
+
+        spawner.assert_called_once_with(["--paired-phones-process"])
+        phone = write_snapshot.call_args.args[0][0]
+        self.assertEqual(phone.phone_label, "My iPhone")
+        self.assertFalse(hasattr(phone, "receiver_token"))
+        self.assertFalse(hasattr(phone, "root_key"))
+        thread_type.return_value.start.assert_called_once_with()
+
+    @patch("tray_app.consume_phone_removal_request")
+    def test_successful_removal_refreshes_receiver_and_home(
+        self,
+        consume_request,
+    ) -> None:
+        request = RemovePhoneRequest(
+            relay_origin="https://relay.example",
+            pair_id="abcDEF0123456789-_xyZA",
+            phone_label="My iPhone",
+        )
+        consume_request.return_value = request
+        pair_manager = Mock()
+        pair_manager.list_pairs.return_value = ()
+        pair_manager.remove_pair.return_value = SimpleNamespace(
+            summary=SimpleNamespace(phone_label="My iPhone")
+        )
+        receiver = Mock()
+        receiver.has_paired_phones.return_value = True
+        application = self._application(
+            pair_manager=pair_manager,
+            receiver_service=receiver,
+        )
+
+        with (
+            patch.object(application, "_refresh_pairing_status"),
+            patch.object(application, "_launch_home") as launch_home,
+        ):
+            application._handle_paired_phones_action(CONTROL_REMOVE_PHONE)
+
+        pair_manager.remove_pair.assert_called_once_with(
+            relay_origin=request.relay_origin,
+            pair_id=request.pair_id,
+        )
+        receiver.request_refresh.assert_called_once_with()
+        launch_home.assert_called_once_with()
+
+    @patch("tray_app.confirm_phone_removal_retry", return_value=True)
+    @patch("tray_app.consume_phone_removal_request")
+    def test_retryable_remote_failure_offers_retry_before_success(
+        self,
+        consume_request,
+        confirm_retry,
+    ) -> None:
+        request = RemovePhoneRequest(
+            relay_origin="https://relay.example",
+            pair_id="abcDEF0123456789-_xyZA",
+            phone_label="My iPhone",
+        )
+        consume_request.return_value = request
+        pair_manager = Mock()
+        pair_manager.list_pairs.return_value = ()
+        pair_manager.remove_pair.side_effect = (
+            PairRevocationError(code="network_error"),
+            SimpleNamespace(summary=SimpleNamespace(phone_label="My iPhone")),
+        )
+        receiver = Mock()
+        receiver.has_paired_phones.return_value = True
+        application = self._application(
+            pair_manager=pair_manager,
+            receiver_service=receiver,
+        )
+
+        with (
+            patch.object(application, "_refresh_pairing_status"),
+            patch.object(application, "_launch_home"),
+        ):
+            application._remove_requested_phone()
+
+        self.assertEqual(pair_manager.remove_pair.call_count, 2)
+        confirm_retry.assert_called_once_with("My iPhone")
+        receiver.request_refresh.assert_called_once_with()
+
+    @patch("tray_app.confirm_phone_removal_retry", return_value=False)
+    @patch("tray_app.consume_phone_removal_request")
+    def test_cancelled_retry_keeps_receiver_unchanged_and_reopens_manager(
+        self,
+        consume_request,
+        confirm_retry,
+    ) -> None:
+        request = RemovePhoneRequest(
+            relay_origin="https://relay.example",
+            pair_id="abcDEF0123456789-_xyZA",
+            phone_label="My iPhone",
+        )
+        consume_request.return_value = request
+        pair_manager = Mock()
+        pair_manager.list_pairs.return_value = (
+            PairedPhoneSummary(
+                relay_origin=request.relay_origin,
+                pair_id=request.pair_id,
+                short_pair_id="abcDEF…xyZA",
+                phone_label=request.phone_label,
+            ),
+        )
+        pair_manager.remove_pair.side_effect = PairRevocationError(
+            code="network_error"
+        )
+        receiver = Mock()
+        receiver.has_paired_phones.return_value = True
+        application = self._application(
+            pair_manager=pair_manager,
+            receiver_service=receiver,
+        )
+
+        with patch.object(
+            application,
+            "_launch_paired_phones",
+        ) as launch_manager:
+            application._remove_requested_phone()
+
+        pair_manager.remove_pair.assert_called_once_with(
+            relay_origin=request.relay_origin,
+            pair_id=request.pair_id,
+        )
+        confirm_retry.assert_called_once_with("My iPhone")
+        receiver.request_refresh.assert_not_called()
+        launch_manager.assert_called_once_with()
 
 
 if __name__ == "__main__":

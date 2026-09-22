@@ -140,7 +140,10 @@ export async function handleRelayRequest(request: Request): Promise<Response> {
         ),
       );
     }
-    console.error("Relay request failed", error);
+    // Never log the raw exception: a future transport dependency could attach
+    // request headers or bodies to it. The stable response below is sufficient
+    // for the caller while deployment metrics still record the 500 status.
+    console.error("Relay request failed");
     return relayError(
       new RelayError(500, "internal_error", "The relay could not process the request."),
     );
@@ -712,7 +715,14 @@ async function senderPair(
     "relay_pairs",
     filters({ pair_id: `eq.${pairId}`, sender_token_hash: `eq.${hash}` }),
   );
-  if (!pair || pair.revoked_at !== null) unauthorized();
+  if (!pair) unauthorized();
+  if (pair.revoked_at !== null) {
+    throw new RelayError(
+      410,
+      "pair_revoked",
+      "This phone no longer has access to the paired PC.",
+    );
+  }
   const device = await selectOne<DeviceRow>(
     admin,
     "relay_devices",

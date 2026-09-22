@@ -32,6 +32,7 @@ class HomeAction(Enum):
     SCAN_CAMERA = "scan_camera"
     SCAN_SCREEN = "scan_screen"
     PAIR_PHONE = "pair_phone"
+    MANAGE_PHONES = "manage_phones"
     EXIT = "exit"
 
 
@@ -44,7 +45,7 @@ class ActionCard:
     accent: str = ACCENT
 
 
-ACTION_CARDS = (
+BASE_ACTION_CARDS = (
     ActionCard(
         HomeAction.SCAN_CAMERA,
         (32, 116, 588, 206),
@@ -57,13 +58,6 @@ ACTION_CARDS = (
         "Scan Computer Screen",
         "Read a QR code that is currently visible on this PC.",
     ),
-    ActionCard(
-        HomeAction.PAIR_PHONE,
-        (32, 324, 588, 414),
-        "Pair a Phone",
-        "Connect a mobile browser securely. v0.2 preview",
-        WARNING,
-    ),
 )
 EXIT_BOUNDS = (456, 470, 588, 510)
 
@@ -74,10 +68,37 @@ class HomeWindowState:
     selected_action: HomeAction | None = None
 
 
-def action_at_point(x: int, y: int) -> HomeAction | None:
+def action_cards(pair_count: int = 0) -> tuple[ActionCard, ...]:
+    """Return the current actions without exposing any pairing credentials."""
+
+    if pair_count > 0:
+        phone_card = ActionCard(
+            HomeAction.MANAGE_PHONES,
+            (32, 324, 588, 414),
+            f"Manage Paired Phones ({pair_count})",
+            "Review paired devices, remove access, or pair another phone.",
+            WARNING,
+        )
+    else:
+        phone_card = ActionCard(
+            HomeAction.PAIR_PHONE,
+            (32, 324, 588, 414),
+            "Pair a Phone",
+            "Connect a mobile browser securely. v0.2 beta",
+            WARNING,
+        )
+    return (*BASE_ACTION_CARDS, phone_card)
+
+
+def action_at_point(
+    x: int,
+    y: int,
+    *,
+    pair_count: int = 0,
+) -> HomeAction | None:
     """Return an action only when the pointer is inside a visible control."""
 
-    for card in ACTION_CARDS:
+    for card in action_cards(pair_count):
         if _contains(card.bounds, x, y):
             return card.action
     if _contains(EXIT_BOUNDS, x, y):
@@ -88,6 +109,7 @@ def action_at_point(x: int, y: int) -> HomeAction | None:
 def build_home_canvas(
     *,
     hover_action: HomeAction | None = None,
+    pair_count: int = 0,
 ) -> np.ndarray:
     """Render the complete control center with sharp system-font text."""
 
@@ -117,7 +139,7 @@ def build_home_canvas(
         fill=SECONDARY_TEXT,
     )
 
-    for card in ACTION_CARDS:
+    for card in action_cards(pair_count):
         hovered = card.action is hover_action
         draw.rounded_rectangle(
             card.bounds,
@@ -179,6 +201,7 @@ def build_home_canvas(
 def show_home_window(
     *,
     confirm_exit: Callable[[], bool] | None = None,
+    pair_count: int = 0,
 ) -> HomeAction:
     """Show the control center; Escape and window close keep the tray alive."""
 
@@ -191,7 +214,7 @@ def show_home_window(
         _: int,
         __: object,
     ) -> None:
-        state.hover_action = action_at_point(x, y)
+        state.hover_action = action_at_point(x, y, pair_count=pair_count)
         if event == cv2.EVENT_LBUTTONUP:
             state.selected_action = state.hover_action
 
@@ -209,7 +232,10 @@ def show_home_window(
         while True:
             cv2.imshow(
                 WINDOW_TITLE,
-                build_home_canvas(hover_action=state.hover_action),
+                build_home_canvas(
+                    hover_action=state.hover_action,
+                    pair_count=pair_count,
+                ),
             )
             if first_frame:
                 _bring_home_window_to_front()
@@ -285,8 +311,14 @@ def _primary_screen_size() -> tuple[int, int]:
 def _bring_home_window_to_front() -> None:
     """Raise the control center once without leaving it always on top."""
 
+    _bring_window_to_front(WINDOW_TITLE)
+
+
+def _bring_window_to_front(window_title: str) -> None:
+    """Raise one OpenCV window once without leaving it always on top."""
+
     try:
-        cv2.setWindowProperty(WINDOW_TITLE, cv2.WND_PROP_TOPMOST, 1)
+        cv2.setWindowProperty(window_title, cv2.WND_PROP_TOPMOST, 1)
     except cv2.error:
         pass
 
@@ -296,7 +328,7 @@ def _bring_home_window_to_front() -> None:
             find_window = user32.FindWindowW
             find_window.argtypes = (ctypes.c_wchar_p, ctypes.c_wchar_p)
             find_window.restype = ctypes.c_void_p
-            window_handle = find_window(None, WINDOW_TITLE)
+            window_handle = find_window(None, window_title)
             if window_handle:
                 user32.ShowWindow(window_handle, 9)  # SW_RESTORE
                 user32.BringWindowToTop(window_handle)
@@ -305,6 +337,6 @@ def _bring_home_window_to_front() -> None:
         pass
     finally:
         try:
-            cv2.setWindowProperty(WINDOW_TITLE, cv2.WND_PROP_TOPMOST, 0)
+            cv2.setWindowProperty(window_title, cv2.WND_PROP_TOPMOST, 0)
         except cv2.error:
             pass

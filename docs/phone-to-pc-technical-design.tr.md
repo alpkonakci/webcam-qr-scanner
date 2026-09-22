@@ -48,7 +48,7 @@ listesi [`protocol/`](../protocol/README.md) altında sürüm kontrollüdür.
 - Mobil istemci, mağazadan indirilen native uygulama yerine HTTPS üzerinden
   açılan ve isteğe bağlı ana ekrana eklenen bir PWA olacak.
 - PWA kamerayı yalnızca kullanıcı **Scan QR** seçtiğinde açacak ve sonuçta
-  **Open on this phone** ile **Send to PC** seçeneklerini gösterecek.
+  **Open link in new tab** ile **Send to PC** seçeneklerini gösterecek.
 - Tarayıcı kriptografisi için harici JavaScript/WASM kripto paketi
   kullanılmayacak; desteklenmeyen tarayıcı fail-closed davranacak.
 
@@ -197,7 +197,7 @@ Tepsi temelinde şu işlemler bulunur:
 
 ### 5.2 Mobil PWA
 
-Mobil istemci, HTTPS üzerinden sunulan install-optional bir Progressive Web App
+Mobil istemci, HTTPS üzerinden sunulan ve kurulum gerektirmeyen bir Progressive Web App
 olacaktır. Kullanıcı siteyi doğrudan tarayıcıda kullanabilir; isterse ana
 ekranına ekleyebilir. App Store veya Play Store kurulumu zorunlu değildir.
 
@@ -575,7 +575,7 @@ Güven, QR içindeki sır ve kriptografik doğrulamadan gelir.
 1. Kullanıcı **Scan QR** seçer.
 2. QR cihaz üzerinde çözülür.
 3. Değer URL doğrulamasından geçer.
-4. PWA **Open on this phone** ve **Send to PC** seçeneklerini gösterir.
+4. PWA **Open link in new tab** ve **Send to PC** seçeneklerini gösterir.
 5. Kullanıcı **Send to PC** seçerse PWA `message_id`, süre ve nonce üretir.
 6. Mesaj anahtarı türetilir.
 7. URL AES-256-GCM ile şifrelenir.
@@ -1141,7 +1141,7 @@ uçtan uca şifreli gönderir ve tarayıcı test vektörlerinin tamamını geçe
 
 - [x] Kullanıcı eylemiyle kamera izni
 - [x] Cihaz üzerinde QR çözümleme
-- [x] **Open on this phone** ve eşleşme sonrası etkin **Send to PC** seçim ekranı
+- [x] **Open link in new tab** ve eşleşme sonrası etkin **Send to PC** seçim ekranı
 - [x] Kamera yaşam döngüsü ve arka plana geçiş temizliği
 - [ ] Gerçek Android Chrome testi
 - [ ] Gerçek iOS Safari testi
@@ -1172,14 +1172,19 @@ olmadan evde açık PC'ye URL gönderilir.
 
 ### Aşama 5 — İnternet relay ve PWA dağıtımı
 
-- [x] Yönetilen TLS ve açık beta dağıtımı
-- [x] D1 şeması ve sürümlü Drizzle migration
+- [x] Eski Sites/D1 üzerinde yönetilen TLS ve açık beta dağıtımı
+- [x] Eski D1 şeması ve sürümlü Drizzle migration
+- [x] Vercel için standart Next.js API ve PWA build'i
+- [x] Supabase Postgres şeması, RLS ve sürümlü migration'lar
+- [x] Özel Realtime cihaz kanalı, beş saniyelik kurtarma sorgusu ve 60 saniyelik
+  güvenlik eşitlemesi
 - [x] Hız, gövde boyutu, süre ve çevrimiçi heartbeat sınırları
 - [x] Relay token'larını yalnızca SHA-256 özetleriyle saklama
 - [x] Veri içermeyen sağlık kontrolü
 - [x] URL gövdesini loglamayan relay hata yüzeyi
 - [x] HTTPS, CSP/izin başlıkları ve sürümlü asset isimleri
 - [x] Hesapsız kullanım için açık beta endpoint'ini etkinleştirme
+- [ ] Vercel önizleme dağıtımı ve gerçek cihaz geçiş testi
 - [ ] Production gözlemleme, yedekleme ve bağımsız güvenlik incelemesi
 
 Çıkış ölçütü: Relay URL'yi bilmeden internet üzerinden güvenilir teslim yapar.
@@ -1187,14 +1192,14 @@ olmadan evde açık PC'ye URL gönderilir.
 ### Aşama 6 — Güvenlik ve release
 
 - Bağımlılık/lisans denetimi
-- Üretim relay'i açılmadan önce bağımsız protokol ve kriptografi incelemesi
 - Paket, PWA CSP/cache ve tarayıcı izin denetimi
 - Fuzz testleri
 - Temiz Windows bilgisayarda kurulum
 - Android Chrome gerçek cihaz testi
 - iOS Safari gerçek cihaz testi
 - README ve gizlilik metni güncellemesi
-- `v0.2.0` release
+- `v0.2.0-beta.1` GitHub pre-release
+- Kararlı `v0.2.0` öncesinde bağımsız protokol ve kriptografi incelemesi
 
 ## 22. `v0.2.0` kabul ölçütleri
 
@@ -1212,6 +1217,8 @@ Sürüm ancak aşağıdakilerin tamamı sağlanırsa hazır sayılır:
 - [x] PC her gelen URL için varsayılan No ile onay istiyor
 - [x] Yalnızca HTTP(S) URL kabul ediliyor
 - [x] Replay, süre aşımı ve pair iptali testleri geçiyor
+- [x] Masaüstü önce relay'i iptal ediyor; ağ hatasında yerel DPAPI kaydını koruyor
+- [x] İptal edilmiş telefon `pair_revoked` alıp yalnız ilgili IndexedDB kaydını siliyor
 - [x] PC anahtarları Windows DPAPI ile korunuyor
 - [x] PWA kök anahtarı non-extractable CryptoKey olarak IndexedDB'de tutuluyor
 - [x] PWA origin/CSP/service worker denetimleri geçiyor
@@ -1284,3 +1291,37 @@ gerçek iPhone ve Android uçtan uca testlerini geçene kadar kaldırılmaz. Ori
 değişimi nedeniyle kullanıcı bir kez yeniden eşleştirme yapar. Ayrıntılı işlem
 sırası ve geri dönüş planı
 [`vercel-supabase-migration.tr.md`](vercel-supabase-migration.tr.md) belgesindedir.
+
+## 26. Eşleşme yönetimi ve beta yayın kapısı
+
+Masaüstü, eşleşme yokken **Pair a Phone**, eşleşme varken **Manage Paired
+Phones (N)** gösterir. Yönetim görünümü yalnız telefon etiketini ve kısaltılmış
+eşleşme kimliğini gösterir; receiver token, sender token ve anahtar malzemesi
+arayüze veya süreçler arası istek dosyasına yazılmaz.
+
+**Remove access** güvenlik işlemidir ve varsayılan seçimi **No** olan açık bir
+onay ister. İşlem sırası değiştirilemez:
+
+1. Masaüstü, DPAPI ile korunan receiver token'ı kullanarak
+   `DELETE /v1/pairs/{pair_id}` çağrısını yapar.
+2. Relay iptali doğrulanırsa yalnız hedef eşleşme yerel depodan atomik silinir;
+   aynı cihazın Realtime oturumu ve diğer eşleşmeleri korunur.
+3. Ağ hatası, 5xx veya biçimsiz yanıt durumunda yerel kayıt korunur ve kullanıcı
+   daha sonra yeniden deneyebilir. Bu fail-closed davranıştır.
+4. Relay kaydı zaten yoksa işlem idempotent başarı kabul edilir ve eski yerel
+   kayıt güvenle temizlenir.
+5. Alıcı yeniden yüklenir. Eski telefonun sonraki gönderimi `pair_revoked`
+   döndürür; PWA yalnız bu kesin hata kodunda ilgili IndexedDB kaydını siler,
+   taranan URL'yi korur ve yeniden eşleştirme yönlendirmesi gösterir.
+
+Genel `unauthorized`, ağ, 5xx, rate-limit veya çevrimdışı hataları eşleşmeyi
+silmez. Böylece geçici altyapı veya yanlış yapılandırma hatası kullanıcı
+kimlik bilgisini geri döndürülemez biçimde kaybettirmez.
+
+İlk yayın hedefi doğrudan kararlı `v0.2.0` değil, GitHub pre-release olarak
+`v0.2.0-beta.1`'dir. Otomatik testler geçse bile Vercel önizlemesi, gerçek
+iPhone/Android matrisi, temiz Windows paketi ve log gizliliği doğrulanmadan dal
+`main` ile birleştirilmez. Ayrıntılı, kanıt temelli kapılar
+[`v0.2-beta-release-checklist.tr.md`](v0.2-beta-release-checklist.tr.md)
+belgesindedir. Eski Sites/Cloudflare yayını yeni production origin en az 48 saat
+doğrulanana kadar korunur; eski kaynakların silinmesi ayrı açık onay gerektirir.

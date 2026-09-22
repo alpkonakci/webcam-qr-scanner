@@ -25,6 +25,15 @@ class HomeUiTests(unittest.TestCase):
         self.assertIs(action_at_point(500, 490), HomeAction.EXIT)
         self.assertIsNone(action_at_point(20, 20))
 
+    def test_phone_card_switches_to_management_when_pairs_exist(self) -> None:
+        self.assertIs(
+            action_at_point(100, 350, pair_count=2),
+            HomeAction.MANAGE_PHONES,
+        )
+        canvas = build_home_canvas(pair_count=2)
+
+        self.assertEqual(canvas.shape, (WINDOW_HEIGHT, WINDOW_WIDTH, 3))
+
     def test_canvas_has_stable_size_and_visible_content(self) -> None:
         canvas = build_home_canvas(hover_action=HomeAction.SCAN_SCREEN)
 

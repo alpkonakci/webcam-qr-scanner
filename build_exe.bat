@@ -17,7 +17,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo Building terminal-free QR-Scanner.exe...
+echo Building terminal-free QR-Scanner.exe for v0.2.0-beta.1...
 ".venv\Scripts\python.exe" -m PyInstaller ^
     --noconfirm ^
     --clean ^
@@ -52,7 +52,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "package_release.ps1" -Version "v0.2.0-dev"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "package_release.ps1" -Version "v0.2.0-beta.1"
 if errorlevel 1 (
     echo.
     echo Release package creation failed.

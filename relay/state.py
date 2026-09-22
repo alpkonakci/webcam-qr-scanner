@@ -30,6 +30,7 @@ class PairRoute:
     pair_id: str
     device_id: str
     sender_token_digest: bytes
+    revoked: bool = False
 
 
 @dataclass(slots=True)
@@ -346,7 +347,13 @@ class RelayState:
             route = self._pairs.get(pair_id)
             if route is None or route.device_id != device_id:
                 return False
-            del self._pairs[pair_id]
+            if not route.revoked:
+                self._pairs[pair_id] = PairRoute(
+                    pair_id=route.pair_id,
+                    device_id=route.device_id,
+                    sender_token_digest=route.sender_token_digest,
+                    revoked=True,
+                )
         return True
 
     def set_connection(self, device_id: str, connection: Any) -> None:
@@ -368,11 +375,17 @@ class RelayState:
         with self._lock:
             return {
                 "device_count": len(self._devices),
-                "pair_count": len(self._pairs),
+                "pair_count": sum(
+                    not route.revoked for route in self._pairs.values()
+                ),
                 "pairing_count": len(self._pairings),
                 "connected_device_count": len(self._connections),
                 "device_ids": sorted(self._devices),
-                "pair_ids": sorted(self._pairs),
+                "pair_ids": sorted(
+                    pair_id
+                    for pair_id, route in self._pairs.items()
+                    if not route.revoked
+                ),
                 "pairing_ids": sorted(self._pairings),
             }
 

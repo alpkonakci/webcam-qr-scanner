@@ -57,12 +57,23 @@ does not change the license of the application source code.
 
 ## Components included in the PWA
 
+- **Next.js 16.2.12** — MIT License; PWA rendering and Vercel API routes
+- **React 19.2.6** — MIT License; browser user interface
+- **React DOM 19.2.6** — MIT License; browser rendering
+- **Drizzle ORM 0.45.2** — Apache License 2.0; versioned relay schema tooling
 - **qr-scanner 1.4.2** — MIT License; camera lifecycle and on-device QR decoding
 - **@types/offscreencanvas 2019.7.3** — MIT License; type declarations used by
   `qr-scanner`
 
-The complete PWA license texts are stored under `pwa/THIRD_PARTY_LICENSES/`.
-The decoder is bundled with the first-party application assets and is not
-loaded from a CDN at runtime.
+The camera-decoder license texts are stored under
+`pwa/THIRD_PARTY_LICENSES/`. The exact PWA and server dependency graph is pinned
+in `pwa/package-lock.json`; npm package license metadata remains part of the
+Vercel build input. The decoder is bundled with the first-party application
+assets and is not loaded from a CDN at runtime.
+
+Vercel and Supabase are managed infrastructure services, not components
+bundled into the Windows executable or browser JavaScript. Their service terms
+and privacy policies apply to the deployment operator separately from this
+project's MIT source license.
 
 This notice is informational and does not replace any included license text.

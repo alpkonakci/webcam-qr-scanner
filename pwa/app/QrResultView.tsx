@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { sendUrlToPc } from "../lib/relay-client";
+import {
+  isPairRevokedError,
+  removePairIfRevoked,
+  sendUrlToPc,
+} from "../lib/relay-client";
 import type { SenderCredentials } from "../lib/wqrs";
 import type { WebUrlResult } from "../lib/url-policy.mjs";
 
@@ -10,6 +14,7 @@ interface QrResultViewProps {
   pairedPc: SenderCredentials | null;
   isMobileClient: boolean;
   onPairPc(): void;
+  onPairRevoked(pairId: string): void;
   onScanAgain(): void;
 }
 
@@ -20,6 +25,7 @@ export function QrResultView({
   pairedPc,
   isMobileClient,
   onPairPc,
+  onPairRevoked,
   onScanAgain,
 }: QrResultViewProps) {
   const [deliveryState, setDeliveryState] = useState<DeliveryState>("idle");
@@ -53,6 +59,20 @@ export function QrResultView({
       setDeliveryState("delivered");
       setDeliveryMessage(`${pairedPc.pcLabel} received and verified the link.`);
     } catch (error) {
+      if (isPairRevokedError(error)) {
+        try {
+          await removePairIfRevoked(error, pairedPc.pairId);
+        } catch {
+          // The invalid credentials are still cleared from this session below.
+          // A later successful pairing replaces any stale browser record.
+        }
+        onPairRevoked(pairedPc.pairId);
+        setDeliveryState("error");
+        setDeliveryMessage(
+          "Access to this PC was removed. Pair a PC again to keep using Send to PC.",
+        );
+        return;
+      }
       setDeliveryState("error");
       setDeliveryMessage(error instanceof Error ? error.message : "The link was not delivered.");
     }

@@ -1,6 +1,6 @@
 # QR Scanner Phone-to-PC PWA
 
-This directory contains the install-optional mobile web companion for Webcam QR
+This directory contains the install-free mobile web companion for Webcam QR
 Scanner and the Vercel-hosted relay API. The WQRS/1 cryptographic contract stays
 shared with the Python desktop application while deployment-specific code stays
 inside this directory.
@@ -15,8 +15,7 @@ inside this directory.
 The current PWA milestone includes:
 
 - a responsive mobile application shell;
-- an installable web manifest and platform icons;
-- optional Home Screen installation guidance;
+- optional PWA metadata and platform icons without installation promotion;
 - a minimal service worker that caches no URL, token, key or relay response;
 - first-party-only runtime resources;
 - restrictive security and permissions headers;
@@ -36,6 +35,8 @@ The current PWA milestone includes:
   envelopes and refuses messages when the PC receiver is offline;
 - private Supabase Realtime device wake-ups with a five-second recovery poll;
 - anonymous, device-only Realtime authentication with no email or phone number;
+- exact `pair_revoked` handling that removes only the revoked IndexedDB pairing
+  and offers pairing again while preserving the scanned URL;
 - automated shell, URL-policy, protocol-vector, D1 compatibility, Vercel relay,
   manifest, cache-policy and security-header tests.
 
@@ -64,6 +65,8 @@ Never put a real `SUPABASE_SECRET_KEY` in source control or client code. The
 Supabase schema is in
 `../supabase/migrations/202608030001_phone_to_pc_relay.sql`; the Turkish cutover
 runbook is in `../docs/vercel-supabase-migration.tr.md`.
+The deployment and real-device release gates are tracked in
+`../docs/v0.2-beta-release-checklist.md`.
 
 ## Privacy boundary
 

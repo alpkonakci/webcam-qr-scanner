@@ -105,7 +105,8 @@ export async function handleRelayRequest(
     if (error instanceof RelayError) {
       return relayError(error);
     }
-    console.error("relay request failed", error);
+    // Do not log raw exceptions because dependencies may attach request data.
+    console.error("relay request failed");
     return relayError(
       new RelayError(500, "internal_error", "The relay could not process the request."),
     );

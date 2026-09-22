@@ -88,6 +88,10 @@ export function PwaHome() {
     setScannerOpen(true);
   };
 
+  const clearRevokedPair = useCallback((pairId: string) => {
+    setPairedPc((current) => current?.pairId === pairId ? null : current);
+  }, []);
+
   return (
     <main className="app-shell">
       <section className="phone-surface" aria-labelledby="page-title">
@@ -102,7 +106,7 @@ export function PwaHome() {
             <p className="eyebrow">PHONE-TO-PC</p>
             <p className="brand-name">QR Scanner</p>
           </div>
-          <span className="dev-badge">v0.2 preview</span>
+          <span className="dev-badge">v0.2 beta</span>
         </header>
 
         {pairingUri ? (
@@ -119,6 +123,7 @@ export function PwaHome() {
             pairedPc={pairedPc}
             isMobileClient={isMobileClient}
             onPairPc={startPairingScanner}
+            onPairRevoked={clearRevokedPair}
             onScanAgain={startScanner}
           />
         ) : (

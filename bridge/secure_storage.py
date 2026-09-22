@@ -6,6 +6,7 @@ import base64
 import ctypes
 import json
 import os
+import threading
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
@@ -28,6 +29,10 @@ STORE_FILENAME = "phone-to-pc.dat"
 CRYPTPROTECT_UI_FORBIDDEN = 0x01
 DPAPI_DESCRIPTION = "Webcam QR Scanner Phone-to-PC credentials"
 DPAPI_ENTROPY = b"webcam-qr-scanner/wqrs/1/credentials"
+
+
+_STORE_LOCKS_GUARD = threading.Lock()
+_STORE_LOCKS: dict[Path, threading.RLock] = {}
 
 
 class SecureStorageError(RuntimeError):
@@ -86,6 +91,14 @@ class PairingStoreSnapshot:
         )
 
 
+def _lock_for_store(path: Path) -> threading.RLock:
+    """Share one re-entrant transaction lock per credential file."""
+
+    key = path.resolve(strict=False)
+    with _STORE_LOCKS_GUARD:
+        return _STORE_LOCKS.setdefault(key, threading.RLock())
+
+
 class DpapiProtector:
     """Bind encrypted bytes to the current Windows user with DPAPI."""
 
@@ -111,50 +124,53 @@ class PairingStore:
     ) -> None:
         self.path = path or settings_directory() / STORE_FILENAME
         self.protector = protector or DpapiProtector()
+        self._lock = _lock_for_store(self.path)
 
     def load(self) -> PairingStoreSnapshot:
-        try:
-            protected = self.path.read_bytes()
-        except FileNotFoundError:
-            return PairingStoreSnapshot()
-        except OSError as error:
-            raise SecureStorageError(
-                "protected credential file could not be read"
-            ) from error
-        try:
-            plaintext = self.protector.unprotect(protected)
-            value = json.loads(plaintext.decode("utf-8"))
-            return _snapshot_from_json(value)
-        except (
-            OSError,
-            UnicodeError,
-            ValueError,
-            TypeError,
-            json.JSONDecodeError,
-            ProtocolViolation,
-        ) as error:
-            raise SecureStorageError(
-                "protected credentials are corrupted or unavailable"
-            ) from error
+        with self._lock:
+            try:
+                protected = self.path.read_bytes()
+            except FileNotFoundError:
+                return PairingStoreSnapshot()
+            except OSError as error:
+                raise SecureStorageError(
+                    "protected credential file could not be read"
+                ) from error
+            try:
+                plaintext = self.protector.unprotect(protected)
+                value = json.loads(plaintext.decode("utf-8"))
+                return _snapshot_from_json(value)
+            except (
+                OSError,
+                UnicodeError,
+                ValueError,
+                TypeError,
+                json.JSONDecodeError,
+                ProtocolViolation,
+            ) as error:
+                raise SecureStorageError(
+                    "protected credentials are corrupted or unavailable"
+                ) from error
 
     def save(self, snapshot: PairingStoreSnapshot) -> None:
-        serialized = _snapshot_to_json(snapshot)
-        protected = self.protector.protect(serialized)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary_path = self.path.with_name(
-            f".{self.path.name}.{os.getpid()}.tmp"
-        )
-        try:
-            temporary_path.write_bytes(protected)
-            os.replace(temporary_path, self.path)
-        except OSError as error:
+        with self._lock:
+            serialized = _snapshot_to_json(snapshot)
+            protected = self.protector.protect(serialized)
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            temporary_path = self.path.with_name(
+                f".{self.path.name}.{os.getpid()}.tmp"
+            )
             try:
-                temporary_path.unlink(missing_ok=True)
-            except OSError:
-                pass
-            raise SecureStorageError(
-                "protected credentials could not be saved"
-            ) from error
+                temporary_path.write_bytes(protected)
+                os.replace(temporary_path, self.path)
+            except OSError as error:
+                try:
+                    temporary_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                raise SecureStorageError(
+                    "protected credentials could not be saved"
+                ) from error
 
     def replace_device(
         self,
@@ -162,58 +178,90 @@ class PairingStore:
         *,
         clear_pairs: bool,
     ) -> PairingStoreSnapshot:
-        current = self.load()
-        origin = normalize_relay_origin(device.relay_origin)
-        checked_device = _validated_device(device)
-        previous = current.device_for(origin)
-        if (
-            previous is not None
-            and previous.device_id != checked_device.device_id
-            and current.pairs_for(origin)
-            and not clear_pairs
-        ):
-            raise SecureStorageError(
-                "changing a relay device requires clearing its old pairs"
+        with self._lock:
+            current = self.load()
+            origin = normalize_relay_origin(device.relay_origin)
+            checked_device = _validated_device(device)
+            previous = current.device_for(origin)
+            if (
+                previous is not None
+                and previous.device_id != checked_device.device_id
+                and current.pairs_for(origin)
+                and not clear_pairs
+            ):
+                raise SecureStorageError(
+                    "changing a relay device requires clearing its old pairs"
+                )
+            devices = tuple(
+                item for item in current.devices if item.relay_origin != origin
+            ) + (checked_device,)
+            pairs = (
+                tuple(
+                    pair
+                    for pair in current.pairs
+                    if pair.relay_origin != origin
+                )
+                if clear_pairs
+                else current.pairs
             )
-        devices = tuple(
-            item for item in current.devices if item.relay_origin != origin
-        ) + (checked_device,)
-        pairs = (
-            tuple(
-                pair for pair in current.pairs if pair.relay_origin != origin
-            )
-            if clear_pairs
-            else current.pairs
-        )
-        updated = PairingStoreSnapshot(devices=devices, pairs=pairs)
-        self.save(updated)
-        return updated
+            updated = PairingStoreSnapshot(devices=devices, pairs=pairs)
+            self.save(updated)
+            return updated
 
     def add_pair(self, pair: StoredPair) -> PairingStoreSnapshot:
-        current = self.load()
-        checked = _validated_pair(pair)
-        if not any(
-            device.relay_origin == checked.relay_origin
-            and device.device_id == checked.device_id
-            for device in current.devices
-        ):
-            raise SecureStorageError(
-                "cannot store a pair without its relay device"
+        with self._lock:
+            current = self.load()
+            checked = _validated_pair(pair)
+            if not any(
+                device.relay_origin == checked.relay_origin
+                and device.device_id == checked.device_id
+                for device in current.devices
+            ):
+                raise SecureStorageError(
+                    "cannot store a pair without its relay device"
+                )
+            pairs = tuple(
+                item
+                for item in current.pairs
+                if not (
+                    item.relay_origin == checked.relay_origin
+                    and item.pair_id == checked.pair_id
+                )
+            ) + (checked,)
+            updated = PairingStoreSnapshot(
+                devices=current.devices,
+                pairs=pairs,
             )
-        pairs = tuple(
-            item
-            for item in current.pairs
-            if not (
-                item.relay_origin == checked.relay_origin
-                and item.pair_id == checked.pair_id
+            self.save(updated)
+            return updated
+
+    def remove_pair(
+        self,
+        relay_origin: str,
+        pair_id: str,
+    ) -> PairingStoreSnapshot:
+        """Atomically remove one pair without changing its relay device."""
+
+        origin = normalize_relay_origin(relay_origin)
+        b64url_decode(pair_id, expected_length=16)
+        with self._lock:
+            current = self.load()
+            pairs = tuple(
+                pair
+                for pair in current.pairs
+                if not (
+                    pair.relay_origin == origin
+                    and pair.pair_id == pair_id
+                )
             )
-        ) + (checked,)
-        updated = PairingStoreSnapshot(
-            devices=current.devices,
-            pairs=pairs,
-        )
-        self.save(updated)
-        return updated
+            if pairs == current.pairs:
+                return current
+            updated = PairingStoreSnapshot(
+                devices=current.devices,
+                pairs=pairs,
+            )
+            self.save(updated)
+            return updated
 
     def update_realtime_session(
         self,
@@ -222,20 +270,21 @@ class PairingStore:
     ) -> PairingStoreSnapshot:
         """Rotate only the DPAPI-protected Supabase session for one device."""
 
-        current = self.load()
-        device = current.device_for(relay_origin)
-        if device is None:
-            raise SecureStorageError(
-                "cannot store a Realtime session without its relay device"
+        with self._lock:
+            current = self.load()
+            device = current.device_for(relay_origin)
+            if device is None:
+                raise SecureStorageError(
+                    "cannot store a Realtime session without its relay device"
+                )
+            updated_device = replace(
+                device,
+                realtime_access_token=session.access_token,
+                realtime_refresh_token=session.refresh_token,
+                realtime_expires_at=session.expires_at,
+                realtime_user_id=session.user_id,
             )
-        updated_device = replace(
-            device,
-            realtime_access_token=session.access_token,
-            realtime_refresh_token=session.refresh_token,
-            realtime_expires_at=session.expires_at,
-            realtime_user_id=session.user_id,
-        )
-        return self.replace_device(updated_device, clear_pairs=False)
+            return self.replace_device(updated_device, clear_pairs=False)
 
 
 class _DataBlob(ctypes.Structure):

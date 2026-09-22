@@ -150,3 +150,46 @@ def confirm_phone_pairing(
         )
         == IDYES
     )
+
+
+def confirm_remove_phone_access(
+    phone_label: str,
+    short_pair_id: str,
+) -> bool:
+    """Confirm revocation with No selected by default."""
+
+    message = (
+        f"Remove access for {phone_label}?\n\n"
+        f"Pair ID:\n{short_pair_id}\n\n"
+        "This phone will no longer be able to send links to this PC. "
+        "The phone can be paired again later."
+    )
+    return (
+        show_dialog(
+            "QR Scanner - Remove Phone Access",
+            message,
+            MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,
+            owner_title="QR Scanner - Paired Phones",
+        )
+        == IDYES
+    )
+
+
+def confirm_phone_removal_retry(phone_label: str) -> bool:
+    """Offer an explicit retry after remote revocation could not complete."""
+
+    message = (
+        f"Access for {phone_label} was not removed.\n\n"
+        "The relay could not be reached, so the protected local pairing was "
+        "kept unchanged.\n\n"
+        "Check your internet connection and retry now?"
+    )
+    return (
+        show_dialog(
+            "QR Scanner - Removal unavailable",
+            message,
+            MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,
+            owner_title=None,
+        )
+        == IDYES
+    )

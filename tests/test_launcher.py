@@ -5,9 +5,13 @@ import launcher
 from exit_codes import (
     APPLICATION_EXIT_REQUESTED,
     CAMERA_CLOSED,
+    CONTROL_MANAGE_PHONES,
     CONTROL_PAIR_PHONE,
+    CONTROL_REMOVE_PHONE,
 )
 from home_ui import HomeAction
+from paired_phone_ipc import PairedPhoneView
+from paired_phones_ui import PairedPhonesAction, PairedPhonesDecision
 
 
 class LauncherTests(unittest.TestCase):
@@ -45,6 +49,46 @@ class LauncherTests(unittest.TestCase):
             result = launcher.main(["--home-process"])
 
         self.assertEqual(result, APPLICATION_EXIT_REQUESTED)
+
+    def test_home_process_receives_pair_count_and_opens_management(self) -> None:
+        with patch(
+            "home_ui.show_home_window",
+            return_value=HomeAction.MANAGE_PHONES,
+        ) as show_home:
+            result = launcher.main(
+                ["--home-process", "--paired-phone-count", "3"]
+            )
+
+        self.assertEqual(result, CONTROL_MANAGE_PHONES)
+        show_home.assert_called_once_with(
+            confirm_exit=unittest.mock.ANY,
+            pair_count=3,
+        )
+
+    def test_paired_phone_process_publishes_confirmed_removal(self) -> None:
+        phone = PairedPhoneView(
+            relay_origin="https://relay.example",
+            pair_id="abcDEF0123456789-_xyZA",
+            phone_label="My iPhone",
+        )
+        with (
+            patch(
+                "paired_phone_ipc.consume_paired_phones_snapshot",
+                return_value=(phone,),
+            ),
+            patch(
+                "paired_phones_ui.show_paired_phones_window",
+                return_value=PairedPhonesDecision(
+                    PairedPhonesAction.REMOVE,
+                    phone,
+                ),
+            ),
+            patch("paired_phone_ipc.request_phone_removal") as request,
+        ):
+            result = launcher.main(["--paired-phones-process"])
+
+        self.assertEqual(result, CONTROL_REMOVE_PHONE)
+        request.assert_called_once_with(phone)
 
     def test_self_test_does_not_emit_camera_lifecycle_signal(self) -> None:
         with patch("launcher.run_camera", return_value=0) as run_camera:

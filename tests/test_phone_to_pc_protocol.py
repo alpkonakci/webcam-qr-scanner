@@ -38,6 +38,7 @@ from native_dialogs import (
     MB_TOPMOST,
     MB_YESNO,
     confirm_phone_pairing,
+    confirm_remove_phone_access,
     confirm_phone_url,
     show_dialog,
 )
@@ -403,6 +404,23 @@ class PhoneToPcDialogTests(unittest.TestCase):
         self.assertIn("My iPhone", message)
         self.assertIn("Mobile PWA", message)
         self.assertIn("https://relay.example", message)
+        self.assertEqual(
+            style,
+            MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,
+        )
+
+    @patch("native_dialogs.show_dialog", return_value=7)
+    def test_phone_removal_defaults_to_keep_access(self, show_dialog) -> None:
+        approved = confirm_remove_phone_access(
+            "My iPhone",
+            "abcDEF…xyZA",
+        )
+
+        self.assertFalse(approved)
+        title, message, style = show_dialog.call_args.args
+        self.assertEqual(title, "QR Scanner - Remove Phone Access")
+        self.assertIn("My iPhone", message)
+        self.assertIn("abcDEF…xyZA", message)
         self.assertEqual(
             style,
             MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,

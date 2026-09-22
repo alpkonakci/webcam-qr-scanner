@@ -435,7 +435,22 @@ class LocalRelayEndToEndTests(unittest.IsolatedAsyncioTestCase):
 
             with self.assertRaises(DeliveryFailed) as revoked:
                 await phone.send_url("https://example.com/revoked")
-            self.assertEqual(revoked.exception.code, "unauthorized")
+            self.assertEqual(revoked.exception.code, "pair_revoked")
+
+            async with httpx.AsyncClient(
+                base_url=live.origin,
+                timeout=5,
+            ) as client:
+                repeated = await client.delete(
+                    f"/v1/pairs/{pairing.receiver.pair_id}",
+                    headers={
+                        "Authorization": (
+                            f"Bearer {pairing.receiver.receiver_token}"
+                        )
+                    },
+                )
+            self.assertEqual(repeated.status_code, 200)
+            self.assertEqual(repeated.json()["status"], "revoked")
 
     async def test_health_endpoint_discloses_no_state(self) -> None:
         async with LiveRelay() as live:

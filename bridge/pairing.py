@@ -7,6 +7,7 @@ import inspect
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any
 
 import httpx
@@ -20,6 +21,7 @@ from bridge.protocol import (
     SenderCredentials,
     VerifiedPairingRequest,
     approve_pairing_request,
+    b64url_decode,
     create_pc_pairing_session,
     decrypt_pairing_request,
     decrypt_pairing_result,
@@ -50,6 +52,35 @@ class PairingWaitTimeout(TimeoutError):
 
 class PairingWaitCancelled(RuntimeError):
     """Raised when the desktop closes an unfinished pairing wait."""
+
+
+class RemotePairRevocationStatus(Enum):
+    """Outcome confirmed by the relay before local credentials are removed."""
+
+    REVOKED = "revoked"
+    ALREADY_REVOKED = "already_revoked"
+
+
+class PairRevocationError(RuntimeError):
+    """Raised when remote revocation was not safely confirmed."""
+
+    def __init__(
+        self,
+        *,
+        code: str,
+        status_code: int | None = None,
+    ) -> None:
+        super().__init__(f"pair revocation was not confirmed: {code}")
+        self.code = code
+        self.status_code = status_code
+
+    @property
+    def retryable(self) -> bool:
+        return (
+            self.status_code is None
+            or self.status_code == 429
+            or self.status_code >= 500
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,6 +174,51 @@ async def cancel_pc_pairing(session: PcPairingSession) -> None:
             headers=_authorization(session.receiver_token),
         )
     _successful_json(response, expected_status=200)
+
+
+async def revoke_remote_pair(
+    *,
+    relay_origin: str,
+    pair_id: str,
+    receiver_token: str,
+) -> RemotePairRevocationStatus:
+    """Revoke one pair remotely, without modifying local credentials."""
+
+    origin = normalize_relay_origin(relay_origin)
+    b64url_decode(pair_id, expected_length=16)
+    b64url_decode(receiver_token, expected_length=32)
+    try:
+        async with _client(origin) as client:
+            response = await client.delete(
+                f"/v1/pairs/{pair_id}",
+                headers=_authorization(receiver_token),
+            )
+    except httpx.HTTPError as error:
+        raise PairRevocationError(code="network_error") from error
+
+    if response.status_code == 404:
+        code = _response_error_code(response)
+        if code == "pair_not_found":
+            return RemotePairRevocationStatus.ALREADY_REVOKED
+        raise PairRevocationError(
+            status_code=response.status_code,
+            code=code,
+        )
+    if response.status_code != 200:
+        raise PairRevocationError(
+            status_code=response.status_code,
+            code=_response_error_code(response),
+        )
+    try:
+        body = response.json()
+    except ValueError:
+        body = None
+    if body != {"status": "revoked", "pair_id": pair_id}:
+        raise PairRevocationError(
+            status_code=response.status_code,
+            code="invalid_relay_response",
+        )
+    return RemotePairRevocationStatus.REVOKED
 
 
 async def complete_pc_pairing(
@@ -359,6 +435,14 @@ def _successful_json(
 
 
 def _raise_response_error(response: httpx.Response) -> None:
+    code = _response_error_code(response)
+    raise PairingTransportError(
+        status_code=response.status_code,
+        code=code,
+    )
+
+
+def _response_error_code(response: httpx.Response) -> str:
     code = "invalid_relay_response"
     try:
         body = response.json()
@@ -366,9 +450,20 @@ def _raise_response_error(response: httpx.Response) -> None:
         body = None
     if isinstance(body, dict):
         error = body.get("error")
-        if isinstance(error, dict) and isinstance(error.get("code"), str):
-            code = error["code"]
-    raise PairingTransportError(
-        status_code=response.status_code,
-        code=code,
-    )
+        if isinstance(error, dict):
+            candidate = error.get("code")
+            if (
+                isinstance(candidate, str)
+                and 1 <= len(candidate) <= 64
+                and all(
+                    character.isascii()
+                    and (
+                        character.islower()
+                        or character.isdigit()
+                        or character == "_"
+                    )
+                    for character in candidate
+                )
+            ):
+                code = candidate
+    return code

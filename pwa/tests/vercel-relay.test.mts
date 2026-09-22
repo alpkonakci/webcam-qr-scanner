@@ -77,3 +77,92 @@ test("device registration binds a Supabase user and stores only a token hash", a
   assert.equal(headers.get("apikey"), process.env.SUPABASE_SECRET_KEY);
   assert.equal(headers.get("authorization"), null);
 });
+
+test("a revoked sender receives pair_revoked without creating a delivery", async (context) => {
+  const originalFetch = globalThis.fetch;
+  let deliveryWriteAttempted = false;
+  context.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const pairId = base64Url(16, 51);
+  const senderToken = base64Url(32, 61);
+  globalThis.fetch = async (input, init = {}) => {
+    const url = String(input);
+    if (url.includes("/rest/v1/rpc/relay_cleanup")) {
+      return Response.json(null);
+    }
+    if (url.includes("/rest/v1/relay_pairs?")) {
+      return Response.json([
+        {
+          pair_id: pairId,
+          device_id: base64Url(16, 71),
+          sender_token_hash: "a".repeat(64),
+          revoked_at: Math.floor(Date.now() / 1000),
+        },
+      ]);
+    }
+    if (url.includes("/rest/v1/relay_deliveries")) {
+      deliveryWriteAttempted = true;
+    }
+    throw new Error(`Unexpected test request: ${url} ${init.method ?? "GET"}`);
+  };
+
+  const response = await handleRelayRequest(
+    new Request(`https://scanner.example/v1/pairs/${pairId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${senderToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    }),
+  );
+
+  assert.equal(response.status, 410);
+  assert.deepEqual(await response.json(), {
+    error: {
+      code: "pair_revoked",
+      message: "This phone no longer has access to the paired PC.",
+    },
+  });
+  assert.equal(deliveryWriteAttempted, false);
+});
+
+test("unexpected relay failures never log raw exception data", async (context) => {
+  const originalFetch = globalThis.fetch;
+  const originalConsoleError = console.error;
+  const logged: unknown[][] = [];
+  context.after(() => {
+    globalThis.fetch = originalFetch;
+    console.error = originalConsoleError;
+  });
+
+  globalThis.fetch = async () => {
+    throw new Error(
+      "https://private.example/path Authorization: Bearer secret ciphertext",
+    );
+  };
+  console.error = (...values: unknown[]) => {
+    logged.push(values);
+  };
+
+  const response = await handleRelayRequest(
+    new Request("https://scanner.example/v1/devices", { method: "POST" }),
+  );
+
+  assert.equal(response.status, 500);
+  assert.deepEqual(await response.json(), {
+    error: {
+      code: "internal_error",
+      message: "The relay could not process the request.",
+    },
+  });
+  const output = JSON.stringify(logged);
+  assert.doesNotMatch(output, /private\.example|Bearer secret|ciphertext/i);
+});
+
+function base64Url(length: number, seed: number): string {
+  const bytes = Uint8Array.from({ length }, (_, index) => (seed + index) % 256);
+  return Buffer.from(bytes).toString("base64url");
+}

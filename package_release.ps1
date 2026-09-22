@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "v0.2.0-dev"
+    [string]$Version = "v0.2.0-beta.1"
 )
 
 $ErrorActionPreference = "Stop"
@@ -126,8 +126,22 @@ Copy-Item -LiteralPath `
 Compress-Archive -LiteralPath $packageDirectory -DestinationPath $archivePath `
     -CompressionLevel Optimal
 
-$archiveHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archivePath).Hash
-$executableHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $executablePath).Hash
+function Get-Sha256Hash {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $stream = [System.IO.File]::OpenRead($Path)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return [System.BitConverter]::ToString($sha256.ComputeHash($stream)).Replace("-", "")
+    }
+    finally {
+        $sha256.Dispose()
+        $stream.Dispose()
+    }
+}
+
+$archiveHash = Get-Sha256Hash -Path $archivePath
+$executableHash = Get-Sha256Hash -Path $executablePath
 $checksumContent = @(
     "$archiveHash  $packageName.zip"
     "$executableHash  QR-Scanner.exe (inside ZIP)"

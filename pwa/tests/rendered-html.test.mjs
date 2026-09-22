@@ -93,7 +93,10 @@ test("camera scanner is local, throttled and destroyed when closed", async () =>
 });
 
 test("opens decoded links without replacing the QR Scanner page", async () => {
-  const resultView = await readFile(new URL("app/QrResultView.tsx", root), "utf8");
+  const [resultView, home] = await Promise.all([
+    readFile(new URL("app/QrResultView.tsx", root), "utf8"),
+    readFile(new URL("app/PwaHome.tsx", root), "utf8"),
+  ]);
 
   assert.match(resultView, /Open link in new tab/);
   assert.match(resultView, /window\.open\(result\.href, "_blank", "noopener,noreferrer"\)/);
@@ -103,4 +106,9 @@ test("opens decoded links without replacing the QR Scanner page", async () => {
   assert.match(resultView, /Scan the pairing QR shown on your PC/);
   assert.match(resultView, /isMobileClient/);
   assert.doesNotMatch(resultView, /Pair a PC first/);
+  assert.match(resultView, /isPairRevokedError\(error\)/);
+  assert.match(resultView, /removePairIfRevoked\(error, pairedPc\.pairId\)/);
+  assert.match(resultView, /Pair a PC again to keep using Send to PC/);
+  assert.match(home, /onPairRevoked=\{clearRevokedPair\}/);
+  assert.match(home, /current\?\.pairId === pairId \? null : current/);
 });

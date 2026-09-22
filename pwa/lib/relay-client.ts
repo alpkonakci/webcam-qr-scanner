@@ -1,4 +1,4 @@
-import { savePair } from "./pair-store";
+import { removePair, savePair } from "./pair-store.ts";
 import {
   buildUrlEnvelope,
   createPhonePairingAttempt,
@@ -6,7 +6,7 @@ import {
   parsePairingUri,
   verifyDeliveryAck,
   type SenderCredentials,
-} from "./wqrs";
+} from "./wqrs.ts";
 
 const POLL_INTERVAL_MS = 500;
 
@@ -17,6 +17,20 @@ export class RelayClientError extends Error {
     super(message);
     this.code = code;
   }
+}
+
+export function isPairRevokedError(error: unknown): error is RelayClientError {
+  return error instanceof RelayClientError && error.code === "pair_revoked";
+}
+
+export async function removePairIfRevoked(
+  error: unknown,
+  pairId: string,
+  removeStoredPair: (storedPairId: string) => Promise<void> = removePair,
+): Promise<boolean> {
+  if (!isPairRevokedError(error)) return false;
+  await removeStoredPair(pairId);
+  return true;
 }
 
 export async function pairWithPc(
@@ -163,6 +177,8 @@ function relayErrorMessage(code: string): string {
   switch (code) {
     case "receiver_offline":
       return "Your paired PC is offline or QR Scanner is not running.";
+    case "pair_revoked":
+      return "Access to this PC was removed. Pair this phone with a PC again.";
     case "unauthorized":
       return "This pairing is no longer valid. Pair the phone again.";
     case "pairing_expired":

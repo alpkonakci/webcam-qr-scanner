@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: "QR Scanner — Phone-to-PC",
     description:
-      "A private, install-optional QR Scanner companion for sending links to your PC.",
+      "A private, install-free QR Scanner companion for sending links to your PC.",
     manifest: "/manifest.webmanifest",
     icons: {
       icon: [

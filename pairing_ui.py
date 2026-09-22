@@ -14,6 +14,8 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
+from qr_reader import QRReader
+
 
 WINDOW_TITLE = "QR Scanner - Pair Phone"
 WINDOW_WIDTH = 574
@@ -58,24 +60,36 @@ def generate_pairing_qr_image(
     if size < 160:
         raise ValueError("pairing QR image is too small")
 
-    encoder = cv2.QRCodeEncoder_create()
-    matrix = encoder.encode(pairing_value)
-    if matrix is None or matrix.ndim != 2:
-        raise RuntimeError("OpenCV could not encode the pairing QR")
-    qr = Image.fromarray(matrix).convert("L")
-    qr = ImageOps.expand(qr, border=4, fill=255)
-    module_scale = size // qr.width
-    if module_scale < 1:
-        raise ValueError("pairing QR image is too small for its payload")
-    scaled_size = qr.width * module_scale
-    qr = qr.resize(
-        (scaled_size, scaled_size),
-        Image.Resampling.NEAREST,
-    ).convert("RGB")
-    image = Image.new("RGB", (size, size), "white")
-    offset = (size - scaled_size) // 2
-    image.paste(qr, (offset, offset))
-    return image
+    # Some random payloads produce QR patterns OpenCV cannot read even when
+    # the image is perfectly sharp. Verify before displaying the pairing code.
+    reader = QRReader()
+    for correction_level in (
+        cv2.QRCodeEncoder_CORRECT_LEVEL_M,
+        cv2.QRCodeEncoder_CORRECT_LEVEL_L,
+        cv2.QRCodeEncoder_CORRECT_LEVEL_Q,
+        cv2.QRCodeEncoder_CORRECT_LEVEL_H,
+    ):
+        parameters = cv2.QRCodeEncoder_Params()
+        parameters.correction_level = correction_level
+        matrix = cv2.QRCodeEncoder_create(parameters).encode(pairing_value)
+        if matrix is None or matrix.ndim != 2:
+            continue
+        qr = ImageOps.expand(
+            Image.fromarray(matrix).convert("L"), border=4, fill=255
+        )
+        module_scale = size // qr.width
+        if module_scale < 1:
+            raise ValueError("pairing QR image is too small for its payload")
+        scaled_size = qr.width * module_scale
+        qr = qr.resize(
+            (scaled_size, scaled_size), Image.Resampling.NEAREST
+        ).convert("RGB")
+        image = Image.new("RGB", (size, size), "white")
+        offset = (size - scaled_size) // 2
+        image.paste(qr, (offset, offset))
+        if any(result.data == pairing_value for result in reader.scan(np.asarray(image))):
+            return image
+    raise RuntimeError("OpenCV could not generate a readable pairing QR")
 
 
 def build_pairing_canvas(

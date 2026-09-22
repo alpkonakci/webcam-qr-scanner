@@ -345,6 +345,12 @@ def create_app(relay_state: RelayState | None = None) -> FastAPI:
         )
         if route is None:
             raise RelayApiError(401, "unauthorized", "Sender token is invalid.")
+        if route.revoked:
+            raise RelayApiError(
+                410,
+                "pair_revoked",
+                "This phone no longer has access to the paired computer.",
+            )
         envelope = await _read_json_object(request)
         if (
             set(envelope) != MESSAGE_ENVELOPE_FIELDS

@@ -26,7 +26,7 @@ flowchart LR
   saniyelik güvenlik eşitlemesinde sorgu yapılır; polling ana taşıma yolu değildir.
 - PC uygulaması dışarıya port açmaz; tüm bağlantılar dışarı doğrudur.
 
-## Bu dalda tamamlanan ilk dilim
+## Bu dalda tamamlanan uygulama dilimi
 
 - PWA, `vinext` yerine standart `next dev`, `next build` ve `next start`
   komutlarıyla derleniyor.
@@ -42,6 +42,14 @@ flowchart LR
 - Eski localhost WebSocket relay'i ve mevcut Sites/D1 HTTP polling yolu geriye
   uyumlu kalıyor.
 - Realtime kesilirse beş saniyelik kurtarma sorgusu teslimatı sürdürüyor.
+- Masaüstü eşleşmiş telefonları güvenli özetlerle listeliyor ve erişimi önce
+  relay'de iptal edip sonra yerel DPAPI kaydını siliyor. Ağ/5xx hatasında yerel
+  kayıt korunuyor.
+- İptal edilmiş telefon `pair_revoked` aldığında yalnız ilgili IndexedDB
+  eşleşmesini siliyor ve yeniden eşleştirme yönlendirmesi gösteriyor.
+
+Vercel hesap bağlantısı destek tarafından çözülene kadar yeni bir barındırma
+platformuna otomatik geçilmez ve mevcut yayın değiştirilmez.
 
 ## Gizlilik sınırı
 
@@ -63,7 +71,8 @@ Authorization başlığı, token, URL, QR görüntüsü veya ciphertext gövdesi
    ile uygulanır.
 3. Realtime ayarında private channel kullanımı korunur; public kanal gerekmez.
 4. GitHub deposu Vercel'e bağlanır ve Root Directory olarak `pwa` seçilir.
-5. Vercel Production ortamına şu değerler girilir:
+5. Önce Vercel Preview, doğrulamadan sonra Production ortamına şu değerler
+   yalnız proje ayarlarından girilir:
    `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` ve en az
    32 karakterlik rastgele `RELAY_RATE_LIMIT_PEPPER`.
 6. Önizleme dağıtımında `/healthz`, PWA kamera yaşam döngüsü, eşleştirme,
@@ -74,7 +83,12 @@ Authorization başlığı, token, URL, QR görüntüsü veya ciphertext gövdesi
    üretilir. Origin değiştiği için telefon bir kez yeniden eşleştirilir.
 9. En az 48 saat iki sistem paralel tutulur. Yeni sistemin gerçek iPhone ve
    Android testleri geçince Sites/Cloudflare yayını kaldırılır ve eski D1
-   kaynakları silinir.
+   kaynakları yalnız ayrı açık onayla silinir.
+
+Dağıtım ve gerçek cihaz sonuçları
+[`v0.2-beta-release-checklist.tr.md`](v0.2-beta-release-checklist.tr.md)
+üzerinde kanıtlanır. Bir testin yerel olarak geçmesi, ilgili gerçek cihaz veya
+production maddesini tamamlanmış saymaz.
 
 ## Gerekli sırlar
 
