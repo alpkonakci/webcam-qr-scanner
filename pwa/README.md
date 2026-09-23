@@ -6,9 +6,9 @@ shared with the Python desktop application while deployment-specific code stays
 inside this directory.
 
 > **Migration status:** `codex/vercel-supabase` contains the tested first
-> Vercel + Supabase migration slice. The existing Sites/Cloudflare beta remains
-> live until the replacement passes real-device tests; this branch is not the
-> production endpoint yet.
+> Vercel + Supabase migration slice. A protected Vercel Preview deployment is
+> ready, but it has not passed real-device acceptance tests. The existing
+> Sites/Cloudflare beta remains live; this branch is not the production endpoint.
 
 ## Current scope
 
@@ -42,7 +42,8 @@ The current PWA milestone includes:
 
 **Open link in new tab**, browser pairing, and encrypted **Send to PC** remain
 available through the existing public beta endpoint. The Vercel + Supabase
-replacement is locally built and automatically tested but is not live yet.
+replacement is locally built and automatically tested, with an access-protected
+Preview deployment; it is not the production endpoint yet.
 Broad Android Chrome and iOS Safari testing plus an independent security review
 are still required, so this remains a preview rather than a stable service.
 

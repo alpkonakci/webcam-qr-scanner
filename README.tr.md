@@ -20,8 +20,9 @@ varsayılan tarayıcıda açılır ve QR Scanner otomatik olarak kapanır.
 > eşleşmiş telefon yönetimi ve URL'yi WebCrypto ile uçtan uca şifreleyen,
 > kurulum gerektirmeyen tarayıcı PWA'sı hazırdır. Vercel API, Supabase Postgres
 > şeması, özel Realtime bildirim yolu, beş saniyelik kurtarma sorgusu ve 60
-> saniyelik güvenlik eşitlemesi yerel olarak doğrulandı. Vercel endpoint'i ile
-> tam iPhone/Android geçişi henüz tamamlanmadığı için mevcut Sites/D1 betasına
+> saniyelik güvenlik eşitlemesi yerel olarak doğrulandı. Vercel önizleme
+> dağıtımı hazır, ancak giriş koruması altında; `/healthz` ve iPhone/Android
+> akışı gerçek cihazlarda henüz doğrulanmadı. Mevcut Sites/D1 betasına
 > dokunulmadı. Ayrıntılar için [geçiş planına](docs/vercel-supabase-migration.tr.md)
 > ve [beta yayın kontrol listesine](docs/v0.2-beta-release-checklist.tr.md) bakın.
 

@@ -3,9 +3,37 @@ import test from "node:test";
 
 import {
   RelayClientError,
+  abortableDelay,
   isPairRevokedError,
   removePairIfRevoked,
 } from "../lib/relay-client.ts";
+
+test("polling delay resolves normally and rejects promptly when cancelled", async () => {
+  const completed = new AbortController();
+  const signal = completed.signal;
+  const addListener = signal.addEventListener.bind(signal);
+  const removeListener = signal.removeEventListener.bind(signal);
+  let activeListeners = 0;
+  signal.addEventListener = ((...args: Parameters<AbortSignal["addEventListener"]>) => {
+    activeListeners += 1;
+    return addListener(...args);
+  }) as AbortSignal["addEventListener"];
+  signal.removeEventListener = ((...args: Parameters<AbortSignal["removeEventListener"]>) => {
+    activeListeners -= 1;
+    return removeListener(...args);
+  }) as AbortSignal["removeEventListener"];
+  await abortableDelay(1, signal);
+  assert.equal(activeListeners, 0);
+
+  const controller = new AbortController();
+  const pending = abortableDelay(10_000, controller.signal);
+  controller.abort();
+  await assert.rejects(pending, { name: "AbortError" });
+  await assert.rejects(
+    abortableDelay(1, controller.signal),
+    { name: "AbortError" },
+  );
+});
 
 test("removes only a pairing explicitly revoked by the relay", async () => {
   const removed: string[] = [];

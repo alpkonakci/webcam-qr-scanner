@@ -66,7 +66,7 @@ export async function pairWithPc(
       }
       return credentials;
     }
-    await delay(POLL_INTERVAL_MS, signal);
+    await abortableDelay(POLL_INTERVAL_MS, signal);
   }
   throw new RelayClientError("pairing_expired", "The pairing code expired. Create a new code on the PC.");
 }
@@ -117,7 +117,7 @@ export async function sendUrlToPc(
       await verifyDeliveryAck(credentials, message.messageId, objectField(response.body, "envelope"));
       return;
     }
-    await delay(350, signal);
+    await abortableDelay(350, signal);
   }
   throw new RelayClientError(
     "delivery_timeout",
@@ -225,20 +225,20 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function delay(milliseconds: number, signal?: AbortSignal): Promise<void> {
+export function abortableDelay(milliseconds: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(new DOMException("Aborted", "AbortError"));
       return;
     }
-    const timeout = window.setTimeout(resolve, milliseconds);
-    signal?.addEventListener(
-      "abort",
-      () => {
-        window.clearTimeout(timeout);
-        reject(new DOMException("Aborted", "AbortError"));
-      },
-      { once: true },
-    );
+    const onAbort = () => {
+      clearTimeout(timeout);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    const timeout = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, milliseconds);
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
 }

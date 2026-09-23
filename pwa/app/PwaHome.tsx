@@ -36,14 +36,14 @@ export function PwaHome() {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
         .register("/sw.js", { scope: "/" })
-        .then(() => setServiceWorkerReady(true))
-        .catch(() => setServiceWorkerReady(false));
+        .then(() => { if (active) setServiceWorkerReady(true); })
+        .catch(() => { if (active) setServiceWorkerReady(false); });
     }
 
     getMostRecentPair()
-      .then(setPairedPc)
-      .catch(() => setPairedPc(null))
-      .finally(() => setPairStoreReady(true));
+      .then((pair) => { if (active) setPairedPc(pair); })
+      .catch(() => { if (active) setPairedPc(null); })
+      .finally(() => { if (active) setPairStoreReady(true); });
 
     const launchPairingUri = pairingUriFromLaunchFragment(
       window.location.hash,

@@ -162,6 +162,47 @@ test("unexpected relay failures never log raw exception data", async (context) =
   assert.doesNotMatch(output, /private\.example|Bearer secret|ciphertext/i);
 });
 
+test("chunked JSON requests are rejected before an oversized body is buffered", async (context) => {
+  const originalFetch = globalThis.fetch;
+  let insertedPairing = false;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("/rest/v1/rpc/relay_cleanup")) return Response.json(null);
+    if (url.includes("/rest/v1/relay_devices?")) {
+      return Response.json([{
+        device_id: base64Url(16, 11),
+        receiver_token_hash: "a".repeat(64),
+        realtime_user_id: "3f25129c-8558-4bdf-a37d-e70b650e25b1",
+        last_seen_at: null,
+      }]);
+    }
+    if (url.includes("/rest/v1/relay_pairings")) insertedPairing = true;
+    throw new Error(`Unexpected test request: ${url}`);
+  };
+
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('{"protocol":"wqrs/1","padding":"'));
+      controller.enqueue(new Uint8Array(12 * 1024));
+      controller.close();
+    },
+  });
+  const response = await handleRelayRequest(
+    new Request("https://scanner.example/v1/pairings", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${base64Url(32, 21)}` },
+      body,
+      duplex: "half",
+    } as RequestInit & { duplex: "half" }),
+  );
+  assert.equal(response.status, 413);
+  assert.deepEqual(await response.json(), {
+    error: { code: "request_too_large", message: "Relay request is too large." },
+  });
+  assert.equal(insertedPairing, false);
+});
+
 function base64Url(length: number, seed: number): string {
   const bytes = Uint8Array.from({ length }, (_, index) => (seed + index) % 256);
   return Buffer.from(bytes).toString("base64url");

@@ -829,10 +829,7 @@ async function readJsonObject(request: Request): Promise<Record<string, unknown>
   if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BYTES) {
     throw new RelayError(413, "request_too_large", "Relay request is too large.");
   }
-  const text = await request.text();
-  if (new TextEncoder().encode(text).length > MAX_REQUEST_BYTES) {
-    throw new RelayError(413, "request_too_large", "Relay request is too large.");
-  }
+  const text = await readBoundedRequestText(request);
   let value: unknown;
   try {
     value = JSON.parse(text);
@@ -841,6 +838,29 @@ async function readJsonObject(request: Request): Promise<Record<string, unknown>
   }
   if (!isObject(value)) invalidRequest("Request body must be a JSON object.");
   return value;
+}
+
+async function readBoundedRequestText(request: Request): Promise<string> {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let byteCount = 0;
+  let text = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      byteCount += value.byteLength;
+      if (byteCount > MAX_REQUEST_BYTES) {
+        await reader.cancel().catch(() => undefined);
+        throw new RelayError(413, "request_too_large", "Relay request is too large.");
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    return text + decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 function accessToken(request: Request): string {

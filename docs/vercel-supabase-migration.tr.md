@@ -48,8 +48,11 @@ flowchart LR
 - İptal edilmiş telefon `pair_revoked` aldığında yalnız ilgili IndexedDB
   eşleşmesini siliyor ve yeniden eşleştirme yönlendirmesi gösteriyor.
 
-Vercel hesap bağlantısı destek tarafından çözülene kadar yeni bir barındırma
-platformuna otomatik geçilmez ve mevcut yayın değiştirilmez.
+Vercel hesap bağlantısı çözüldü. `codex/vercel-supabase` dalı için giriş
+korumalı bir Preview dağıtımı hazır; GitHub PR #3 taslak durumdadır. Bu durum
+yalnız dağıtımın tamamlandığını gösterir, gerçek cihaz akışının çalıştığını
+kanıtlamaz. Kullanıcının tercihiyle Preview giriş koruması açık kalır.
+Üretim dağıtımı, `main` dalı ve mevcut yayın değiştirilmedi.
 
 ## Gizlilik sınırı
 

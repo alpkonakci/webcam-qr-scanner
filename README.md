@@ -21,8 +21,9 @@ default browser, and closes the scanner automatically.
 > install-free browser PWA that encrypts URLs end to end with WebCrypto. The
 > Vercel API, Supabase Postgres schema, private Realtime wake-up path, five-second
 > recovery poll, and 60-second safety resync are locally tested. The Vercel
-> endpoint and the complete iPhone/Android cutover are still pending, so the
-> existing Sites/D1 beta remains untouched. See the
+> Preview deployment is ready behind Vercel Authentication, but `/healthz` and
+> the complete iPhone/Android flow have not yet been validated on real devices.
+> The existing Sites/D1 beta remains untouched. See the
 > [migration runbook](docs/vercel-supabase-migration.tr.md) and
 > [beta release checklist](docs/v0.2-beta-release-checklist.md).
 
