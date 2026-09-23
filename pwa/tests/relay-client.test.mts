@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -6,7 +7,47 @@ import {
   abortableDelay,
   isPairRevokedError,
   removePairIfRevoked,
+  sendUrlToPc,
 } from "../lib/relay-client.ts";
+import { decodeBase64Url, type SenderCredentials } from "../lib/wqrs.ts";
+
+const vector = JSON.parse(
+  await readFile(new URL("../../protocol/test-vectors/wqrs-1.json", import.meta.url), "utf8"),
+);
+
+test("relay fetch permits only same-origin deployment cookies", async () => {
+  const rootKey = await crypto.subtle.importKey(
+    "raw",
+    Uint8Array.from(decodeBase64Url(vector.derived.root_key, 32, "root key")).buffer,
+    "HKDF",
+    false,
+    ["deriveKey"],
+  );
+  const credentials: SenderCredentials = {
+    relayOrigin: "https://relay.example",
+    pairId: vector.inputs.pair_id,
+    senderToken: vector.inputs.sender_token,
+    rootKey,
+    pcLabel: "Test PC",
+    keyEpoch: 1,
+    pairedAt: vector.cases.delivered_ack.envelope.created_at,
+  };
+  const originalFetch = globalThis.fetch;
+  let fetchOptions: RequestInit | undefined;
+  globalThis.fetch = async (_url, options) => {
+    fetchOptions = options;
+    return Response.json({ error: { code: "receiver_offline" } }, { status: 409 });
+  };
+  try {
+    await assert.rejects(sendUrlToPc(credentials, "https://example.com"), {
+      code: "receiver_offline",
+    });
+    assert.equal(fetchOptions?.credentials, "same-origin");
+    assert.equal(fetchOptions?.referrerPolicy, "no-referrer");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("polling delay resolves normally and rejects promptly when cancelled", async () => {
   const completed = new AbortController();

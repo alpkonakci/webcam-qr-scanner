@@ -147,7 +147,7 @@ async function relayFetch(
       },
       body: options.body ? JSON.stringify(options.body) : undefined,
       cache: "no-store",
-      credentials: "omit",
+      credentials: "same-origin",
       referrerPolicy: "no-referrer",
       signal: options.signal,
     });

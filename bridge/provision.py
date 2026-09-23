@@ -16,12 +16,17 @@ from bridge.protocol import (
     create_phone_pairing_attempt,
     pairing_transcript,
 )
+from bridge.relay_http import relay_protection_headers
 
 
 async def provision_local_pairing(relay_origin: str) -> LocalPairing:
     """Run the real HTTP pairing flow with an explicit development approval."""
 
-    async with httpx.AsyncClient(base_url=relay_origin, timeout=5) as client:
+    async with httpx.AsyncClient(
+        base_url=relay_origin,
+        timeout=5,
+        headers=relay_protection_headers(relay_origin),
+    ) as client:
         device_response = await client.post("/v1/devices")
         device_response.raise_for_status()
         device = device_response.json()

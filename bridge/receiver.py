@@ -21,6 +21,7 @@ from bridge.protocol import (
     normalize_relay_origin,
 )
 from bridge.replay import InMemoryReplayGuard
+from bridge.relay_http import relay_protection_headers
 from bridge.realtime import (
     RealtimeConfig,
     RealtimeSession,
@@ -150,7 +151,8 @@ class PcReceiver:
     ) -> None:
         delivered = 0
         headers = {
-            "Authorization": f"Bearer {self.credentials.receiver_token}"
+            "Authorization": f"Bearer {self.credentials.receiver_token}",
+            **relay_protection_headers(self.relay_origin),
         }
         path = f"/v1/devices/{self.credentials.device_id}/messages"
         async with httpx.AsyncClient(
@@ -189,7 +191,8 @@ class PcReceiver:
         )
         delivered = 0
         headers = {
-            "Authorization": f"Bearer {self.credentials.receiver_token}"
+            "Authorization": f"Bearer {self.credentials.receiver_token}",
+            **relay_protection_headers(self.relay_origin),
         }
         path = f"/v1/devices/{self.credentials.device_id}/messages"
         try:

@@ -54,6 +54,29 @@ yalnız dağıtımın tamamlandığını gösterir, gerçek cihaz akışının �
 kanıtlamaz. Kullanıcının tercihiyle Preview giriş koruması açık kalır.
 Üretim dağıtımı, `main` dalı ve mevcut yayın değiştirilmedi.
 
+## Giriş korumalı Preview testi
+
+Vercel Authentication açık kalırken masaüstü HTTP istemcisi tarayıcı giriş
+çerezini kullanamaz. Geçici test için Vercel projesinin **Settings → Deployment
+Protection → Protection Bypass for Automation** bölümünde ayrı bir secret
+oluşturulur. Secret, proje düzeyinde tüm dağıtımların korumasını bypass
+edebildiğinden yalnız test süresince tutulur ve test bitince iptal edilir.
+Değerini Git'e, sohbete, URL'ye veya Vercel PWA ortam değişkenlerine koymayın.
+
+Masaüstü başlatılmadan önce aynı yerel PowerShell oturumunda
+`WQRS_RELAY_ORIGIN` ile `WQRS_VERCEL_BYPASS_ORIGIN` **aynı tam HTTPS Preview
+origin'ine**, `WQRS_VERCEL_BYPASS_SECRET` ise geçici değere ayarlanır. Başlık
+yalnız bu origin'e gönderilir; Supabase'e, eski Sites origin'ine veya başka
+Vercel dağıtımına iletilmez. Bu oturumdan başlatılan kaynak kodu/EXE ayarları
+devralır; Explorer'dan çift tıklama aynı geçici ortamı devralmaz.
+
+Telefonda önce **aynı Preview adresine** tarayıcıda giriş yapılır; ardından
+PWA'nın kendi kamera tarayıcısıyla PC'deki eşleşme QR'ı okutulur. Normal telefon
+kamerasından açılan link, giriş yönlendirmesinde QR'ın `#` parçasını
+kaybedebilir. PWA API çağrıları yalnız aynı origin'in oturum çerezini taşır.
+Preview test eşleşmesi kalıcı değildir: Production origin'ine geçildiğinde
+cihazlar bir kez yeniden eşleştirilir.
+
 ## Gizlilik sınırı
 
 Uygulama GPS/konum, mikrofon, kişi listesi, fotoğraf arşivi veya yerel ağ izni
@@ -80,8 +103,8 @@ Authorization başlığı, token, URL, QR görüntüsü veya ciphertext gövdesi
    32 karakterlik rastgele `RELAY_RATE_LIMIT_PEPPER`.
 6. Önizleme dağıtımında `/healthz`, PWA kamera yaşam döngüsü, eşleştirme,
    Realtime teslimi, ACK, replay reddi ve beş saniyelik kurtarma yolu sınanır.
-7. Sabit Production `.vercel.app` adresi seçilir. Preview URL eşleştirme için
-   kullanılmaz.
+7. Sabit Production `.vercel.app` adresi seçilir. Preview URL yalnız geçici
+   doğrulama eşleşmesi içindir; kalıcı kullanıcı eşleşmesinde kullanılmaz.
 8. Masaüstünün varsayılan public relay adresi bu sabit URL'ye alınır ve yeni EXE
    üretilir. Origin değiştiği için telefon bir kez yeniden eşleştirilir.
 9. En az 48 saat iki sistem paralel tutulur. Yeni sistemin gerçek iPhone ve

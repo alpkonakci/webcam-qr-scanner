@@ -12,6 +12,7 @@ from typing import Any
 
 import httpx
 
+from bridge.relay_http import relay_protection_headers
 from bridge.protocol import (
     PROTOCOL,
     ApprovedPairing,
@@ -405,6 +406,7 @@ def _client(origin: str) -> httpx.AsyncClient:
     return httpx.AsyncClient(
         base_url=normalize_relay_origin(origin),
         timeout=5,
+        headers=relay_protection_headers(origin),
     )
 
 

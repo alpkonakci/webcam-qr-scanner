@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from bridge.relay_http import relay_protection_headers
 from bridge.pairing import (
     PairingTransportError,
     PairingWaitCancelled,
@@ -259,6 +260,7 @@ class PairingController:
         async with httpx.AsyncClient(
             base_url=self.relay_origin,
             timeout=5,
+            headers=relay_protection_headers(self.relay_origin),
         ) as client:
             response = await client.post("/v1/devices", headers=headers)
         if response.status_code != 201:

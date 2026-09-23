@@ -14,6 +14,7 @@ import httpx
 from websockets.asyncio.client import connect
 
 from bridge.protocol import PROTOCOL, normalize_relay_origin
+from bridge.relay_http import relay_protection_headers
 
 
 MAX_TOKEN_LENGTH = 4096
@@ -52,7 +53,11 @@ async def fetch_realtime_config(relay_origin: str) -> RealtimeConfig | None:
     """Return public Realtime settings, or ``None`` for the legacy relay."""
 
     origin = normalize_relay_origin(relay_origin)
-    async with httpx.AsyncClient(base_url=origin, timeout=5) as client:
+    async with httpx.AsyncClient(
+        base_url=origin,
+        timeout=5,
+        headers=relay_protection_headers(origin),
+    ) as client:
         response = await client.get("/v1/realtime/config")
     if response.status_code == 404:
         return None
