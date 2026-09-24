@@ -15,6 +15,7 @@ from bridge.realtime import (
     create_anonymous_session,
     fetch_realtime_config,
     refresh_session,
+    _parse_session,
 )
 
 
@@ -66,6 +67,24 @@ def _session_body(*, user_id: str = USER_ID) -> dict[str, object]:
 
 
 class RealtimeTransportTests(unittest.IsolatedAsyncioTestCase):
+    def test_accepts_supabase_legacy_twelve_character_refresh_token(self) -> None:
+        body = _session_body()
+        body["refresh_token"] = "abc123def456"
+
+        session = _parse_session(body)
+
+        self.assertEqual(session.refresh_token, "abc123def456")
+
+    def test_auth_failure_maps_known_code_without_exposing_body(self) -> None:
+        error = RealtimeTransportError(
+            "server response omitted",
+            code="anonymous_provider_disabled",
+            status_code=400,
+        )
+
+        self.assertIn("anonymous sign-ins are disabled", error.user_message)
+        self.assertNotIn("server response omitted", error.user_message)
+
     async def test_fetches_only_public_realtime_configuration(self) -> None:
         value = {
             "protocol": "wqrs/1",

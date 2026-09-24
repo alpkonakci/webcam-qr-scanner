@@ -13,11 +13,11 @@ from urllib.parse import urlencode, urlsplit, urlunsplit
 import httpx
 from websockets.asyncio.client import connect
 
+from bridge.auth_validation import MAX_TOKEN_LENGTH, valid_session_token
 from bridge.protocol import PROTOCOL, normalize_relay_origin
 from bridge.relay_http import relay_protection_headers
 
 
-MAX_TOKEN_LENGTH = 4096
 SESSION_REFRESH_MARGIN_SECONDS = 60
 REALTIME_HEARTBEAT_SECONDS = 25.0
 REALTIME_RECONNECT_DELAYS_SECONDS = (1.0, 2.0, 5.0, 10.0)
@@ -26,6 +26,72 @@ UUID_LENGTH = 36
 
 class RealtimeTransportError(RuntimeError):
     """Raised when Supabase Auth or Realtime returns an unsafe response."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "realtime_unavailable",
+        status_code: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.status_code = status_code
+
+    @property
+    def user_message(self) -> str:
+        # Only local, allowlisted text reaches the UI; response bodies may
+        # contain credentials or attacker-controlled content.
+        message = {
+            "preview_protected": (
+                "Vercel Preview access was rejected. Restart QR Scanner from "
+                "the PowerShell session containing the preview address and "
+                "temporary bypass secret. Check that the secret is still valid."
+            ),
+            "config_unavailable": (
+                "The relay configuration could not be loaded. Check the "
+                "deployment and try again."
+            ),
+            "config_invalid": (
+                "The relay returned an incompatible configuration. Check that "
+                "the desktop and relay versions match."
+            ),
+            "anonymous_provider_disabled": (
+                "Supabase anonymous sign-ins are disabled. Enable Allow "
+                "anonymous sign-ins in Authentication > Sign In / Providers."
+            ),
+            "signup_disabled": (
+                "Supabase is not accepting new device sessions. Enable Allow "
+                "new users to sign up in Authentication > Sign In / Providers."
+            ),
+            "auth_key_rejected": (
+                "Supabase rejected the project's public API key. Check "
+                "SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in Vercel, then "
+                "redeploy."
+            ),
+            "over_request_rate_limit": (
+                "Supabase temporarily limited new device sessions. Wait a few "
+                "minutes before trying again."
+            ),
+            "captcha_failed": (
+                "Supabase requires a CAPTCHA for this device session. The "
+                "desktop pairing flow cannot complete this challenge."
+            ),
+            "auth_unavailable": (
+                "The Supabase device session could not be created or refreshed. "
+                "Check the project status and authentication settings."
+            ),
+            "session_invalid": (
+                "Supabase returned an unsupported device session. Update QR "
+                "Scanner and retry."
+            ),
+        }.get(
+            self.code,
+            "The private connection could not be established. Please try again.",
+        )
+        if self.status_code is not None:
+            message += f"\n\nHTTP status: {self.status_code}"
+        return message
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,13 +129,19 @@ async def fetch_realtime_config(relay_origin: str) -> RealtimeConfig | None:
         return None
     if response.status_code != 200:
         raise RealtimeTransportError(
-            f"Realtime configuration failed with HTTP {response.status_code}"
+            f"Realtime configuration failed with HTTP {response.status_code}",
+            code=(
+                "preview_protected"
+                if response.status_code in {401, 403}
+                else "config_unavailable"
+            ),
+            status_code=response.status_code,
         )
     try:
         value = response.json()
     except ValueError as error:
         raise RealtimeTransportError(
-            "Realtime configuration is not valid JSON"
+            "Realtime configuration is not valid JSON", code="config_invalid"
         ) from error
     if not isinstance(value, dict) or set(value) != {
         "protocol",
@@ -78,9 +150,15 @@ async def fetch_realtime_config(relay_origin: str) -> RealtimeConfig | None:
         "fallback_poll_seconds",
         "connected_resync_seconds",
     }:
-        raise RealtimeTransportError("Realtime configuration fields are invalid")
+        raise RealtimeTransportError(
+            "Realtime configuration fields are invalid",
+            code="config_invalid",
+        )
     if value["protocol"] != PROTOCOL:
-        raise RealtimeTransportError("Realtime protocol is unsupported")
+        raise RealtimeTransportError(
+            "Realtime protocol is unsupported",
+            code="config_invalid",
+        )
     supabase_url = normalize_relay_origin(value["url"])
     if not supabase_url.startswith("https://"):
         raise RealtimeTransportError("Supabase Realtime must use HTTPS")
@@ -97,7 +175,10 @@ async def fetch_realtime_config(relay_origin: str) -> RealtimeConfig | None:
         or type(resync_seconds) not in {int, float}
         or not 30 <= float(resync_seconds) <= 300
     ):
-        raise RealtimeTransportError("Realtime configuration values are invalid")
+        raise RealtimeTransportError(
+            "Realtime configuration values are invalid",
+            code="config_invalid",
+        )
     return RealtimeConfig(
         supabase_url=supabase_url,
         publishable_key=publishable_key,
@@ -294,8 +375,34 @@ async def _auth_request(
             json=body,
         )
     if response.status_code not in {200, 201}:
+        try:
+            failure = response.json()
+        except ValueError:
+            failure = None
+        known_codes = {
+            "anonymous_provider_disabled",
+            "signup_disabled",
+            "over_request_rate_limit",
+            "captcha_failed",
+        }
+        reported_code = (
+            failure.get("error_code", failure.get("code"))
+            if isinstance(failure, dict)
+            else None
+        )
+        code = (
+            reported_code
+            if isinstance(reported_code, str) and reported_code in known_codes
+            else "auth_unavailable"
+        )
+        if code == "auth_unavailable" and response.status_code == 401:
+            code = "auth_key_rejected"
+        if response.status_code == 429:
+            code = "over_request_rate_limit"
         raise RealtimeTransportError(
-            f"Supabase anonymous authentication failed with HTTP {response.status_code}"
+            f"Supabase authentication failed with HTTP {response.status_code}",
+            code=code,
+            status_code=response.status_code,
         )
     try:
         return response.json()
@@ -317,14 +424,17 @@ def _parse_session(value: object) -> RealtimeSession:
     if expires_at is None and type(expires_in) is int:
         expires_at = int(time.time()) + expires_in
     if (
-        not _valid_token(access_token)
-        or not _valid_token(refresh_token)
+        not valid_session_token(access_token)
+        or not valid_session_token(refresh_token, refresh=True)
         or type(expires_at) is not int
         or expires_at <= int(time.time())
         or not isinstance(user_id, str)
         or not _valid_uuid(user_id)
     ):
-        raise RealtimeTransportError("Supabase session fields are invalid")
+        raise RealtimeTransportError(
+            "Supabase session fields are invalid",
+            code="session_invalid",
+        )
     return RealtimeSession(
         access_token=access_token,
         refresh_token=refresh_token,
@@ -397,14 +507,6 @@ async def _run_session_callback(
     result = await asyncio.to_thread(callback, session)
     if inspect.isawaitable(result):
         await result
-
-
-def _valid_token(value: object) -> bool:
-    return (
-        isinstance(value, str)
-        and 20 <= len(value) <= MAX_TOKEN_LENGTH
-        and not any(character.isspace() for character in value)
-    )
 
 
 def _valid_uuid(value: str) -> bool:

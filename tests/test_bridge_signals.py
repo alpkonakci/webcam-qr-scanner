@@ -7,9 +7,11 @@ from bridge_signals import (
     consume_bridge_exit_request,
     consume_camera_closed,
     consume_open_camera_request,
+    consume_open_home_request,
     request_bridge_exit,
     request_camera_closed,
     request_open_camera,
+    request_open_home,
 )
 
 
@@ -23,6 +25,7 @@ class BridgeSignalTests(unittest.TestCase):
         cases = (
             (request_bridge_exit, consume_bridge_exit_request),
             (request_camera_closed, consume_camera_closed),
+            (request_open_home, consume_open_home_request),
         )
         for request, consume in cases:
             with self.subTest(request=request.__name__):
@@ -43,12 +46,14 @@ class BridgeSignalTests(unittest.TestCase):
         request_bridge_exit(self.directory)
         request_open_camera(directory=self.directory)
         request_camera_closed(self.directory)
+        request_open_home(self.directory)
 
         clear_control_requests(self.directory)
 
         self.assertFalse(consume_bridge_exit_request(self.directory))
         self.assertIsNone(consume_open_camera_request(self.directory))
         self.assertFalse(consume_camera_closed(self.directory))
+        self.assertFalse(consume_open_home_request(self.directory))
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ from bridge_signals import (
     consume_bridge_exit_request,
     consume_camera_closed,
     consume_open_camera_request,
+    consume_open_home_request,
 )
 from bridge.pair_management import (
     PairManagementService,
@@ -23,6 +24,7 @@ from bridge.pair_management import (
 )
 from bridge.pairing import PairRevocationError
 from bridge.receiver_service import ReceiverService
+from bridge.realtime import RealtimeTransportError
 from bridge.secure_storage import SecureStorageError
 from exit_codes import (
     APPLICATION_EXIT_REQUESTED,
@@ -116,6 +118,7 @@ class TrayApplication:
         self,
         *,
         open_camera_on_start: bool = False,
+        open_home_on_start: bool = False,
         camera_arguments: Sequence[str] = (),
         process_spawner: Callable[
             [list[str]],
@@ -126,6 +129,7 @@ class TrayApplication:
         receiver_service: ReceiverService | None = None,
     ) -> None:
         self.open_camera_on_start = open_camera_on_start
+        self.open_home_on_start = open_home_on_start
         self.camera_arguments = tuple(camera_arguments)
         self.process_spawner = process_spawner
         self.pairing_runner = pairing_runner or self._default_pairing_runner
@@ -147,7 +151,7 @@ class TrayApplication:
         self._exit_prompt_lock = threading.Lock()
         self._foreground_dialog_count = 0
         pairing_status = (
-            "ready"
+            "saved pairings"
             if self.receiver_service.has_paired_phones()
             else "not paired"
         )
@@ -189,7 +193,7 @@ class TrayApplication:
     def _phone_menu_text(self, _: pystray.MenuItem) -> str:
         count = len(self._list_pairs_safely())
         if count:
-            return f"Manage Paired Phones ({count})..."
+            return f"Manage Saved Pairings ({count})..."
         return "Pair Phone..."
 
     def _phone_action(
@@ -222,6 +226,8 @@ class TrayApplication:
         ).start()
         if self.open_camera_on_start:
             self._launch_camera()
+        elif self.open_home_on_start:
+            self._launch_home()
 
     def _scan_with_camera(
         self,
@@ -699,7 +705,7 @@ class TrayApplication:
 
     def _refresh_pairing_status(self) -> None:
         count = len(self._list_pairs_safely())
-        status = "ready" if count else "not paired"
+        status = f"{count} saved pairings" if count else "not paired"
         self.icon.title = f"{APPLICATION_NAME} - Phone-to-PC {status}"
         try:
             self.icon.update_menu()
@@ -740,6 +746,8 @@ class TrayApplication:
                 self._launch_camera(camera_arguments)
             if consume_camera_closed():
                 self._launch_home()
+            if consume_open_home_request():
+                self._launch_home()
 
     def _stop(self) -> None:
         if self._stop_event.is_set():
@@ -765,6 +773,8 @@ class TrayApplication:
 
 
 def _pairing_error_message(error: Exception) -> str:
+    if isinstance(error, RealtimeTransportError):
+        return error.user_message
     if error.__class__.__module__.startswith(("httpx", "httpcore")):
         return (
             "The Phone-to-PC relay could not be reached.\n\n"

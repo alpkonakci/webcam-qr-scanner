@@ -75,8 +75,8 @@ def action_cards(pair_count: int = 0) -> tuple[ActionCard, ...]:
         phone_card = ActionCard(
             HomeAction.MANAGE_PHONES,
             (32, 324, 588, 414),
-            f"Manage Paired Phones ({pair_count})",
-            "Review paired devices, remove access, or pair another phone.",
+            f"Manage Saved Pairings ({pair_count})",
+            "Saved approvals, not online phones. Manage or add a pairing.",
             WARNING,
         )
     else:

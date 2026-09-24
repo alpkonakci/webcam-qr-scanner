@@ -10,6 +10,7 @@ from bridge_signals import (
     request_bridge_exit,
     request_camera_closed,
     request_open_camera,
+    request_open_home,
 )
 from exit_codes import (
     APPLICATION_EXIT_REQUESTED,
@@ -42,14 +43,17 @@ def parse_launcher_args(
 def run_bridge(
     *,
     open_camera: bool = False,
+    open_home: bool = False,
     camera_arguments: Sequence[str] = (),
 ) -> int:
-    """Start the sole tray controller or ask the existing one for a camera."""
+    """Start the sole controller or route a window request to the existing one."""
 
     with BridgeInstanceGuard() as guard:
         if guard.already_running:
             if open_camera:
                 request_open_camera(camera_arguments)
+            elif open_home:
+                request_open_home()
             return 0
 
         clear_control_requests()
@@ -60,6 +64,7 @@ def run_bridge(
 
         TrayApplication(
             open_camera_on_start=open_camera,
+            open_home_on_start=open_home,
             camera_arguments=camera_arguments,
         ).run()
     return 0
@@ -154,7 +159,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     if "--self-test" in remaining:
         return run_camera(remaining, signal_controller=False)
 
-    return run_bridge(open_camera=True, camera_arguments=remaining)
+    open_camera = args.open_camera or bool(remaining)
+    return run_bridge(
+        open_camera=open_camera,
+        open_home=not open_camera,
+        camera_arguments=remaining,
+    )
 
 
 if __name__ == "__main__":

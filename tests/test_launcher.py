@@ -15,14 +15,26 @@ from paired_phones_ui import PairedPhonesAction, PairedPhonesDecision
 
 
 class LauncherTests(unittest.TestCase):
-    def test_default_launch_starts_tray_and_opens_camera(self) -> None:
+    def test_camera_options_start_tray_and_open_camera(self) -> None:
         with patch("launcher.run_bridge", return_value=0) as run_bridge:
             result = launcher.main(["--show-fps"])
 
         self.assertEqual(result, 0)
         run_bridge.assert_called_once_with(
             open_camera=True,
+            open_home=False,
             camera_arguments=["--show-fps"],
+        )
+
+    def test_default_launch_opens_control_center(self) -> None:
+        with patch("launcher.run_bridge", return_value=0) as run_bridge:
+            result = launcher.main([])
+
+        self.assertEqual(result, 0)
+        run_bridge.assert_called_once_with(
+            open_camera=False,
+            open_home=True,
+            camera_arguments=[],
         )
 
     def test_screen_mode_bypasses_camera_tray(self) -> None:

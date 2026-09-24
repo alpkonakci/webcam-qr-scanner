@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import Enum
+from urllib.parse import urlsplit
 
 import cv2
 import numpy as np
@@ -126,11 +127,17 @@ def build_paired_phones_canvas(
     small_font = _load_font(12)
     button_font = _load_font(14, semibold=True)
 
-    draw.text((32, 24), "PAIRED PHONES", font=title_font, fill=PRIMARY_TEXT)
+    draw.text((32, 24), "SAVED PAIRINGS", font=title_font, fill=PRIMARY_TEXT)
     draw.text(
         (32, 66),
-        "Review phone access or connect another device.",
+        "Saved approvals, not currently connected phones.",
         font=subtitle_font,
+        fill=SECONDARY_TEXT,
+    )
+    draw.text(
+        (32, 87),
+        "The same phone can have multiple browser or test pairings.",
+        font=small_font,
         fill=SECONDARY_TEXT,
     )
 
@@ -160,9 +167,16 @@ def build_paired_phones_canvas(
             fill=PRIMARY_TEXT,
         )
         draw.text(
-            (LIST_LEFT + 40, top + 42),
+            (LIST_LEFT + 40, top + 33),
             f"Pair ID  {abbreviated_pair_id(phone.pair_id)}",
             font=id_font,
+            fill=SECONDARY_TEXT,
+        )
+        service = urlsplit(phone.relay_origin).netloc
+        draw.text(
+            (LIST_LEFT + 40, top + 52),
+            _ellipsize(draw, f"Service: {service}", small_font, 490),
+            font=small_font,
             fill=SECONDARY_TEXT,
         )
 

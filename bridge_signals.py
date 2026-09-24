@@ -13,6 +13,7 @@ from app_settings import settings_directory
 EXIT_REQUEST_FILENAME = "bridge-exit.request"
 OPEN_CAMERA_REQUEST_FILENAME = "open-camera.request"
 CAMERA_CLOSED_FILENAME = "camera-closed.request"
+OPEN_HOME_REQUEST_FILENAME = "open-home.request"
 
 
 def _signal_path(filename: str, directory: Path | None = None) -> Path:
@@ -95,6 +96,14 @@ def request_camera_closed(directory: Path | None = None) -> None:
     _request(CAMERA_CLOSED_FILENAME, directory)
 
 
+def request_open_home(directory: Path | None = None) -> None:
+    _request(OPEN_HOME_REQUEST_FILENAME, directory)
+
+
+def consume_open_home_request(directory: Path | None = None) -> bool:
+    return _consume(OPEN_HOME_REQUEST_FILENAME, directory)
+
+
 def consume_camera_closed(directory: Path | None = None) -> bool:
     return _consume(CAMERA_CLOSED_FILENAME, directory)
 
@@ -104,5 +113,6 @@ def clear_control_requests(directory: Path | None = None) -> None:
         EXIT_REQUEST_FILENAME,
         OPEN_CAMERA_REQUEST_FILENAME,
         CAMERA_CLOSED_FILENAME,
+        OPEN_HOME_REQUEST_FILENAME,
     ):
         _consume(filename, directory)

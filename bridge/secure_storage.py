@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
 from app_settings import settings_directory
+from bridge.auth_validation import valid_session_token
 from bridge.protocol import (
     KEY_EPOCH,
     ProtocolViolation,
@@ -500,8 +501,8 @@ def _validated_device(device: RelayDevice) -> RelayDevice:
                 "stored Realtime session must be complete"
             )
         if (
-            not _valid_stored_token(device.realtime_access_token)
-            or not _valid_stored_token(device.realtime_refresh_token)
+            not valid_session_token(device.realtime_access_token)
+            or not valid_session_token(device.realtime_refresh_token, refresh=True)
             or type(device.realtime_expires_at) is not int
             or device.realtime_expires_at <= 0
             or not _valid_stored_uuid(device.realtime_user_id)
@@ -515,14 +516,6 @@ def _validated_device(device: RelayDevice) -> RelayDevice:
         realtime_refresh_token=device.realtime_refresh_token,
         realtime_expires_at=device.realtime_expires_at,
         realtime_user_id=device.realtime_user_id,
-    )
-
-
-def _valid_stored_token(value: object) -> bool:
-    return (
-        isinstance(value, str)
-        and 20 <= len(value) <= 4096
-        and not any(character.isspace() for character in value)
     )
 
 
