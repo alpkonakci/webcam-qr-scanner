@@ -182,11 +182,38 @@ def confirm_phone_removal_retry(phone_label: str) -> bool:
         f"Access for {phone_label} was not removed.\n\n"
         "The relay could not be reached, so the protected local pairing was "
         "kept unchanged.\n\n"
-        "Check your internet connection and retry now?"
+        "Check your internet connection and retry now? If the retry also "
+        "fails, QR Scanner can offer to forget an old service record on this "
+        "PC only."
     )
     return (
         show_dialog(
             "QR Scanner - Removal unavailable",
+            message,
+            MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,
+            owner_title=None,
+        )
+        == IDYES
+    )
+
+
+def confirm_forget_phone_locally(
+    phone_label: str,
+    relay_origin: str,
+) -> bool:
+    """Confirm local-only cleanup when remote revocation stays unavailable."""
+
+    message = (
+        f"The relay still cannot remove access for {phone_label}.\n\n"
+        f"Service:\n{relay_origin}\n\n"
+        "Forget this saved pairing on this PC only?\n\n"
+        "This deletes its protected credentials from this computer, but the "
+        "relay could not confirm that remote access was revoked. Use this only "
+        "for an old or permanently unavailable service."
+    )
+    return (
+        show_dialog(
+            "QR Scanner - Forget Saved Pairing",
             message,
             MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,
             owner_title=None,

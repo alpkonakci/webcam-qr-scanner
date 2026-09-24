@@ -137,6 +137,21 @@ class PairManagementServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.load().pairs, (self.pair,))
         self.assertEqual(self.store.load().devices, (self.device,))
 
+    def test_explicit_local_forget_removes_pair_without_remote_request(
+        self,
+    ) -> None:
+        with patch("bridge.pair_management.revoke_remote_pair") as remote:
+            result = self.service.forget_local_pair(
+                relay_origin=self.pair.relay_origin,
+                pair_id=self.pair.pair_id,
+            )
+
+        self.assertEqual(result.status, PairRemovalStatus.LOCAL_ONLY)
+        self.assertEqual(result.summary.pair_id, self.pair.pair_id)
+        self.assertEqual(self.store.load().pairs, ())
+        self.assertEqual(self.store.load().devices, (self.device,))
+        remote.assert_not_called()
+
     async def test_remote_not_found_allows_local_cleanup(self) -> None:
         with patch(
             "bridge.pair_management.revoke_remote_pair",

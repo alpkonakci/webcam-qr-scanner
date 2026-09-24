@@ -23,6 +23,7 @@ class PairRemovalStatus(Enum):
 
     REVOKED = "revoked"
     ALREADY_REVOKED = "already_revoked"
+    LOCAL_ONLY = "local_only"
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,6 +141,37 @@ class PairManagementService:
                 is RemotePairRevocationStatus.ALREADY_REVOKED
                 else PairRemovalStatus.REVOKED
             ),
+        )
+
+    def forget_local_pair(
+        self,
+        *,
+        relay_origin: str,
+        pair_id: str,
+    ) -> PairRemovalResult:
+        """Delete one protected local record without claiming remote revocation.
+
+        This is intentionally separate from ``remove_pair``. Callers must only
+        expose it after an explicit warning when a retired or unreachable relay
+        makes authoritative revocation impossible.
+        """
+
+        origin = normalize_relay_origin(relay_origin)
+        b64url_decode(pair_id, expected_length=16)
+        pair = next(
+            (
+                item
+                for item in self.store.load().pairs
+                if item.relay_origin == origin and item.pair_id == pair_id
+            ),
+            None,
+        )
+        if pair is None:
+            raise PairNotStoredError("paired phone is no longer stored")
+        self.store.remove_pair(origin, pair_id)
+        return PairRemovalResult(
+            summary=_pair_summary(pair),
+            status=PairRemovalStatus.LOCAL_ONLY,
         )
 
 

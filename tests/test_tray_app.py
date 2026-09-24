@@ -392,6 +392,100 @@ class TrayApplicationTests(unittest.TestCase):
         receiver.request_refresh.assert_not_called()
         launch_manager.assert_called_once_with()
 
+    @patch("tray_app.confirm_forget_phone_locally", return_value=True)
+    @patch("tray_app.confirm_phone_removal_retry", return_value=True)
+    @patch("tray_app.consume_phone_removal_request")
+    def test_repeated_network_failure_can_forget_legacy_pair_locally(
+        self,
+        consume_request,
+        confirm_retry,
+        confirm_forget,
+    ) -> None:
+        request = RemovePhoneRequest(
+            relay_origin="https://retired-relay.example",
+            pair_id="abcDEF0123456789-_xyZA",
+            phone_label="My iPhone",
+        )
+        consume_request.return_value = request
+        pair_manager = Mock()
+        pair_manager.list_pairs.return_value = ()
+        pair_manager.remove_pair.side_effect = PairRevocationError(
+            code="network_error"
+        )
+        pair_manager.forget_local_pair.return_value = SimpleNamespace(
+            summary=SimpleNamespace(phone_label="My iPhone")
+        )
+        receiver = Mock()
+        application = self._application(
+            pair_manager=pair_manager,
+            receiver_service=receiver,
+        )
+
+        with (
+            patch.object(application, "_refresh_pairing_status"),
+            patch.object(application, "_launch_home") as launch_home,
+        ):
+            application._remove_requested_phone()
+
+        self.assertEqual(pair_manager.remove_pair.call_count, 2)
+        confirm_retry.assert_called_once_with("My iPhone")
+        confirm_forget.assert_called_once_with(
+            "My iPhone",
+            "https://retired-relay.example",
+        )
+        pair_manager.forget_local_pair.assert_called_once_with(
+            relay_origin=request.relay_origin,
+            pair_id=request.pair_id,
+        )
+        receiver.request_refresh.assert_called_once_with()
+        launch_home.assert_called_once_with()
+
+    @patch("tray_app.confirm_forget_phone_locally", return_value=False)
+    @patch("tray_app.confirm_phone_removal_retry", return_value=True)
+    @patch("tray_app.consume_phone_removal_request")
+    def test_declined_local_forget_preserves_pair_after_repeated_failure(
+        self,
+        consume_request,
+        confirm_retry,
+        confirm_forget,
+    ) -> None:
+        request = RemovePhoneRequest(
+            relay_origin="https://retired-relay.example",
+            pair_id="abcDEF0123456789-_xyZA",
+            phone_label="My iPhone",
+        )
+        consume_request.return_value = request
+        pair_manager = Mock()
+        pair_manager.list_pairs.return_value = (
+            PairedPhoneSummary(
+                relay_origin=request.relay_origin,
+                pair_id=request.pair_id,
+                short_pair_id="abcDEF…xyZA",
+                phone_label=request.phone_label,
+            ),
+        )
+        pair_manager.remove_pair.side_effect = PairRevocationError(
+            code="network_error"
+        )
+        receiver = Mock()
+        application = self._application(
+            pair_manager=pair_manager,
+            receiver_service=receiver,
+        )
+
+        with patch.object(
+            application,
+            "_launch_paired_phones",
+        ) as launch_manager:
+            application._remove_requested_phone()
+
+        self.assertEqual(pair_manager.remove_pair.call_count, 2)
+        confirm_retry.assert_called_once_with("My iPhone")
+        confirm_forget.assert_called_once()
+        pair_manager.forget_local_pair.assert_not_called()
+        receiver.request_refresh.assert_not_called()
+        launch_manager.assert_called_once_with()
+
 
 if __name__ == "__main__":
     unittest.main()
