@@ -159,10 +159,10 @@ def confirm_remove_phone_access(
     """Confirm revocation with No selected by default."""
 
     message = (
-        f"Remove access for {phone_label}?\n\n"
-        f"Pair ID:\n{short_pair_id}\n\n"
-        "This phone will no longer be able to send links to this PC. "
-        "The phone can be paired again later."
+        f"Remove {phone_label} from this PC?\n\n"
+        f"Pair ID: {short_pair_id}\n\n"
+        "Online access will be revoked when possible. Unavailable old "
+        "service records will be deleted locally."
     )
     return (
         show_dialog(
@@ -170,53 +170,6 @@ def confirm_remove_phone_access(
             message,
             MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,
             owner_title="QR Scanner - Paired Phones",
-        )
-        == IDYES
-    )
-
-
-def confirm_phone_removal_retry(phone_label: str) -> bool:
-    """Offer an explicit retry after remote revocation could not complete."""
-
-    message = (
-        f"Access for {phone_label} was not removed.\n\n"
-        "The relay could not be reached, so the protected local pairing was "
-        "kept unchanged.\n\n"
-        "Check your internet connection and retry now? If the retry also "
-        "fails, QR Scanner can offer to forget an old service record on this "
-        "PC only."
-    )
-    return (
-        show_dialog(
-            "QR Scanner - Removal unavailable",
-            message,
-            MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,
-            owner_title=None,
-        )
-        == IDYES
-    )
-
-
-def confirm_forget_phone_locally(
-    phone_label: str,
-    relay_origin: str,
-) -> bool:
-    """Confirm local-only cleanup when remote revocation stays unavailable."""
-
-    message = (
-        f"The relay still cannot remove access for {phone_label}.\n\n"
-        f"Service:\n{relay_origin}\n\n"
-        "Forget this saved pairing on this PC only?\n\n"
-        "This deletes its protected credentials from this computer, but the "
-        "relay could not confirm that remote access was revoked. Use this only "
-        "for an old or permanently unavailable service."
-    )
-    return (
-        show_dialog(
-            "QR Scanner - Forget Saved Pairing",
-            message,
-            MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,
-            owner_title=None,
         )
         == IDYES
     )

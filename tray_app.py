@@ -39,8 +39,6 @@ from exit_codes import (
 from native_dialogs import (
     MB_ICONWARNING,
     confirm_application_exit,
-    confirm_forget_phone_locally,
-    confirm_phone_removal_retry,
     show_dialog,
 )
 from paired_phone_ipc import (
@@ -588,78 +586,58 @@ class TrayApplication:
             self._launch_paired_phones()
             return
 
-        retry_attempted = False
-        while not self._stop_event.is_set():
-            try:
-                result = self.pair_manager.remove_pair(
-                    relay_origin=request.relay_origin,
-                    pair_id=request.pair_id,
-                )
-            except PairNotStoredError:
-                self.receiver_service.request_refresh()
-                self._refresh_pairing_status()
-                self._notify(
-                    f"{request.phone_label} no longer has stored access.",
-                    "QR Scanner",
-                )
-                break
-            except PairRevocationError as error:
-                if error.retryable:
-                    if not retry_attempted and confirm_phone_removal_retry(
-                        request.phone_label
-                    ):
-                        retry_attempted = True
-                        continue
-                    if retry_attempted and confirm_forget_phone_locally(
-                        request.phone_label,
-                        request.relay_origin,
-                    ):
-                        if not self._forget_pair_locally(request):
-                            return
-                        break
-                if not error.retryable:
-                    show_dialog(
-                        "QR Scanner - Removal unavailable",
-                        "The relay rejected the removal request. The protected "
-                        "local pairing was kept unchanged.",
-                        MB_ICONWARNING,
-                        owner_title=None,
-                    )
-                self._launch_paired_phones()
+        try:
+            result = self.pair_manager.remove_pair(
+                relay_origin=request.relay_origin,
+                pair_id=request.pair_id,
+            )
+        except PairNotStoredError:
+            self.receiver_service.request_refresh()
+            self._refresh_pairing_status()
+            self._notify(
+                f"{request.phone_label} no longer has stored access.",
+                "QR Scanner",
+            )
+        except PairRevocationError:
+            if not self._forget_pair_locally(request):
                 return
-            except SecureStorageError:
-                show_dialog(
-                    "QR Scanner - Removal unavailable",
-                    "Windows could not update the protected pairing store. "
-                    "No unprotected fallback was used.",
-                    MB_ICONWARNING,
-                    owner_title=None,
-                )
-                self._launch_paired_phones()
-                return
-            except Exception as error:
-                show_dialog(
-                    "QR Scanner - Removal unavailable",
-                    "Phone access was not changed.\n\n"
-                    f"Technical reason: {error.__class__.__name__}",
-                    MB_ICONWARNING,
-                    owner_title=None,
-                )
-                self._launch_paired_phones()
-                return
-            else:
-                self.receiver_service.request_refresh()
-                self._refresh_pairing_status()
-                phone_label = getattr(
-                    getattr(result, "summary", None),
-                    "phone_label",
-                    request.phone_label,
-                )
-                self._notify(
-                    f"Access for {phone_label} was removed.",
-                    "QR Scanner",
-                )
-                break
+            self._notify(
+                "Online revocation could not be confirmed. The protected "
+                f"record for {request.phone_label} was removed from this PC.",
+                "QR Scanner",
+            )
+        except SecureStorageError:
+            show_dialog(
+                "QR Scanner - Removal unavailable",
+                "Windows could not update the protected pairing store. "
+                "No unprotected fallback was used.",
+                MB_ICONWARNING,
+                owner_title=None,
+            )
+            self._launch_paired_phones()
+            return
+        except Exception as error:
+            show_dialog(
+                "QR Scanner - Removal unavailable",
+                "Phone access was not changed.\n\n"
+                f"Technical reason: {error.__class__.__name__}",
+                MB_ICONWARNING,
+                owner_title=None,
+            )
+            self._launch_paired_phones()
+            return
+        else:
+            self.receiver_service.request_refresh()
+            self._refresh_pairing_status()
+            phone_label = getattr(
+                getattr(result, "summary", None),
+                "phone_label",
+                request.phone_label,
+            )
+            self._notify(
+                f"Access for {phone_label} was removed.",
+                "QR Scanner",
+            )
 
         if self._list_pairs_safely():
             self._launch_paired_phones()
@@ -670,12 +648,12 @@ class TrayApplication:
         """Forget one unreachable legacy pair and refresh desktop state."""
 
         try:
-            result = self.pair_manager.forget_local_pair(
+            self.pair_manager.forget_local_pair(
                 relay_origin=request.relay_origin,
                 pair_id=request.pair_id,
             )
         except PairNotStoredError:
-            phone_label = request.phone_label
+            pass
         except SecureStorageError:
             show_dialog(
                 "QR Scanner - Local cleanup unavailable",
@@ -696,19 +674,8 @@ class TrayApplication:
             )
             self._launch_paired_phones()
             return False
-        else:
-            phone_label = getattr(
-                getattr(result, "summary", None),
-                "phone_label",
-                request.phone_label,
-            )
-
         self.receiver_service.request_refresh()
         self._refresh_pairing_status()
-        self._notify(
-            f"The saved pairing for {phone_label} was forgotten on this PC.",
-            "QR Scanner",
-        )
         return True
 
     def _request_full_exit(self) -> None:

@@ -37,7 +37,6 @@ from native_dialogs import (
     MB_SETFOREGROUND,
     MB_TOPMOST,
     MB_YESNO,
-    confirm_forget_phone_locally,
     confirm_phone_pairing,
     confirm_remove_phone_access,
     confirm_phone_url,
@@ -426,28 +425,6 @@ class PhoneToPcDialogTests(unittest.TestCase):
             style,
             MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,
         )
-
-    @patch("native_dialogs.show_dialog", return_value=7)
-    def test_local_forget_defaults_to_keep_saved_pairing(
-        self,
-        show_dialog,
-    ) -> None:
-        approved = confirm_forget_phone_locally(
-            "My iPhone",
-            "https://retired-relay.example",
-        )
-
-        self.assertFalse(approved)
-        title, message, style = show_dialog.call_args.args
-        self.assertEqual(title, "QR Scanner - Forget Saved Pairing")
-        self.assertIn("My iPhone", message)
-        self.assertIn("https://retired-relay.example", message)
-        self.assertIn("on this PC only", message)
-        self.assertEqual(
-            style,
-            MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,
-        )
-
 
 if __name__ == "__main__":
     unittest.main()
