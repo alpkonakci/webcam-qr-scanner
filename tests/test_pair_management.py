@@ -71,6 +71,34 @@ class PairManagementServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(hasattr(summary, "root_key"))
         self.assertFalse(hasattr(summary, "receiver_token"))
 
+    def test_scoped_list_hides_pairs_from_other_relay_origins(self) -> None:
+        current_origin = "https://preview.example"
+        scoped = PairManagementService(
+            store=self.store,
+            relay_origin=current_origin,
+        )
+
+        self.assertEqual(scoped.list_pairs(), ())
+
+        current_device = RelayDevice(
+            relay_origin=current_origin,
+            device_id=random_b64url(16),
+            receiver_token=random_b64url(32),
+        )
+        current_pair = StoredPair(
+            relay_origin=current_origin,
+            device_id=current_device.device_id,
+            pair_id=random_b64url(16),
+            root_key=os.urandom(32),
+            phone_label="Preview phone",
+        )
+        self.store.replace_device(current_device, clear_pairs=False)
+        self.store.add_pair(current_pair)
+
+        summaries = scoped.list_pairs()
+        self.assertEqual(len(summaries), 1)
+        self.assertEqual(summaries[0].pair_id, current_pair.pair_id)
+
     async def test_remote_success_precedes_local_removal(self) -> None:
         remote = AsyncMock(
             return_value=RemotePairRevocationStatus.REVOKED

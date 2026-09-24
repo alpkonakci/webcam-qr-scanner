@@ -133,7 +133,13 @@ class TrayApplication:
         self.camera_arguments = tuple(camera_arguments)
         self.process_spawner = process_spawner
         self.pairing_runner = pairing_runner or self._default_pairing_runner
-        self.pair_manager = pair_manager or PairManagementService()
+        if pair_manager is None:
+            from bridge.pairing_controller import configured_relay_origin
+
+            pair_manager = PairManagementService(
+                relay_origin=configured_relay_origin()
+            )
+        self.pair_manager = pair_manager
         self._stop_event = threading.Event()
         self._pairing_cancel_event = threading.Event()
         self._pairing_window_closed = threading.Event()

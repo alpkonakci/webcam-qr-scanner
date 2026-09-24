@@ -44,11 +44,27 @@ class PairRemovalResult:
 class PairManagementService:
     """List pairs and revoke them remotely before deleting local secrets."""
 
-    def __init__(self, *, store: PairingStore | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        store: PairingStore | None = None,
+        relay_origin: str | None = None,
+    ) -> None:
         self.store = store or PairingStore()
+        self.relay_origin = (
+            normalize_relay_origin(relay_origin)
+            if relay_origin is not None
+            else None
+        )
 
     def list_pairs(self) -> tuple[PairedPhoneSummary, ...]:
         pairs = self.store.load().pairs
+        if self.relay_origin is not None:
+            pairs = tuple(
+                pair
+                for pair in pairs
+                if pair.relay_origin == self.relay_origin
+            )
         return tuple(
             _pair_summary(pair)
             for pair in sorted(
