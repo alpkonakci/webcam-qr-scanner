@@ -22,7 +22,7 @@ from bridge.pair_management import (
     PairNotStoredError,
     PairedPhoneSummary,
 )
-from bridge.pairing import PairRevocationError
+from bridge.pairing import PairingTransportError, PairRevocationError
 from bridge.receiver_service import ReceiverService
 from bridge.realtime import RealtimeTransportError
 from bridge.secure_storage import SecureStorageError
@@ -813,6 +813,45 @@ class TrayApplication:
 def _pairing_error_message(error: Exception) -> str:
     if isinstance(error, RealtimeTransportError):
         return error.user_message
+    if isinstance(error, PairingTransportError):
+        message = {
+            "rate_limited": (
+                "Too many pairing attempts were made. Wait a few minutes "
+                "and try again."
+            ),
+            "relay_unavailable": (
+                "The relay database is unavailable. Check the Supabase "
+                "project status and SUPABASE_SECRET_KEY in Vercel."
+            ),
+            "deployment_not_configured": (
+                "The Vercel deployment is missing one or more Supabase "
+                "environment variables."
+            ),
+            "realtime_auth_required": (
+                "Supabase rejected the anonymous device session. Check the "
+                "Authentication settings and project API keys."
+            ),
+            "unauthorized": (
+                "The saved relay registration is no longer valid. Restart "
+                "QR Scanner and pair the phone again."
+            ),
+            "conflict": (
+                "The relay could not create a unique pairing record. Try "
+                "again."
+            ),
+            "internal_error": (
+                "The relay encountered an internal error. Check the Vercel "
+                "function logs and try again."
+            ),
+            "invalid_relay_response": (
+                "The relay returned an incompatible response. Check that the "
+                "desktop and Vercel deployment use the same version."
+            ),
+        }.get(
+            error.code,
+            "The relay rejected the pairing request. Please try again.",
+        )
+        return f"{message}\n\nHTTP status: {error.status_code}"
     if error.__class__.__module__.startswith(("httpx", "httpcore")):
         return (
             "The Phone-to-PC relay could not be reached.\n\n"
@@ -821,11 +860,6 @@ def _pairing_error_message(error: Exception) -> str:
             "WQRS_RELAY_ORIGIN."
         )
     code = getattr(error, "code", None)
-    if code == "unauthorized":
-        return (
-            "The saved relay registration is no longer valid. Try pairing "
-            "again after restarting the relay."
-        )
     if error.__class__.__name__ == "SecureStorageError":
         return (
             "Windows could not read or save the protected Phone-to-PC "

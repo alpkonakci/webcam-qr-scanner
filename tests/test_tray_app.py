@@ -3,14 +3,19 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from bridge.pair_management import PairedPhoneSummary
-from bridge.pairing import PairRevocationError
+from bridge.pairing import PairingTransportError, PairRevocationError
 from exit_codes import (
     CONTROL_MANAGE_PHONES,
     CONTROL_REMOVE_PHONE,
     CONTROL_SCAN_SCREEN,
 )
 from paired_phone_ipc import RemovePhoneRequest
-from tray_app import ChildRole, TrayApplication, create_tray_image
+from tray_app import (
+    ChildRole,
+    TrayApplication,
+    _pairing_error_message,
+    create_tray_image,
+)
 
 
 class TrayApplicationTests(unittest.TestCase):
@@ -20,6 +25,30 @@ class TrayApplicationTests(unittest.TestCase):
         self.icon.notify = Mock()
         self.icon.stop = Mock()
         self.icon.run = Mock()
+
+    def test_pairing_transport_error_shows_safe_actionable_reason(self) -> None:
+        error = PairingTransportError(
+            status_code=503,
+            code="relay_unavailable",
+        )
+
+        message = _pairing_error_message(error)
+
+        self.assertIn("SUPABASE_SECRET_KEY", message)
+        self.assertIn("HTTP status: 503", message)
+        self.assertNotIn(str(error), message)
+
+    def test_unknown_pairing_error_does_not_echo_remote_code(self) -> None:
+        error = PairingTransportError(
+            status_code=418,
+            code="attacker_controlled_code",
+        )
+
+        message = _pairing_error_message(error)
+
+        self.assertIn("relay rejected", message)
+        self.assertIn("HTTP status: 418", message)
+        self.assertNotIn(error.code, message)
 
     def _application(
         self,
