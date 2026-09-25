@@ -31,9 +31,9 @@ default browser, and closes the scanner automatically.
 
 - Live camera preview with a modern turquoise interface
 - A visible guide that is also the real QR analysis area
-- Separate, one-shot QR scanning across all connected screens
+- Drag-to-select, one-shot QR scanning across all connected screens
 - Link confirmation showing the destination hostname for screen scans
-- Click-to-select screen overlay when different QR codes are found
+- Clear feedback when the selected area has no QR or more than one QR
 - Single and multiple QR-code detection
 - Automatic opening of valid HTTP/HTTPS links
 - Automatic camera-view shutdown after the first successful scan
@@ -64,22 +64,22 @@ Double-click `QR-Scanner.exe`:
 
 ### Scan a QR code already displayed on the computer
 
-Keep exactly one QR code clearly visible and double-click `Scan Screen.vbs`.
+Keep the QR code visible and double-click `Scan Screen.vbs`.
 
 > **Important:** The QR code must be fully visible when `Scan Screen.vbs` runs.
 > A QR code hidden behind another window, inside a minimized window, or on an
 > inactive browser tab cannot be scanned. The application scans only what is
 > currently visible on the displays, not background window contents.
 
-1. The application captures all connected displays once.
-2. The image stays in memory and is never saved.
-3. If the QR contains a valid HTTP/HTTPS link, a confirmation dialog shows the
+1. The application captures all connected displays once and opens a frozen preview.
+2. Drag a rectangle around exactly one QR code. The image stays in memory and
+   is never saved.
+3. Only the selected area is scanned. If it contains no QR code or multiple
+   different QR codes, the application shows an error and opens nothing.
+4. If the QR contains a valid HTTP/HTTPS link, a confirmation dialog shows the
    destination hostname and full address.
-4. Select **Yes** to open it or **No** to cancel.
-
-If different QR codes are detected at the same time, nothing is opened. Hide
-all but one and run `Scan Screen.vbs` again. The screen is not monitored
-continuously.
+5. Select **Yes** to open it or **No** to cancel. The screen is not monitored
+   continuously.
 
 The first launch can take a few seconds longer because the single-file package
 needs to prepare its bundled files. Windows SmartScreen may warn about unsigned
@@ -133,10 +133,9 @@ desktop can dismiss the QR window; it does not approve the phone. Incoming URL,
 pairing, and full-exit questions are serialized and brought to the foreground
 so a transient application window cannot cover a security decision.
 
-When **Scan Screen** finds different QR codes, the development build shows one
-frozen in-memory preview with every detected code outlined. Moving the pointer
-highlights the nearest code; only a direct click selects it. `Esc` cancels, and
-the existing hostname confirmation still appears before a selected URL opens.
+**Scan Screen** shows a frozen in-memory preview before decoding. Drag around
+one QR and release to scan only that area. `Esc` cancels, and the existing
+hostname confirmation still appears before a selected URL opens.
 
 ## Scanning from a phone screen
 
@@ -303,7 +302,7 @@ verification.
 - `camera.py`: camera negotiation, Full HD measurement, and 720p fallback
 - `qr_reader.py`: fast and thorough QR decoding
 - `screen_capture.py`: one-shot, multi-monitor Windows desktop capture
-- `screen_selector.py`: safe click-to-select overlay for multiple screen QR codes
+- `screen_selector.py`: in-memory drag-to-select screen region overlay
 - `scan_worker.py`: newest-frame-only background worker
 - `scan_geometry.py`: real scan area and coordinate transformations
 - `ui.py`: interface, animated scan line, and result presentation
@@ -406,7 +405,7 @@ documented in the
 - [x] System tray, post-camera control center, optional Windows startup, and
   confirmed full exit
 - [x] Camera stays off while only the background controller is running
-- [x] Explicit click-to-select overlay for multiple screen QR codes
+- [x] Explicit drag-to-select area for one screen QR code
 - [x] First encrypted end-to-end transfer through a localhost relay and fake phone
 - [x] Two-minute, single-use pairing HTTP flow with encrypted approval/rejection
 - [x] Show the pairing QR and default-reject approval dialog from the tray controller

@@ -2,36 +2,14 @@ import unittest
 
 import numpy as np
 
-from qr_reader import QRResult
 from screen_selector import (
     HEADER_HEIGHT,
-    build_selector_canvas,
-    display_results,
-    nearest_result_index,
-    result_index_at_point,
-    result_label,
+    build_region_selector_canvas,
+    crop_screen_region,
+    map_preview_region_to_source,
+    normalize_preview_region,
     selector_preview_size,
 )
-
-
-def _result(
-    value: str,
-    left: int,
-    top: int,
-    size: int = 100,
-) -> QRResult:
-    return QRResult(
-        value,
-        np.array(
-            [
-                [left, top],
-                [left + size, top],
-                [left + size, top + size],
-                [left, top + size],
-            ],
-            dtype=np.int32,
-        ),
-    )
 
 
 class ScreenSelectorTests(unittest.TestCase):
@@ -41,64 +19,52 @@ class ScreenSelectorTests(unittest.TestCase):
             (1600, 450),
         )
 
-    def test_result_coordinates_include_header_offset(self) -> None:
-        mapped = display_results(
-            [_result("https://example.com", 100, 100)],
+    def test_drag_rectangle_is_normalized_and_clamped(self) -> None:
+        region = normalize_preview_region(
+            (520, 260),
+            (-20, 40),
+            (500, 300),
+        )
+
+        self.assertEqual(region, (0, 40, 500, 260))
+
+    def test_tiny_drag_is_not_accepted(self) -> None:
+        self.assertIsNone(
+            normalize_preview_region((10, 10), (15, 18), (500, 300))
+        )
+
+    def test_preview_region_maps_back_to_source_pixels(self) -> None:
+        source_region = map_preview_region_to_source(
+            (100, 50, 300, 200),
+            (2000, 1000),
             (1000, 500),
-            (500, 250),
         )
 
-        np.testing.assert_array_equal(
-            mapped[0].corners,
-            np.array(
-                [
-                    [50, 50 + HEADER_HEIGHT],
-                    [100, 50 + HEADER_HEIGHT],
-                    [100, 100 + HEADER_HEIGHT],
-                    [50, 100 + HEADER_HEIGHT],
-                ]
-            ),
-        )
+        self.assertEqual(source_region, (200, 100, 600, 400))
 
-    def test_nearest_result_is_hover_feedback_only(self) -> None:
-        results = [
-            _result("https://one.example", 10, 10),
-            _result("https://two.example", 400, 10),
-        ]
+    def test_crop_returns_only_selected_source_area(self) -> None:
+        frame = np.arange(100 * 200 * 3, dtype=np.int32).reshape(100, 200, 3)
 
-        self.assertEqual(nearest_result_index(results, (430, 50)), 1)
-
-    def test_click_must_be_inside_padded_qr_bounds(self) -> None:
-        results = [
-            _result("https://one.example", 20, 20),
-            _result("https://two.example", 300, 20),
-        ]
-
-        self.assertEqual(result_index_at_point(results, (330, 50)), 1)
-        self.assertIsNone(result_index_at_point(results, (200, 250)))
-
-    def test_url_label_shows_hostname_without_full_path(self) -> None:
-        label = result_label(
-            _result("https://example.com/private/path", 0, 0),
-            2,
-        )
-
-        self.assertEqual(label, "2  example.com")
-        self.assertNotIn("private", label)
-
-    def test_selector_canvas_keeps_frame_in_memory_and_draws_markers(self) -> None:
-        frame = np.zeros((300, 600, 3), dtype=np.uint8)
-        result = _result("https://example.com", 100, 100)
-
-        canvas, mapped = build_selector_canvas(
+        crop = crop_screen_region(
             frame,
-            [result],
-            hover_index=0,
+            (25, 10, 75, 40),
+            (100, 50),
+        )
+
+        np.testing.assert_array_equal(crop, frame[20:80, 50:150])
+        self.assertFalse(np.shares_memory(crop, frame))
+
+    def test_selector_canvas_keeps_capture_in_memory_and_draws_region(self) -> None:
+        frame = np.zeros((300, 600, 3), dtype=np.uint8)
+
+        canvas, preview_size = build_region_selector_canvas(
+            frame,
+            selection=(100, 80, 300, 220),
             window_limit=(600, 500),
         )
 
+        self.assertEqual(preview_size, (600, 300))
         self.assertEqual(canvas.shape, (300 + HEADER_HEIGHT, 600, 3))
-        self.assertEqual(len(mapped), 1)
         self.assertGreater(int(canvas.sum()), 0)
         self.assertEqual(int(frame.sum()), 0)
 

@@ -24,7 +24,7 @@ from native_dialogs import confirm_application_exit, show_dialog, show_error_dia
 from performance import FPSCounter
 from qr_reader import QRReader, QRResult
 from screen_capture import ScreenCaptureError, capture_virtual_screen
-from screen_selector import select_screen_result
+from screen_selector import select_screen_region
 from scan_geometry import scale_result, scan_region
 from scan_worker import QRScanWorker, ScanGate
 from ui import (
@@ -41,6 +41,7 @@ class ScreenScanStatus(Enum):
     """Observable outcomes of a one-shot screen scan."""
 
     NO_CODE = auto()
+    MULTIPLE_CODES = auto()
     TEXT_FOUND = auto()
     CANCELLED = auto()
     OPENED = auto()
@@ -101,48 +102,41 @@ def run_screen_scan(
     confirm: Callable[[str], bool] | None = None,
     opener: Callable[[str], bool] | None = None,
     notify: Callable[[str, str, int], int] | None = None,
-    select: Callable[
-        [np.ndarray, list[QRResult]],
-        QRResult | None,
-    ]
-    | None = None,
+    select_region: Callable[[np.ndarray], np.ndarray | None] | None = None,
 ) -> ScreenScanStatus:
-    """Capture all displays once, decode one QR, and safely handle its payload."""
+    """Capture once, scan one user-selected area, and handle its payload."""
     capture = capture or capture_virtual_screen
     reader = reader or QRReader()
     confirm = confirm or confirm_screen_url
     opener = opener or open_web_url
     notify = notify or show_dialog
-    select = select or select_screen_result
+    select_region = select_region or select_screen_region
 
-    print("Scanning all connected screens once...")
+    print("Capture ready; select the screen area containing one QR code.")
     screen = capture()
-    results = _unique_results(reader.scan_all(screen))
+    selected_region = select_region(screen)
+    if selected_region is None:
+        return ScreenScanStatus.CANCELLED
+
+    results = _unique_results(reader.scan_all(selected_region))
 
     if not results:
         notify(
             "Scan Screen",
-            "No QR code was found. Make the QR code clearly visible and try again.",
+            "No QR code was found in the selected area. Select the entire QR "
+            "code and try again.",
             0x40,
         )
         return ScreenScanStatus.NO_CODE
 
     if len(results) > 1:
-        selected = select(screen, results)
-        if selected is None:
-            return ScreenScanStatus.CANCELLED
-        selected = next(
-            (
-                result
-                for result in results
-                if result.data == selected.data
-                and np.array_equal(result.corners, selected.corners)
-            ),
-            None,
+        notify(
+            "Scan Screen",
+            "More than one QR code was found in the selected area. Select a "
+            "smaller area containing only the QR code you want.",
+            0x40,
         )
-        if selected is None:
-            return ScreenScanStatus.CANCELLED
-        results = [selected]
+        return ScreenScanStatus.MULTIPLE_CODES
 
     value = results[0].data
     if payload_kind(value) != "URL":
@@ -346,7 +340,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--screen",
         action="store_true",
-        help="Scan all connected screens once instead of opening the camera",
+        help="Select and scan one area from the connected screens",
     )
     parser.add_argument("--desktop", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--self-test", action="store_true", help=argparse.SUPPRESS)

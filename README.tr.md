@@ -30,9 +30,9 @@ varsayılan tarayıcıda açılır ve QR Scanner otomatik olarak kapanır.
 
 - Modern turkuaz arayüzle canlı kamera görüntüsü
 - Aynı zamanda gerçek QR analiz alanı olan görünür tarama çerçevesi
-- Tüm bağlı ekranları tek sefer tarayan ayrı `Scan Screen` seçeneği
+- Tüm bağlı ekranlarda sürükleyerek alan seçilen tek seferlik `Scan Screen`
 - Ekran taramalarında hedef alan adını gösteren bağlantı onayı
-- Farklı QR kodlar bulunduğunda güvenli tıkla-seç ekranı
+- Seçilen alanda QR yoksa veya birden fazlaysa açık hata bildirimi
 - Tek veya birden fazla QR kod algılama
 - Geçerli HTTP/HTTPS bağlantılarını otomatik açma
 - İlk başarılı okumadan sonra kamera penceresini otomatik kapatma
@@ -63,22 +63,21 @@ indirin ve arşivden çıkarın. Python veya OpenCV'yi ayrıca kurmanız gerekme
 
 ### Bilgisayar ekranında görünen QR kodu tarama
 
-Ekranda yalnızca bir QR kodu açık bırakın ve `Scan Screen.vbs` dosyasına çift
-tıklayın.
+QR kodu ekranda görünür bırakın ve `Scan Screen.vbs` dosyasına çift tıklayın.
 
 > **Önemli:** `Scan Screen.vbs` çalıştırıldığı anda QR kod ekranda tamamen görünür
 > olmalıdır. Başka bir pencerenin arkasında kalan, küçültülmüş veya etkin olmayan
 > bir tarayıcı sekmesindeki QR kod okunamaz. Uygulama arka plandaki pencere
 > içeriğini değil, ekranda o anda görünen görüntüyü tarar.
 
-1. Uygulama bağlı ekranların tamamını bir kez yakalar.
-2. Görüntü yalnızca bellekte tutulur ve hiçbir zaman kaydedilmez.
-3. QR geçerli bir HTTP/HTTPS bağlantısı içeriyorsa onay penceresinde hedef alan
+1. Uygulama bağlı ekranların tamamını bir kez yakalayıp donmuş önizleme açar.
+2. Tek bir QR kodun çevresini fareyle sürükleyerek seçin. Görüntü yalnızca
+   bellekte tutulur ve hiçbir zaman kaydedilmez.
+3. Yalnız seçilen alan taranır. Alanda QR yoksa veya birden fazla farklı QR
+   varsa hata gösterilir ve hiçbir bağlantı açılmaz.
+4. QR geçerli bir HTTP/HTTPS bağlantısı içeriyorsa onay penceresinde hedef alan
    adı ve tam adres gösterilir.
-4. Açmak için **Yes**, vazgeçmek için **No** seçin.
-
-Aynı anda farklı QR kodlar algılanırsa hiçbir bağlantı açılmaz. Diğerlerini
-gizleyip `Scan Screen.vbs` dosyasını yeniden çalıştırın. Ekran sürekli izlenmez.
+5. Açmak için **Yes**, vazgeçmek için **No** seçin. Ekran sürekli izlenmez.
 
 Tek dosyalı paket, içindeki dosyaları hazırladığı için ilk açılış birkaç saniye
 daha uzun sürebilir. İnternetten indirilen imzasız EXE'ler için Windows
@@ -131,11 +130,10 @@ kapatabilmesi için kısa ömürlü bir yaşam döngüsü sinyali gönderir; tel
 onaylamaz. Gelen URL, eşleştirme ve tam çıkış soruları sıraya alınır ve geçici
 bir uygulama penceresinin güvenlik kararını örtememesi için öne getirilir.
 
-**Scan Screen** farklı QR kodlar bulursa geliştirme sürümü, algılanan kodları
-çerçeveleyen ve yalnızca bellekte tutulan donmuş ekran görüntüsünü gösterir.
-Fare hareketi en yakın kodu vurgular; yalnızca QR sınırına doğrudan tıklamak
-seçim yapar. `Esc` iptal eder ve seçilen URL açılmadan önce mevcut alan adı
-onayı yine gösterilir.
+**Scan Screen**, QR çözümlemesinden önce yalnızca bellekte tutulan donmuş ekran
+önizlemesini gösterir. Tek bir QR'ın çevresini sürükleyip bıraktığınızda yalnız
+o alan taranır. `Esc` iptal eder ve URL açılmadan önce mevcut alan adı onayı
+yine gösterilir.
 
 ## Telefon ekranından daha iyi tarama
 
@@ -303,7 +301,7 @@ bulunur. Bütünlük kontrolü için ayrıca `SHA256SUMS.txt` üretilir.
 - `camera.py`: kamera seçimi, Full HD ölçümü ve 720p geri dönüşü
 - `qr_reader.py`: hızlı ve kapsamlı QR çözümleme
 - `screen_capture.py`: tek seferlik, çoklu monitör Windows ekran yakalama
-- `screen_selector.py`: çoklu ekran QR'ları için güvenli tıkla-seç görünümü
+- `screen_selector.py`: bellekiçi sürükle-seç ekran alanı görünümü
 - `scan_worker.py`: yalnızca en güncel kareyi işleyen arka plan işçisi
 - `scan_geometry.py`: gerçek tarama alanı ve koordinat dönüşümleri
 - `ui.py`: arayüz, hareketli tarama çizgisi ve sonuç görünümü
@@ -406,7 +404,7 @@ Ayrıntılı mimari, eşleştirme protokolü, tehdit modeli ve kabul ölçütler
 - [x] Sistem tepsisi, kamera sonrası kontrol ekranı, isteğe bağlı Windows
   başlangıcı ve onaylı tam çıkış
 - [x] Yalnızca arka plan denetleyicisi çalışırken kameranın kapalı kalması
-- [x] Çoklu ekran QR'ları için açık tıkla-seç görünümü
+- [x] Tek ekran QR'ı için açık sürükle-seç alanı
 - [x] Localhost relay ve sahte telefonla ilk şifreli uçtan uca aktarım
 - [x] İki dakikalık, tek kullanımlık ve şifreli onay/ret içeren pairing HTTP akışı
 - [x] Eşleştirme QR'ını ve varsayılan ret seçili onayı tepsi denetleyicisinden gösterme

@@ -1,35 +1,36 @@
-"""Interactive, one-shot selection when a screen contains multiple QR codes."""
+"""Interactive in-memory region selection for one-shot screen scanning."""
 
 from __future__ import annotations
 
 import ctypes
+import math
 import os
 from dataclasses import dataclass
-from urllib.parse import urlparse
 
 import cv2
 import numpy as np
 
-from links import payload_kind
-from qr_reader import QRResult
-from scan_geometry import scale_result
 from ui import COLOR_ACCENT, COLOR_MUTED, COLOR_PANEL, COLOR_TEXT
 
 
-WINDOW_TITLE = "Scan Screen - Choose QR"
+WINDOW_TITLE = "Scan Screen - Select Area"
 HEADER_HEIGHT = 94
 DEFAULT_SCREEN_SIZE = (1280, 720)
 WINDOW_WIDTH_RATIO = 0.90
 WINDOW_HEIGHT_RATIO = 0.82
-HIT_PADDING = 14
+MINIMUM_SELECTION_SIZE = 12
+
+PreviewRegion = tuple[int, int, int, int]
 
 
 @dataclass(slots=True)
-class SelectorState:
-    """Mutable mouse state owned by one selector window."""
+class RegionSelectorState:
+    """Mouse state owned by one selector window."""
 
-    hover_index: int | None = None
-    selected_index: int | None = None
+    start: tuple[int, int] | None = None
+    current: tuple[int, int] | None = None
+    selected: PreviewRegion | None = None
+    dragging: bool = False
 
 
 def primary_screen_size() -> tuple[int, int]:
@@ -80,85 +81,70 @@ def selector_preview_size(
     )
 
 
-def display_results(
-    results: list[QRResult],
+def normalize_preview_region(
+    start: tuple[int, int],
+    end: tuple[int, int],
+    preview_size: tuple[int, int],
+    *,
+    minimum_size: int = MINIMUM_SELECTION_SIZE,
+) -> PreviewRegion | None:
+    """Normalize, clamp, and validate a drag rectangle in preview pixels."""
+
+    width, height = preview_size
+    first_x = max(0, min(start[0], width))
+    second_x = max(0, min(end[0], width))
+    first_y = max(0, min(start[1], height))
+    second_y = max(0, min(end[1], height))
+    left, right = sorted((first_x, second_x))
+    top, bottom = sorted((first_y, second_y))
+    if right - left < minimum_size or bottom - top < minimum_size:
+        return None
+    return left, top, right, bottom
+
+
+def map_preview_region_to_source(
+    region: PreviewRegion,
     source_size: tuple[int, int],
     preview_size: tuple[int, int],
-) -> list[QRResult]:
-    """Map detector coordinates into the selector canvas."""
+) -> PreviewRegion:
+    """Map a validated preview rectangle back to source image pixels."""
 
-    vertical_offset = np.array([0, HEADER_HEIGHT], dtype=np.int32)
-    return [
-        QRResult(
-            result.data,
-            scale_result(result, source_size, preview_size).corners
-            + vertical_offset,
-        )
-        for result in results
-    ]
-
-
-def nearest_result_index(
-    results: list[QRResult],
-    point: tuple[int, int],
-) -> int | None:
-    """Find the nearest QR for hover feedback only."""
-
-    if not results:
-        return None
-    cursor = np.asarray(point, dtype=np.float32)
-    distances = [
-        float(np.linalg.norm(result.corners.mean(axis=0) - cursor))
-        for result in results
-    ]
-    return int(np.argmin(distances))
+    source_width, source_height = source_size
+    preview_width, preview_height = preview_size
+    left, top, right, bottom = region
+    source_region = (
+        max(0, math.floor(left * source_width / preview_width)),
+        max(0, math.floor(top * source_height / preview_height)),
+        min(source_width, math.ceil(right * source_width / preview_width)),
+        min(source_height, math.ceil(bottom * source_height / preview_height)),
+    )
+    if source_region[2] <= source_region[0] or source_region[3] <= source_region[1]:
+        raise ValueError("selected screen region is empty")
+    return source_region
 
 
-def result_index_at_point(
-    results: list[QRResult],
-    point: tuple[int, int],
-    *,
-    padding: int = HIT_PADDING,
-) -> int | None:
-    """Return a QR only when the user clicks its padded visible bounds."""
-
-    x, y = point
-    candidates: list[int] = []
-    for index, result in enumerate(results):
-        left, top, width, height = cv2.boundingRect(result.corners)
-        if (
-            left - padding <= x <= left + width + padding
-            and top - padding <= y <= top + height + padding
-        ):
-            candidates.append(index)
-    if not candidates:
-        return None
-    candidate_results = [results[index] for index in candidates]
-    nearest = nearest_result_index(candidate_results, point)
-    return candidates[nearest] if nearest is not None else None
-
-
-def result_label(result: QRResult, number: int) -> str:
-    """Build a short ASCII label that OpenCV can render reliably."""
-
-    if payload_kind(result.data) != "URL":
-        return f"{number}  Text QR"
-    host = urlparse(result.data).hostname or "unknown host"
-    try:
-        host = host.encode("idna").decode("ascii")
-    except UnicodeError:
-        host = "unknown host"
-    return f"{number}  {host[:48]}"
-
-
-def build_selector_canvas(
+def crop_screen_region(
     frame: np.ndarray,
-    results: list[QRResult],
+    region: PreviewRegion,
+    preview_size: tuple[int, int],
+) -> np.ndarray:
+    """Return an independent in-memory crop for the selected preview area."""
+
+    left, top, right, bottom = map_preview_region_to_source(
+        region,
+        (frame.shape[1], frame.shape[0]),
+        preview_size,
+    )
+    return frame[top:bottom, left:right].copy()
+
+
+def build_region_selector_canvas(
+    frame: np.ndarray,
     *,
-    hover_index: int | None = None,
+    selection: PreviewRegion | None = None,
     window_limit: tuple[int, int] | None = None,
-) -> tuple[np.ndarray, list[QRResult]]:
-    """Render a frozen desktop preview and return its mapped QR results."""
+) -> tuple[np.ndarray, tuple[int, int]]:
+    """Render a frozen desktop preview with an optional drag rectangle."""
 
     source_size = (frame.shape[1], frame.shape[0])
     preview_size = selector_preview_size(
@@ -177,11 +163,10 @@ def build_selector_canvas(
         dtype=np.uint8,
     )
     canvas[HEADER_HEIGHT:, :] = preview
-    mapped_results = display_results(results, source_size, preview_size)
 
     cv2.putText(
         canvas,
-        "MULTIPLE QR CODES FOUND",
+        "SELECT QR AREA",
         (24, 34),
         cv2.FONT_HERSHEY_DUPLEX,
         0.72,
@@ -191,7 +176,7 @@ def build_selector_canvas(
     )
     cv2.putText(
         canvas,
-        "Click the QR code you want to scan",
+        "Drag around one QR code and release to scan",
         (24, 65),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.57,
@@ -210,94 +195,37 @@ def build_selector_canvas(
         cv2.LINE_AA,
     )
 
-    for index, result in enumerate(mapped_results):
-        hovered = index == hover_index
-        outline_color = COLOR_TEXT if hovered else COLOR_ACCENT
-        thickness = 4 if hovered else 2
-        overlay = canvas.copy()
-        cv2.fillPoly(overlay, [result.corners], COLOR_ACCENT, cv2.LINE_AA)
-        alpha = 0.16 if hovered else 0.08
-        cv2.addWeighted(overlay, alpha, canvas, 1.0 - alpha, 0, canvas)
-        cv2.polylines(
+    if selection is not None:
+        left, top, right, bottom = selection
+        image = canvas[HEADER_HEIGHT:, :]
+        dimmed = np.zeros_like(image)
+        cv2.addWeighted(image, 0.42, dimmed, 0.58, 0, dimmed)
+        dimmed[top:bottom, left:right] = preview[top:bottom, left:right]
+        canvas[HEADER_HEIGHT:, :] = dimmed
+        cv2.rectangle(
             canvas,
-            [result.corners.reshape((-1, 1, 2))],
-            True,
-            outline_color,
-            thickness,
+            (left, top + HEADER_HEIGHT),
+            (right, bottom + HEADER_HEIGHT),
+            COLOR_ACCENT,
+            3,
             cv2.LINE_AA,
         )
-        _draw_result_label(
-            canvas,
-            result,
-            result_label(result, index + 1),
-            hovered=hovered,
+
+    return canvas, preview_size
+
+
+def select_screen_region(frame: np.ndarray) -> np.ndarray | None:
+    """Let the user drag one screen area; Escape and close cancel safely."""
+
+    state = RegionSelectorState()
+    initial_canvas, preview_size = build_region_selector_canvas(frame)
+    preview_width, preview_height = preview_size
+
+    def preview_point(x: int, y: int) -> tuple[int, int]:
+        return (
+            max(0, min(x, preview_width)),
+            max(0, min(y - HEADER_HEIGHT, preview_height)),
         )
-
-    return canvas, mapped_results
-
-
-def _draw_result_label(
-    canvas: np.ndarray,
-    result: QRResult,
-    label: str,
-    *,
-    hovered: bool,
-) -> None:
-    font_scale = 0.48
-    thickness = 1
-    (text_width, text_height), baseline = cv2.getTextSize(
-        label,
-        cv2.FONT_HERSHEY_SIMPLEX,
-        font_scale,
-        thickness,
-    )
-    left, top, _, height = cv2.boundingRect(result.corners)
-    label_width = text_width + 20
-    label_height = text_height + baseline + 14
-    label_left = max(4, min(left, canvas.shape[1] - label_width - 4))
-    label_top = top - label_height - 6
-    if label_top < HEADER_HEIGHT:
-        label_top = min(
-            canvas.shape[0] - label_height - 4,
-            top + height + 6,
-        )
-    cv2.rectangle(
-        canvas,
-        (label_left, label_top),
-        (label_left + label_width, label_top + label_height),
-        COLOR_PANEL,
-        -1,
-    )
-    cv2.rectangle(
-        canvas,
-        (label_left, label_top),
-        (label_left + label_width, label_top + label_height),
-        COLOR_TEXT if hovered else COLOR_ACCENT,
-        1,
-    )
-    cv2.putText(
-        canvas,
-        label,
-        (label_left + 10, label_top + text_height + 6),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        font_scale,
-        COLOR_TEXT,
-        thickness,
-        cv2.LINE_AA,
-    )
-
-
-def select_screen_result(
-    frame: np.ndarray,
-    results: list[QRResult],
-) -> QRResult | None:
-    """Let the user explicitly click one QR; Escape and window close cancel."""
-
-    if not results:
-        return None
-
-    state = SelectorState()
-    initial_canvas, mapped_results = build_selector_canvas(frame, results)
 
     def handle_mouse(
         event: int,
@@ -306,12 +234,24 @@ def select_screen_result(
         _: int,
         __: object,
     ) -> None:
-        state.hover_index = nearest_result_index(mapped_results, (x, y))
-        if event == cv2.EVENT_LBUTTONUP:
-            state.selected_index = result_index_at_point(
-                mapped_results,
-                (x, y),
-            )
+        if event == cv2.EVENT_LBUTTONDOWN and y >= HEADER_HEIGHT:
+            state.start = preview_point(x, y)
+            state.current = state.start
+            state.selected = None
+            state.dragging = True
+            return
+        if event == cv2.EVENT_MOUSEMOVE and state.dragging:
+            state.current = preview_point(x, y)
+            return
+        if event == cv2.EVENT_LBUTTONUP and state.dragging:
+            state.current = preview_point(x, y)
+            state.dragging = False
+            if state.start is not None:
+                state.selected = normalize_preview_region(
+                    state.start,
+                    state.current,
+                    preview_size,
+                )
 
     cv2.namedWindow(WINDOW_TITLE, cv2.WINDOW_AUTOSIZE)
     cv2.setMouseCallback(WINDOW_TITLE, handle_mouse)
@@ -327,18 +267,25 @@ def select_screen_result(
         pass
 
     try:
-        while state.selected_index is None:
-            canvas, _ = build_selector_canvas(
+        while state.selected is None:
+            drag_region = None
+            if state.start is not None and state.current is not None:
+                drag_region = normalize_preview_region(
+                    state.start,
+                    state.current,
+                    preview_size,
+                    minimum_size=1,
+                )
+            canvas, _ = build_region_selector_canvas(
                 frame,
-                results,
-                hover_index=state.hover_index,
+                selection=drag_region,
             )
             cv2.imshow(WINDOW_TITLE, canvas)
             if cv2.waitKey(16) & 0xFF == 27:
                 return None
             if cv2.getWindowProperty(WINDOW_TITLE, cv2.WND_PROP_VISIBLE) < 1:
                 return None
-        return results[state.selected_index]
+        return crop_screen_region(frame, state.selected, preview_size)
     finally:
         try:
             cv2.destroyWindow(WINDOW_TITLE)
