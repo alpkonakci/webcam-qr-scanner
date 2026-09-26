@@ -55,8 +55,8 @@ BASE_ACTION_CARDS = (
     ActionCard(
         HomeAction.SCAN_SCREEN,
         (32, 220, 588, 310),
-        "Scan Computer Screen",
-        "Read a QR code that is currently visible on this PC.",
+        "Select a Screen Area",
+        "Take a screenshot, then drag around the QR code to scan it.",
     ),
 )
 EXIT_BOUNDS = (456, 470, 588, 510)
@@ -75,16 +75,16 @@ def action_cards(pair_count: int = 0) -> tuple[ActionCard, ...]:
         phone_card = ActionCard(
             HomeAction.MANAGE_PHONES,
             (32, 324, 588, 414),
-            f"Manage Saved Pairings ({pair_count})",
-            "Saved approvals, not online phones. Manage or add a pairing.",
+            f"Paired Phones ({pair_count})",
+            "View, remove, or add a phone.",
             WARNING,
         )
     else:
         phone_card = ActionCard(
             HomeAction.PAIR_PHONE,
             (32, 324, 588, 414),
-            "Pair a Phone",
-            "Connect a mobile browser securely. v0.2 beta",
+            "Pair Phone",
+            "Scan a code to connect your phone.",
             WARNING,
         )
     return (*BASE_ACTION_CARDS, phone_card)

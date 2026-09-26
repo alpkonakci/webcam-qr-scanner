@@ -402,8 +402,8 @@ class PhoneToPcDialogTests(unittest.TestCase):
         title, message, style = show_dialog.call_args.args
         self.assertEqual(title, "QR Scanner - Pair Phone")
         self.assertIn("My iPhone", message)
-        self.assertIn("Mobile PWA", message)
-        self.assertIn("https://relay.example", message)
+        self.assertNotIn("Mobile PWA", message)
+        self.assertNotIn("https://relay.example", message)
         self.assertEqual(
             style,
             MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,
@@ -421,6 +421,7 @@ class PhoneToPcDialogTests(unittest.TestCase):
         self.assertEqual(title, "QR Scanner - Remove Phone Access")
         self.assertIn("My iPhone", message)
         self.assertIn("abcDEF…xyZA", message)
+        self.assertNotIn("Online access", message)
         self.assertEqual(
             style,
             MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,

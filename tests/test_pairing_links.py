@@ -12,6 +12,14 @@ from bridge.protocol import create_pc_pairing_session, random_b64url
 
 
 class PairingLinkTests(unittest.TestCase):
+    def test_public_service_uses_the_stable_vercel_production_domain(
+        self,
+    ) -> None:
+        self.assertEqual(
+            PUBLIC_SERVICE_ORIGIN,
+            "https://project-e17uk.vercel.app",
+        )
+
     def setUp(self) -> None:
         now = int(time.time())
         self.session = create_pc_pairing_session(

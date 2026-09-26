@@ -184,7 +184,7 @@ class TrayApplication:
                 default=True,
             ),
             pystray.MenuItem("Scan with Camera", self._scan_with_camera),
-            pystray.MenuItem("Scan Screen", self._scan_screen),
+            pystray.MenuItem("Select a Screen Area", self._scan_screen),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
                 "Phone-to-PC: v0.2 beta",
@@ -207,7 +207,7 @@ class TrayApplication:
     def _phone_menu_text(self, _: pystray.MenuItem) -> str:
         count = len(self._list_pairs_safely())
         if count:
-            return f"Manage Saved Pairings ({count})..."
+            return f"Paired Phones ({count})..."
         return "Pair Phone..."
 
     def _phone_action(

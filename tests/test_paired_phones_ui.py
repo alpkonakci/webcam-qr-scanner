@@ -35,15 +35,18 @@ class PairedPhonesUiTests(unittest.TestCase):
         self.assertNotEqual(short, self.phone.pair_id)
 
     def test_rows_and_remove_button_have_explicit_targets(self) -> None:
+        left, top, right, bottom = REMOVE_BOUNDS
+        remove_x = (left + right) // 2
+        remove_y = (top + bottom) // 2
         self.assertEqual(
             row_at_point(100, 120, phone_count=2, scroll_offset=0),
             0,
         )
         self.assertIsNone(
-            action_at_point(500, 510, has_selection=False)
+            action_at_point(remove_x, remove_y, has_selection=False)
         )
         self.assertIs(
-            action_at_point(500, 510, has_selection=True),
+            action_at_point(remove_x, remove_y, has_selection=True),
             PairedPhonesAction.REMOVE,
         )
 

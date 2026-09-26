@@ -85,7 +85,7 @@ class TrayApplicationTests(unittest.TestCase):
 
         self.assertEqual(
             application._phone_menu_text(Mock()),
-            "Manage Saved Pairings (2)...",
+            "Paired Phones (2)...",
         )
 
     @patch("tray_app.threading.Thread")

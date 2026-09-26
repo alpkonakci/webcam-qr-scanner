@@ -5,8 +5,6 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from urllib.parse import urlsplit
-
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -31,16 +29,16 @@ from paired_phone_ipc import PairedPhoneView
 
 WINDOW_TITLE = "QR Scanner - Paired Phones"
 WINDOW_WIDTH = 620
-WINDOW_HEIGHT = 590
+WINDOW_HEIGHT = 540
 LIST_LEFT = 32
-LIST_TOP = 110
+LIST_TOP = 92
 LIST_RIGHT = 588
 ROW_HEIGHT = 72
-ROW_GAP = 10
+ROW_GAP = 8
 VISIBLE_ROWS = 4
-PAIR_ANOTHER_BOUNDS = (32, 488, 248, 536)
-BACK_BOUNDS = (264, 488, 388, 536)
-REMOVE_BOUNDS = (404, 488, 588, 536)
+PAIR_ANOTHER_BOUNDS = (32, 436, 242, 484)
+BACK_BOUNDS = (258, 436, 382, 484)
+REMOVE_BOUNDS = (398, 436, 588, 484)
 
 
 class PairedPhonesAction(Enum):
@@ -127,17 +125,11 @@ def build_paired_phones_canvas(
     small_font = _load_font(12)
     button_font = _load_font(14, semibold=True)
 
-    draw.text((32, 24), "SAVED PAIRINGS", font=title_font, fill=PRIMARY_TEXT)
+    draw.text((32, 24), "PAIRED PHONES", font=title_font, fill=PRIMARY_TEXT)
     draw.text(
         (32, 66),
-        "Saved approvals, not currently connected phones.",
+        "Select a phone to manage its access.",
         font=subtitle_font,
-        fill=SECONDARY_TEXT,
-    )
-    draw.text(
-        (32, 87),
-        "The same phone can have multiple browser or test pairings.",
-        font=small_font,
         fill=SECONDARY_TEXT,
     )
 
@@ -161,22 +153,15 @@ def build_paired_phones_canvas(
             fill=ACCENT,
         )
         draw.text(
-            (LIST_LEFT + 40, top + 11),
+            (LIST_LEFT + 40, top + 14),
             _ellipsize(draw, phone.phone_label, label_font, 350),
             font=label_font,
             fill=PRIMARY_TEXT,
         )
         draw.text(
-            (LIST_LEFT + 40, top + 33),
-            f"Pair ID  {abbreviated_pair_id(phone.pair_id)}",
+            (LIST_LEFT + 40, top + 42),
+            f"ID  {abbreviated_pair_id(phone.pair_id)}",
             font=id_font,
-            fill=SECONDARY_TEXT,
-        )
-        service = urlsplit(phone.relay_origin).netloc
-        draw.text(
-            (LIST_LEFT + 40, top + 52),
-            _ellipsize(draw, f"Service: {service}", small_font, 490),
-            font=small_font,
             fill=SECONDARY_TEXT,
         )
 
@@ -184,15 +169,8 @@ def build_paired_phones_canvas(
         first = scroll_offset + 1
         last = min(len(phones), scroll_offset + VISIBLE_ROWS)
         draw.text(
-            (32, 448),
-            f"Showing {first}-{last} of {len(phones)}  \u00b7  Scroll to see more",
-            font=small_font,
-            fill=SECONDARY_TEXT,
-        )
-    else:
-        draw.text(
-            (32, 448),
-            "Select a phone to remove its access.",
+            (32, 412),
+            f"{first}-{last} of {len(phones)}  \u00b7  Scroll for more",
             font=small_font,
             fill=SECONDARY_TEXT,
         )
@@ -200,7 +178,7 @@ def build_paired_phones_canvas(
     _draw_button(
         draw,
         PAIR_ANOTHER_BOUNDS,
-        "Pair another phone",
+        "Add phone",
         button_font,
         hovered=hover_action is PairedPhonesAction.PAIR_ANOTHER,
         accent=ACCENT,
@@ -216,14 +194,14 @@ def build_paired_phones_canvas(
     _draw_button(
         draw,
         REMOVE_BOUNDS,
-        "Remove access",
+        "Remove",
         button_font,
         hovered=hover_action is PairedPhonesAction.REMOVE,
         accent=WARNING,
         enabled=selected_index is not None,
     )
     draw.text(
-        (32, 558),
+        (32, 512),
         "ESC  Back",
         font=small_font,
         fill=SECONDARY_TEXT,

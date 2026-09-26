@@ -12,7 +12,7 @@ from bridge.protocol import (
 )
 
 
-PUBLIC_SERVICE_ORIGIN = "https://webcam-qr-scanner-pwa.alpkon.chatgpt.site"
+PUBLIC_SERVICE_ORIGIN = "https://project-e17uk.vercel.app"
 PAIRING_URI_PREFIX = "wqrs://pair?"
 COMPACT_FRAGMENT_PREFIX = "p1."
 COMPACT_PAYLOAD_BYTES = 138

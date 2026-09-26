@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 
 from home_ui import (
+    BASE_ACTION_CARDS,
     WINDOW_HEIGHT,
     WINDOW_WIDTH,
     HomeAction,
@@ -18,6 +19,16 @@ from home_ui import (
 
 
 class HomeUiTests(unittest.TestCase):
+    def test_screen_action_explains_region_selection(self) -> None:
+        screen_card = next(
+            card
+            for card in BASE_ACTION_CARDS
+            if card.action is HomeAction.SCAN_SCREEN
+        )
+
+        self.assertEqual(screen_card.title, "Select a Screen Area")
+        self.assertIn("drag around the QR code", screen_card.description)
+
     def test_each_visible_action_has_an_explicit_click_target(self) -> None:
         self.assertIs(action_at_point(100, 150), HomeAction.SCAN_CAMERA)
         self.assertIs(action_at_point(100, 250), HomeAction.SCAN_SCREEN)

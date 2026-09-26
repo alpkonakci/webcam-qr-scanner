@@ -135,12 +135,9 @@ def confirm_phone_pairing(
     """Ask before granting a mobile browser permission to send URLs."""
 
     message = (
-        "A mobile browser wants to pair with this computer.\n\n"
-        f"Device name:\n{phone_label}\n\n"
-        "Client:\nMobile PWA\n\n"
-        f"Relay:\n{relay_origin}\n\n"
-        "Approve this device?\n\n"
-        "Only approve while the pairing QR is visible on this computer."
+        f"Pair with {phone_label}?\n\n"
+        "This phone will be able to send links to this PC. "
+        "Only continue if you just scanned the QR code."
     )
     return (
         show_dialog(
@@ -159,10 +156,8 @@ def confirm_remove_phone_access(
     """Confirm revocation with No selected by default."""
 
     message = (
-        f"Remove {phone_label} from this PC?\n\n"
-        f"Pair ID: {short_pair_id}\n\n"
-        "Online access will be revoked when possible. Unavailable old "
-        "service records will be deleted locally."
+        f"Remove access for {phone_label} ({short_pair_id})?\n\n"
+        "The phone can be paired again later."
     )
     return (
         show_dialog(

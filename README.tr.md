@@ -94,8 +94,8 @@ Mevcut kaynak kod ve yerel olarak oluşturulan `v0.2.0-beta.1` paketi yine tek b
   kamerayı kapatır ve sade kontrol ekranını öne getirir. Denetleyici kamerayı
   kullanmadan çalışmaya devam eder.
 - Kontrol ekranı, gizli tepsi simgesini bulmayı gerektirmeden **Scan with
-  Camera**, **Scan Computer Screen** ve duruma göre **Pair a Phone** veya
-  **Manage Paired Phones (N)** seçeneklerini sunar.
+  Camera**, **Select a Screen Area** ve duruma göre **Pair Phone** veya
+  **Paired Phones (N)** seçeneklerini sunar.
 - Kontrol ekranını kapatmak uygulamayı tepside çalışır bırakır. Ekrandaki
   **Exit** işlemi tam kapanmadan önce mevcut onayı korur.
 - Tepsi menüsünde **Open QR Scanner**, doğrudan tarama/eşleştirme işlemleri,

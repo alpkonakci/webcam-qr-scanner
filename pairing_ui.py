@@ -19,7 +19,7 @@ from qr_reader import QRReader
 
 WINDOW_TITLE = "QR Scanner - Pair Phone"
 WINDOW_WIDTH = 574
-WINDOW_HEIGHT = 720
+WINDOW_HEIGHT = 624
 WINDOW_BACKGROUND = "#0B1220"
 PANEL_BACKGROUND = "#111C2E"
 PRIMARY_TEXT = "#F8FAFC"
@@ -109,8 +109,6 @@ def build_pairing_canvas(
     draw = ImageDraw.Draw(canvas)
     title_font = _load_font(26, semibold=True)
     body_font = _load_font(15)
-    body_bold_font = _load_font(15, semibold=True)
-    detail_font = _load_font(13)
     countdown_font = _load_font(18, semibold=True)
 
     draw.text(
@@ -136,7 +134,7 @@ def build_pairing_canvas(
         qr = qr.resize((QR_SIZE, QR_SIZE), Image.Resampling.NEAREST)
     canvas.paste(qr, ((WINDOW_WIDTH - QR_SIZE) // 2, 108))
 
-    countdown = f"Expires in {max(0, remaining_seconds)} seconds"
+    countdown = f"{max(0, remaining_seconds)} seconds remaining"
     countdown_width = draw.textlength(countdown, font=countdown_font)
     draw.text(
         ((WINDOW_WIDTH - countdown_width) / 2, 532),
@@ -147,37 +145,19 @@ def build_pairing_canvas(
 
     draw.text(
         (28, 580),
-        "Keep this window visible while pairing.",
-        font=body_bold_font,
-        fill=PRIMARY_TEXT,
-    )
-    _draw_wrapped_text(
-        draw,
-        (
-            "The code expires after two minutes and can be used only once. "
-            "You will still confirm the device before access is granted."
-        ),
-        position=(28, 606),
-        maximum_width=WINDOW_WIDTH - 56,
-        font=detail_font,
+        "Keep this window open until your phone connects.",
+        font=body_font,
         fill=SECONDARY_TEXT,
-        line_spacing=4,
     )
 
-    relay_text = f"Relay: {relay_origin}"
     if development_mode:
-        relay_text += (
-            "\nLocal development mode — a real phone cannot connect yet."
+        warning_font = _load_font(12)
+        draw.text(
+            (28, 604),
+            "Local test mode: a real phone cannot connect.",
+            font=warning_font,
+            fill=WARNING,
         )
-    _draw_wrapped_text(
-        draw,
-        relay_text,
-        position=(28, 666),
-        maximum_width=WINDOW_WIDTH - 56,
-        font=detail_font,
-        fill=WARNING if development_mode else SECONDARY_TEXT,
-        line_spacing=3,
-    )
 
     rgb = np.asarray(canvas, dtype=np.uint8)
     return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)

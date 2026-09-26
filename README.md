@@ -95,8 +95,8 @@ one `QR-Scanner.exe`, but the executable starts separate internal modes:
 - `Esc`, the camera window's close button, or a successful scan closes only the
   camera and brings a calm control center to the foreground. The controller
   stays available without using the camera.
-- The control center offers **Scan with Camera**, **Scan Computer Screen**, and
-  either **Pair a Phone** or **Manage Paired Phones (N)** without requiring the
+- The control center offers **Scan with Camera**, **Select a Screen Area**, and
+  either **Pair Phone** or **Paired Phones (N)** without requiring the
   user to find a hidden tray icon.
 - Closing the control center keeps the app available in the tray. Its explicit
   **Exit** action preserves the existing confirmation before full shutdown.
