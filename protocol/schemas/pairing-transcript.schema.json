@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/alpkonakci/webcam-qr-scanner/protocol/schemas/pairing-transcript.schema.json",
+  "title": "WQRS/1 pairing transcript",
+  "type": "object",
+  "required": [
+    "protocol",
+    "relay_origin",
+    "device_id",
+    "pairing_id",
+    "expires_at",
+    "pc_public_key",
+    "phone_public_key"
+  ],
+  "properties": {
+    "protocol": {
+      "const": "wqrs/1"
+    },
+    "relay_origin": {
+      "type": "string",
+      "pattern": "^https://[A-Za-z0-9.-]+(?::[1-9][0-9]{0,4})?$",
+      "maxLength": 253
+    },
+    "device_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{22}$"
+    },
+    "pairing_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{22}$"
+    },
+    "expires_at": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "pc_public_key": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{87}$"
+    },
+    "phone_public_key": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{87}$"
+    }
+  },
+  "additionalProperties": false
+}

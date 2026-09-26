@@ -17,6 +17,7 @@ from ui import (
     COLOR_SUCCESS,
     draw_result,
     fps_color,
+    is_application_exit_key,
     is_exit_key,
     readable_preview,
     show_instructions,
@@ -79,10 +80,13 @@ class AppHelpersTests(unittest.TestCase):
         self.assertEqual(fps_color(30.0), COLOR_ACCENT)
         self.assertNotEqual(fps_color(30.0), COLOR_SUCCESS)
 
-    def test_only_escape_key_closes_the_application(self) -> None:
+    def test_escape_closes_camera_and_ctrl_q_requests_full_exit(self) -> None:
         self.assertTrue(is_exit_key(27))
         self.assertFalse(is_exit_key(ord("q")))
         self.assertFalse(is_exit_key(ord("Q")))
+        self.assertTrue(is_application_exit_key(17))
+        self.assertFalse(is_application_exit_key(27))
+        self.assertFalse(is_application_exit_key(ord("q")))
 
     @patch("sys.argv", ["app.py"])
     def test_closes_after_first_scan_by_default(self) -> None:
@@ -165,12 +169,16 @@ class AppHelpersTests(unittest.TestCase):
         *,
         confirmed: bool = False,
         opened: bool = False,
+        region_selector: Mock | None = None,
     ) -> tuple[ScreenScanStatus, Mock, Mock, Mock]:
         reader = Mock()
-        reader.scan.return_value = results
+        reader.scan_all.return_value = results
         confirm = Mock(return_value=confirmed)
         opener = Mock(return_value=opened)
         notify = Mock(return_value=1)
+        region_selector = region_selector or Mock(
+            return_value=np.zeros((50, 50, 3), dtype=np.uint8)
+        )
 
         status = run_screen_scan(
             capture=lambda: np.zeros((100, 100, 3), dtype=np.uint8),
@@ -178,8 +186,12 @@ class AppHelpersTests(unittest.TestCase):
             confirm=confirm,
             opener=opener,
             notify=notify,
+            select_region=region_selector,
         )
-        reader.scan.assert_called_once()
+        if region_selector.return_value is None:
+            reader.scan_all.assert_not_called()
+        else:
+            reader.scan_all.assert_called_once()
         return status, confirm, opener, notify
 
     def test_screen_scan_does_not_open_when_no_qr_exists(self) -> None:
@@ -190,18 +202,57 @@ class AppHelpersTests(unittest.TestCase):
         opener.assert_not_called()
         notify.assert_called_once()
 
-    def test_screen_scan_blocks_multiple_distinct_qr_codes(self) -> None:
+    def test_screen_scan_rejects_multiple_qrs_inside_selected_area(self) -> None:
         results = [
             self._screen_result("https://example.com/one"),
-            self._screen_result("https://example.com/two"),
+            QRResult(
+                data="https://example.com/two",
+                corners=np.array(
+                    [[110, 10], [190, 10], [190, 90], [110, 90]]
+                ),
+            ),
         ]
-
-        status, confirm, opener, notify = self._run_mock_screen_scan(results)
+        status, confirm, opener, notify = self._run_mock_screen_scan(
+            results,
+        )
 
         self.assertIs(status, ScreenScanStatus.MULTIPLE_CODES)
         confirm.assert_not_called()
         opener.assert_not_called()
         notify.assert_called_once()
+
+    def test_screen_scan_cancels_when_area_selection_is_closed(self) -> None:
+        region_selector = Mock(return_value=None)
+
+        status, confirm, opener, notify = self._run_mock_screen_scan(
+            [self._screen_result("https://example.com/one")],
+            region_selector=region_selector,
+        )
+
+        self.assertIs(status, ScreenScanStatus.CANCELLED)
+        region_selector.assert_called_once()
+        confirm.assert_not_called()
+        opener.assert_not_called()
+        notify.assert_not_called()
+
+    def test_screen_scan_decodes_only_the_selected_crop(self) -> None:
+        reader = Mock()
+        reader.scan_all.return_value = [
+            self._screen_result("https://example.com/selected")
+        ]
+        full_screen = np.zeros((100, 120, 3), dtype=np.uint8)
+        selected_crop = np.ones((30, 40, 3), dtype=np.uint8)
+
+        status = run_screen_scan(
+            capture=lambda: full_screen,
+            reader=reader,
+            confirm=lambda _: False,
+            notify=Mock(return_value=1),
+            select_region=lambda frame: selected_crop,
+        )
+
+        self.assertIs(status, ScreenScanStatus.CANCELLED)
+        np.testing.assert_array_equal(reader.scan_all.call_args.args[0], selected_crop)
 
     def test_screen_scan_collapses_duplicate_payloads_before_confirming(self) -> None:
         result = self._screen_result("https://example.com/same")
@@ -252,6 +303,7 @@ class AppHelpersTests(unittest.TestCase):
             confirm=confirm,
             opener=opener,
             notify=notify,
+            select_region=lambda screen: screen,
         )
 
         self.assertIs(status, ScreenScanStatus.OPENED)

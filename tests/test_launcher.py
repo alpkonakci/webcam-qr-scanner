@@ -1,0 +1,166 @@
+import unittest
+from unittest.mock import Mock, patch
+
+import launcher
+from exit_codes import (
+    APPLICATION_EXIT_REQUESTED,
+    CAMERA_CLOSED,
+    CONTROL_MANAGE_PHONES,
+    CONTROL_PAIR_PHONE,
+    CONTROL_REMOVE_PHONE,
+)
+from home_ui import HomeAction
+from paired_phone_ipc import PairedPhoneView
+from paired_phones_ui import PairedPhonesAction, PairedPhonesDecision
+
+
+class LauncherTests(unittest.TestCase):
+    def test_camera_options_start_tray_and_open_camera(self) -> None:
+        with patch("launcher.run_bridge", return_value=0) as run_bridge:
+            result = launcher.main(["--show-fps"])
+
+        self.assertEqual(result, 0)
+        run_bridge.assert_called_once_with(
+            open_camera=True,
+            open_home=False,
+            camera_arguments=["--show-fps"],
+        )
+
+    def test_default_launch_opens_control_center(self) -> None:
+        with patch("launcher.run_bridge", return_value=0) as run_bridge:
+            result = launcher.main([])
+
+        self.assertEqual(result, 0)
+        run_bridge.assert_called_once_with(
+            open_camera=False,
+            open_home=True,
+            camera_arguments=[],
+        )
+
+    def test_screen_mode_bypasses_camera_tray(self) -> None:
+        with patch("launcher.run_screen", return_value=0) as run_screen:
+            result = launcher.main(["--screen", "--desktop"])
+
+        self.assertEqual(result, 0)
+        run_screen.assert_called_once_with(["--desktop"])
+
+    def test_home_process_returns_selected_action_exit_code(self) -> None:
+        with patch(
+            "home_ui.show_home_window",
+            return_value=HomeAction.PAIR_PHONE,
+        ):
+            result = launcher.main(["--home-process"])
+
+        self.assertEqual(result, CONTROL_PAIR_PHONE)
+
+    def test_confirmed_home_exit_requests_full_application_shutdown(self) -> None:
+        with patch(
+            "home_ui.show_home_window",
+            return_value=HomeAction.EXIT,
+        ):
+            result = launcher.main(["--home-process"])
+
+        self.assertEqual(result, APPLICATION_EXIT_REQUESTED)
+
+    def test_home_process_receives_pair_count_and_opens_management(self) -> None:
+        with patch(
+            "home_ui.show_home_window",
+            return_value=HomeAction.MANAGE_PHONES,
+        ) as show_home:
+            result = launcher.main(
+                ["--home-process", "--paired-phone-count", "3"]
+            )
+
+        self.assertEqual(result, CONTROL_MANAGE_PHONES)
+        show_home.assert_called_once_with(
+            confirm_exit=unittest.mock.ANY,
+            pair_count=3,
+        )
+
+    def test_paired_phone_process_publishes_confirmed_removal(self) -> None:
+        phone = PairedPhoneView(
+            relay_origin="https://relay.example",
+            pair_id="abcDEF0123456789-_xyZA",
+            phone_label="My iPhone",
+        )
+        with (
+            patch(
+                "paired_phone_ipc.consume_paired_phones_snapshot",
+                return_value=(phone,),
+            ),
+            patch(
+                "paired_phones_ui.show_paired_phones_window",
+                return_value=PairedPhonesDecision(
+                    PairedPhonesAction.REMOVE,
+                    phone,
+                ),
+            ),
+            patch("paired_phone_ipc.request_phone_removal") as request,
+        ):
+            result = launcher.main(["--paired-phones-process"])
+
+        self.assertEqual(result, CONTROL_REMOVE_PHONE)
+        request.assert_called_once_with(phone)
+
+    def test_self_test_does_not_emit_camera_lifecycle_signal(self) -> None:
+        with patch("launcher.run_camera", return_value=0) as run_camera:
+            result = launcher.main(["--self-test"])
+
+        self.assertEqual(result, 0)
+        run_camera.assert_called_once_with(
+            ["--self-test"],
+            signal_controller=False,
+        )
+
+    @patch("launcher.request_open_camera")
+    @patch("launcher.BridgeInstanceGuard")
+    def test_second_launch_asks_existing_tray_to_open_camera(
+        self,
+        guard_type,
+        request_open_camera,
+    ) -> None:
+        guard = Mock(already_running=True)
+        guard_type.return_value.__enter__.return_value = guard
+
+        result = launcher.run_bridge(
+            open_camera=True,
+            camera_arguments=["--camera", "1"],
+        )
+
+        self.assertEqual(result, 0)
+        request_open_camera.assert_called_once_with(["--camera", "1"])
+
+    @patch("launcher.request_camera_closed")
+    @patch("launcher.request_bridge_exit")
+    @patch("app.main", return_value=CAMERA_CLOSED)
+    def test_camera_close_notifies_background_controller(
+        self,
+        camera_main,
+        request_bridge_exit,
+        request_camera_closed,
+    ) -> None:
+        result = launcher.run_camera(["--desktop"])
+
+        self.assertEqual(result, CAMERA_CLOSED)
+        camera_main.assert_called_once_with(["--desktop"])
+        request_camera_closed.assert_called_once_with()
+        request_bridge_exit.assert_not_called()
+
+    @patch("launcher.request_camera_closed")
+    @patch("launcher.request_bridge_exit")
+    @patch("app.main", return_value=APPLICATION_EXIT_REQUESTED)
+    def test_full_exit_requests_background_controller_shutdown(
+        self,
+        camera_main,
+        request_bridge_exit,
+        request_camera_closed,
+    ) -> None:
+        result = launcher.run_camera(["--desktop"])
+
+        self.assertEqual(result, APPLICATION_EXIT_REQUESTED)
+        request_bridge_exit.assert_called_once_with()
+        request_camera_closed.assert_not_called()
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -58,6 +58,30 @@ class QRReaderTests(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].data, "https://example.com/mobile")
 
+    def test_screen_scan_finds_codes_overlooked_by_first_multi_pass(self) -> None:
+        frame = np.full((720, 1280, 3), 255, dtype=np.uint8)
+        values = (
+            "https://example.com/one",
+            "https://example.com/two",
+        )
+        for value, (left, top) in zip(
+            values,
+            ((160, 220), (820, 220)),
+        ):
+            qr_image = cv2.resize(
+                make_qr_code(value),
+                (260, 260),
+                interpolation=cv2.INTER_NEAREST,
+            )
+            frame[top : top + 260, left : left + 260] = cv2.cvtColor(
+                qr_image,
+                cv2.COLOR_GRAY2BGR,
+            )
+
+        results = self.reader.scan_all(frame)
+
+        self.assertEqual({result.data for result in results}, set(values))
+
 
 if __name__ == "__main__":
     unittest.main()

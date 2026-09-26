@@ -14,23 +14,38 @@ default browser, and closes the scanner automatically.
 
 ![Webcam QR Scanner usage demo](docs/assets/webcam-qr-scanner-demo.gif)
 
+> **Development status:** The latest stable GitHub release is `v0.1.1`. The
+> current branch is the `v0.2.0-beta.1` Phone-to-PC candidate, not a stable
+> release. It includes two-minute single-use pairing, default-No PC approval,
+> Windows DPAPI credential protection, paired-phone access management, and an
+> install-free browser PWA that encrypts URLs end to end with WebCrypto. The
+> Vercel API, Supabase Postgres schema, private Realtime wake-up path, five-second
+> recovery poll, and 60-second safety resync are locally tested. The Vercel
+> Preview deployment is ready behind Vercel Authentication, but `/healthz` and
+> the complete iPhone/Android flow have not yet been validated on real devices.
+> The existing Sites/D1 beta remains untouched. See the
+> [migration runbook](docs/vercel-supabase-migration.tr.md) and
+> [beta release checklist](docs/v0.2-beta-release-checklist.md).
+
 ## Features
 
 - Live camera preview with a modern turquoise interface
 - A visible guide that is also the real QR analysis area
-- Separate, one-shot QR scanning across all connected screens
+- Drag-to-select, one-shot QR scanning across all connected screens
 - Link confirmation showing the destination hostname for screen scans
-- Multiple-screen-QR protection: nothing opens when different codes are found
+- Clear feedback when the selected area has no QR or more than one QR
 - Single and multiple QR-code detection
 - Automatic opening of valid HTTP/HTTPS links
-- Automatic shutdown after the first successful scan
+- Automatic camera-view shutdown after the first successful scan
 - Duplicate-scan prevention
 - 1920×1080 at 30 FPS target with automatic 1280×720 fallback
 - Non-blocking background analysis that always prioritizes the newest frame
 - Periodic high-detail detection for small or distant codes
 - Additional processing for QR codes displayed on phone screens
 - Developer FPS overlay available with `--show-fps`
-- Safe exit with `Esc` or the window close button
+- `Esc` or the window close button closes only the camera view
+- Optional background controller with system-tray camera and screen actions
+- Confirmed full exit with `Ctrl+Q` or **Exit QR Scanner** in the tray
 - Terminal-free standalone Windows executable
 
 ## Download and use
@@ -45,25 +60,82 @@ Double-click `QR-Scanner.exe`:
 1. Allow camera access if Windows asks for permission.
 2. Place the complete QR code inside the turquoise frame.
 3. A valid web link opens in the default browser.
-4. The scanner closes after the first successful scan.
+4. In stable `v0.1.1`, the scanner closes after the first successful scan.
 
 ### Scan a QR code already displayed on the computer
 
-Keep exactly one QR code clearly visible and double-click `Scan Screen.vbs`.
+Keep the QR code visible and double-click `Scan Screen.vbs`.
 
-1. The application captures all connected displays once.
-2. The image stays in memory and is never saved.
-3. If the QR contains a valid HTTP/HTTPS link, a confirmation dialog shows the
+> **Important:** The QR code must be fully visible when `Scan Screen.vbs` runs.
+> A QR code hidden behind another window, inside a minimized window, or on an
+> inactive browser tab cannot be scanned. The application scans only what is
+> currently visible on the displays, not background window contents.
+
+1. The application captures all connected displays once and opens a frozen preview.
+2. Drag a rectangle around exactly one QR code. The image stays in memory and
+   is never saved.
+3. Only the selected area is scanned. If it contains no QR code or multiple
+   different QR codes, the application shows an error and opens nothing.
+4. If the QR contains a valid HTTP/HTTPS link, a confirmation dialog shows the
    destination hostname and full address.
-4. Select **Yes** to open it or **No** to cancel.
-
-If different QR codes are detected at the same time, nothing is opened. Hide
-all but one and run `Scan Screen.vbs` again. The screen is not monitored
-continuously.
+5. Select **Yes** to open it or **No** to cancel. The screen is not monitored
+   continuously.
 
 The first launch can take a few seconds longer because the single-file package
 needs to prepare its bundled files. Windows SmartScreen may warn about unsigned
 executables downloaded from the internet.
+
+### v0.2.0-beta.1 candidate: background behavior
+
+The current source and locally generated `v0.2.0-beta.1` package still distribute
+one `QR-Scanner.exe`, but the executable starts separate internal modes:
+
+- A lightweight controller stays visible in the Windows system tray.
+- The camera opens only after a user action and runs in a separate process.
+- `Esc`, the camera window's close button, or a successful scan closes only the
+  camera and brings a calm control center to the foreground. The controller
+  stays available without using the camera.
+- The control center offers **Scan with Camera**, **Select a Screen Area**, and
+  either **Pair Phone** or **Paired Phones (N)** without requiring the
+  user to find a hidden tray icon.
+- Closing the control center keeps the app available in the tray. Its explicit
+  **Exit** action preserves the existing confirmation before full shutdown.
+- The tray offers **Open QR Scanner**, direct scan/pair actions,
+  **Start with Windows**, and **Exit QR Scanner**.
+- Reopening the EXE asks the existing tray instance to open the camera instead
+  of creating a second controller or a second camera window.
+- `Ctrl+Q` in the camera or **Exit QR Scanner** in the tray asks for
+  confirmation before stopping everything.
+- **Start with Windows** is off by default and starts only the controller, not
+  the camera.
+
+If at least one approved phone is stored, the controller keeps a lightweight
+outbound Phone-to-PC receiver alive while the camera stays off. It never opens
+an inbound port. Choosing **Pair Phone...** explicitly contacts the configured
+relay and displays a two-minute pairing QR. Until cutover succeeds, this branch
+defaults to the legacy public HTTPS beta; local and self-hosted development relays remain
+available through the `WQRS_RELAY_ORIGIN` environment variable.
+The public pairing QR is an HTTPS launch link that the phone's normal camera
+can open. Its single-use pairing material stays after `#`, is never sent in the
+HTTP request, and is removed from the address bar as soon as the PWA consumes
+it. The PWA requests PC approval, stores a non-extractable root key in IndexedDB,
+and enables **Send to PC**. If the browser is already paired, it offers
+**Continue** or an explicit **Replace pairing** action instead of silently
+creating another local credential. The PC authenticates and decrypts the URL,
+sends an encrypted delivery receipt, and still asks the user before opening the
+address. The legacy public beta completed one iPhone-to-Windows encrypted
+transfer. The Vercel/Supabase candidate still requires preview deployment,
+iPhone and Android cutover tests, and an independent security review before
+v0.2 can be considered stable.
+
+Opening the pairing link sends only a short-lived lifecycle signal so the
+desktop can dismiss the QR window; it does not approve the phone. Incoming URL,
+pairing, and full-exit questions are serialized and brought to the foreground
+so a transient application window cannot cover a security decision.
+
+**Scan Screen** shows a frozen in-memory preview before decoding. Drag around
+one QR and release to scan only that area. `Esc` cancels, and the existing
+hostname confirmation still appears before a selected URL opens.
 
 ## Scanning from a phone screen
 
@@ -101,7 +173,7 @@ all affect the result.
 The FPS counter is hidden by default. Enable it for development:
 
 ```powershell
-.\.venv\Scripts\python.exe app.py --show-fps
+.\.venv\Scripts\python.exe launcher.py --show-fps
 ```
 
 Normal performance is shown in turquoise and a value below 24 FPS is shown in
@@ -114,37 +186,88 @@ Python 3.10 or newer is required:
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe app.py
+.\.venv\Scripts\python.exe launcher.py
 ```
 
 Useful options:
 
 ```powershell
 # Use another camera
-.\.venv\Scripts\python.exe app.py --camera 1
+.\.venv\Scripts\python.exe launcher.py --camera 1
 
 # Do not open links automatically
-.\.venv\Scripts\python.exe app.py --no-open
+.\.venv\Scripts\python.exe launcher.py --no-open
 
 # Keep scanning after the first QR code
-.\.venv\Scripts\python.exe app.py --keep-open
+.\.venv\Scripts\python.exe launcher.py --keep-open
 
 # Display the developer FPS overlay
-.\.venv\Scripts\python.exe app.py --show-fps
+.\.venv\Scripts\python.exe launcher.py --show-fps
 
 # Scan all connected screens once
-.\.venv\Scripts\python.exe app.py --screen
+.\.venv\Scripts\python.exe launcher.py --screen
 ```
 
 `QR Scanner.vbs` starts the source version without a terminal. The
 `Scan Screen.vbs` launcher runs the separate one-shot screen scan without a
 terminal. `start_qr_scanner.bat` keeps the terminal visible for diagnostics.
 
+## Local Phone-to-PC developer demo
+
+There are two localhost-only development checks. Neither is the mobile feature,
+and neither exposes a service to the local network or internet.
+
+### Automated transport demo
+
+This command proves the encrypted pairing and URL transport in one process:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m bridge.local_demo
+```
+
+It starts a relay bound only to `127.0.0.1`, completes a two-minute,
+single-use encrypted pairing flow, derives matching phone and PC keys through
+P-256 ECDH and HKDF, encrypts a sample URL with AES-256-GCM, routes the opaque
+URL envelope over HTTP/WebSocket, and asks for confirmation on the PC. **No**
+opens nothing; **Yes** opens the sample URL. Credentials exist only in memory.
+The relay retains no URL or URL-message history; opaque pairing envelopes live
+in memory only until their short session expires.
+
+Use `--url https://example.com` to choose the test URL or `--no-dialog` for a
+fully automated verification. This demo runs entirely on one computer; it is
+not the mobile feature and is not exposed to the local network or internet.
+
+### Interactive tray pairing
+
+This test exercises the actual tray action, visible QR, default-reject PC
+dialog, and Windows DPAPI storage. Use three PowerShell windows:
+
+```powershell
+# Terminal 1 — local development relay
+.\.venv\Scripts\python.exe -m relay.server
+
+# Terminal 2 — desktop controller
+.\.venv\Scripts\python.exe launcher.py
+
+# Terminal 3 — after choosing Pair Phone... from the tray
+.\.venv\Scripts\python.exe -m bridge.fake_pairing_phone --phone-label "Test phone"
+```
+
+The fake phone captures the currently visible desktop once, requires exactly
+one `wqrs://pair` QR, and keeps the screenshot in memory only. It does not copy
+the pairing URI or any secret to the clipboard or console. Approving on the PC
+stores the relay registration and derived pair key in
+`%LOCALAPPDATA%\Webcam QR Scanner\phone-to-pc.dat`; the entire file is protected
+for the current Windows user by DPAPI. Rejecting creates no sender credentials.
+Restarting the in-memory local relay invalidates its routes, so the next pairing
+re-registers the local device and removes obsolete local pairs.
+
 ## Tests
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
-.\.venv\Scripts\python.exe app.py --self-test
+.\.venv\Scripts\python.exe launcher.py --self-test
 ```
 
 The self-test verifies OpenCV imports and QR decoding without opening a camera.
@@ -159,7 +282,7 @@ The self-test verifies OpenCV imports and QR decoding without opening a camera.
 The build produces the terminal-free executable and a distributable ZIP:
 
 ```text
-dist\Webcam-QR-Scanner-v0.1.1-windows-x64.zip
+dist\Webcam-QR-Scanner-v0.2.0-beta.1-windows-x64.zip
 ```
 
 The ZIP contains `QR-Scanner.exe`, the `Scan Screen.vbs` launcher, the project
@@ -170,14 +293,27 @@ verification.
 ## Project structure
 
 - `app.py`: application flow and command-line options
+- `launcher.py`: lightweight mode selection and single-controller startup
+- `tray_app.py`: system-tray actions and child-process lifecycle
+- `home_ui.py`: calm post-camera control center and explicit action selection
+- `app_settings.py`: atomic per-user interface preferences
+- `bridge_signals.py`: local control signals between executable modes
+- `windows_startup.py`: optional current-user Windows startup entry
 - `camera.py`: camera negotiation, Full HD measurement, and 720p fallback
 - `qr_reader.py`: fast and thorough QR decoding
 - `screen_capture.py`: one-shot, multi-monitor Windows desktop capture
+- `screen_selector.py`: in-memory drag-to-select screen region overlay
 - `scan_worker.py`: newest-frame-only background worker
 - `scan_geometry.py`: real scan area and coordinate transformations
 - `ui.py`: interface, animated scan line, and result presentation
 - `links.py`: safe URL classification and browser integration
 - `performance.py`: optional FPS measurement
+- `protocol/`: `wqrs/1` schemas, test vectors, and independent verification tools
+- `bridge/`: encrypted pairing/message codecs, controller, DPAPI storage, PC receiver,
+  fake phones, and local demo
+- `pairing_ui.py`: in-memory, two-minute pairing QR window and countdown
+- `relay/`: localhost-only FastAPI relay with in-memory opaque routing
+- `pwa/`: install-free browser UI, optional PWA metadata, Vercel API, and tests
 - `tests/`: automated behavior, camera-selection, and QR-reader tests
 
 ## Security
@@ -187,16 +323,43 @@ Payloads using schemes such as `javascript:` or `file:` are never executed. A
 QR code held in front of the camera does not continuously open new tabs.
 
 Camera frames are processed locally in memory and are neither saved nor sent
-outside the computer. The application does not request location information or
-collect analytics, telemetry, or device identifiers. Once a valid URL is
-opened, the destination website is handled by the default browser and is
-subject to that browser's privacy settings.
+outside the computer. Local camera and screen scanning request no location
+information and collect no analytics or telemetry. Once a valid URL is opened,
+the destination website is handled by the default browser and is subject to
+that browser's privacy settings.
 
 Screen scanning is explicitly started by the user and captures the virtual
 desktop only once. The captured pixels are processed locally in memory and are
-not written to disk. A screen QR link is never opened without confirmation, and
-different QR payloads detected together are rejected rather than selected
-arbitrarily.
+not written to disk. A screen QR link is never opened without confirmation.
+When different payloads are detected, the application requires the user to
+click a visible QR boundary instead of choosing automatically. Pointer
+proximity changes only the highlight and can never open a link.
+
+The development system-tray controller does not activate the camera or start
+Phone-to-PC networking in the background. **Start with Windows** writes only
+this application's current-user startup entry and is changed solely after the
+user selects the menu option. **Pair Phone...** is the explicit action that
+contacts the configured relay. The separate developer relay binds only to
+`127.0.0.1` while its command is running; it stores token HMAC digests and
+routing IDs, but no URL or message history.
+
+Phone-to-PC creates random routing/device identifiers and an account-free
+Supabase anonymous device session; it does not ask for an email address, phone
+number, profile, or location. Vercel and Supabase may process standard network
+metadata such as an IP address under their own policies. QR images stay on the
+device, the plaintext URL is end-to-end encrypted before transport, and
+application logs must not contain URLs, Authorization headers, tokens, keys,
+QR images, or ciphertext bodies.
+
+The pairing QR is generated in memory, expires after two minutes, and is
+single-use. Closing it invalidates the unfinished relay session immediately.
+The PC approval dialog shows the phone label and relay, defaults to **No**, and
+rejection creates no sender credentials. Approved relay and pair credentials
+are stored only inside a Windows DPAPI-protected file bound to the current user;
+the application has no plaintext fallback. Public relay origins require HTTPS,
+and non-loopback plain HTTP origins are rejected. Removing phone access revokes
+the relay route before deleting the local DPAPI record; a network failure keeps
+the local record so removal can be retried safely.
 
 The application validates the URL scheme but cannot determine whether a website
 is trustworthy or malicious. Check the hostname shown in the confirmation
@@ -219,20 +382,61 @@ dialog before opening a screen QR link.
 - [x] Block ambiguous scans containing different QR payloads
 - [x] Add automated tests and a standalone Windows package
 
-### v0.2 — Phone-to-PC bridge
+### v0.2.0-beta.1 — Install-free PWA Phone-to-PC bridge
 
-Planned account-free pairing with a short-lived QR code and one-time approval
-on the computer. QR payloads will be end-to-end encrypted on the phone and
-delivered through an internet relay that cannot read their contents, allowing
-the phone to send a link over mobile data without local-network or location
-permission. The computer will validate the payload and request confirmation
-before opening it by default.
+The v0.2 beta candidate provides account-free pairing with a short-lived QR
+code and one-time approval on the computer. Users open the mobile PWA over
+HTTPS without installing a native app. Browsers may technically allow adding
+the PWA to the Home Screen, but the interface does not promote installation.
+The PWA decodes QR codes on-device and offers **Open link in new tab** or
+**Send to PC**. URLs are end-to-end encrypted with built-in Browser WebCrypto and
+delivered through an internet relay that cannot read their contents. No
+local-network or location permission is required. The computer validates the
+payload and requests confirmation before opening it by default.
+
+Architecture, pairing protocol, threat model, and acceptance criteria are
+documented in the
+[v0.2 technical design (Turkish)](docs/phone-to-pc-technical-design.tr.md).
+
+- [x] PWA-compatible `wqrs/1` JSON schemas and threat-model checklist
+- [x] P-256/HKDF/AES-GCM vectors verified by Python, independent Node.js, and
+  browser-compatible WebCrypto code
+- [x] One-EXE desktop controller with separate camera and screen processes
+- [x] System tray, post-camera control center, optional Windows startup, and
+  confirmed full exit
+- [x] Camera stays off while only the background controller is running
+- [x] Explicit drag-to-select area for one screen QR code
+- [x] First encrypted end-to-end transfer through a localhost relay and fake phone
+- [x] Two-minute, single-use pairing HTTP flow with encrypted approval/rejection
+- [x] Show the pairing QR and default-reject approval dialog from the tray controller
+- [x] Protect approved desktop relay and pair credentials with Windows DPAPI
+- [x] Add the responsive, install-free browser UI, optional PWA metadata, icons, and
+  static-only service worker
+- [x] Add user-initiated camera access, on-device QR decoding, strict URL
+  validation, and the mobile result screen
+- [x] Integrate the persistent PC receiver with the tray controller
+- [x] Add Browser WebCrypto, real browser pairing, and encrypted **Send to PC**
+- [x] Add the legacy D1-backed HTTPS relay API with short-lived opaque envelopes,
+  online heartbeat checks, replay rejection, and encrypted delivery receipts
+- [x] Enable the public beta relay and verify one real iPhone-to-Windows flow
+- [x] Let the normal phone camera open a fragment-protected HTTPS pairing link
+- [x] Detect an existing browser pairing before offering explicit replacement
+- [x] Add the Vercel API, Supabase Postgres/RLS schema, private Realtime wake-up,
+  five-second recovery poll, and 60-second safety resync
+- [x] Add desktop paired-phone management with remote-first, fail-closed access
+  removal and PWA `pair_revoked` cleanup
+- [ ] Deploy and verify the Vercel preview with real iPhone and Android devices
+- [ ] Test the beta ZIP on a clean Windows environment and publish it as a
+  GitHub pre-release
+- [ ] Complete broad Android Chrome and iOS Safari device tests
+- [ ] Complete an independent protocol, cryptography, and deployment review
 
 ### v0.2.1 — Encrypted queue and reminders
 
-If the computer is offline, the encrypted item will remain on the phone until
-the computer reconnects. Optional reminders and expiry-based automatic cleanup
-are planned; automatic opening will remain an explicit user preference.
+If the computer is offline, the encrypted item may remain in the PWA's local
+storage until the computer reconnects. Browsers do not guarantee background
+execution, so reminders and timers will be offered only where genuinely
+supported; automatic opening will remain an explicit user preference.
 
 ### v0.2.2 — Optional local-network mode
 

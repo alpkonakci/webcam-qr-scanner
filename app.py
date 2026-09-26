@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import ctypes
 import os
 import sys
 import time
@@ -19,25 +18,23 @@ import cv2
 import numpy as np
 
 from camera import CameraConfig, CameraError, CameraStream
+from exit_codes import APPLICATION_EXIT_REQUESTED
 from links import open_web_url, payload_kind
+from native_dialogs import confirm_application_exit, show_dialog, show_error_dialog
 from performance import FPSCounter
 from qr_reader import QRReader, QRResult
 from screen_capture import ScreenCaptureError, capture_virtual_screen
+from screen_selector import select_screen_region
 from scan_geometry import scale_result, scan_region
 from scan_worker import QRScanWorker, ScanGate
-from ui import DISPLAY_SIZE, WINDOW_TITLE, draw_result, is_exit_key, show_instructions
-
-
-def show_dialog(title: str, message: str, style: int = 0) -> int:
-    """Show a native Windows message box and return the selected button."""
-    if os.name == "nt":
-        return int(ctypes.windll.user32.MessageBoxW(0, message, title, style))
-    return 0
-
-
-def show_error_dialog(title: str, message: str) -> None:
-    """Show an error when the Windows application has no terminal."""
-    show_dialog(title, message, 0x10)
+from ui import (
+    DISPLAY_SIZE,
+    WINDOW_TITLE,
+    draw_result,
+    is_application_exit_key,
+    is_exit_key,
+    show_instructions,
+)
 
 
 class ScreenScanStatus(Enum):
@@ -49,6 +46,13 @@ class ScreenScanStatus(Enum):
     CANCELLED = auto()
     OPENED = auto()
     OPEN_FAILED = auto()
+
+
+class CameraCloseReason(Enum):
+    """Why the camera loop returned to its launcher."""
+
+    CAMERA_CLOSED = auto()
+    APPLICATION_EXIT = auto()
 
 
 def _dialog_preview(value: str, limit: int = 900) -> str:
@@ -98,21 +102,29 @@ def run_screen_scan(
     confirm: Callable[[str], bool] | None = None,
     opener: Callable[[str], bool] | None = None,
     notify: Callable[[str, str, int], int] | None = None,
+    select_region: Callable[[np.ndarray], np.ndarray | None] | None = None,
 ) -> ScreenScanStatus:
-    """Capture all displays once, decode one QR, and safely handle its payload."""
+    """Capture once, scan one user-selected area, and handle its payload."""
     capture = capture or capture_virtual_screen
     reader = reader or QRReader()
     confirm = confirm or confirm_screen_url
     opener = opener or open_web_url
     notify = notify or show_dialog
+    select_region = select_region or select_screen_region
 
-    print("Scanning all connected screens once...")
-    results = _unique_results(reader.scan(capture(), thorough=True))
+    print("Capture ready; select the screen area containing one QR code.")
+    screen = capture()
+    selected_region = select_region(screen)
+    if selected_region is None:
+        return ScreenScanStatus.CANCELLED
+
+    results = _unique_results(reader.scan_all(selected_region))
 
     if not results:
         notify(
             "Scan Screen",
-            "No QR code was found. Make the QR code clearly visible and try again.",
+            "No QR code was found in the selected area. Select the entire QR "
+            "code and try again.",
             0x40,
         )
         return ScreenScanStatus.NO_CODE
@@ -120,11 +132,9 @@ def run_screen_scan(
     if len(results) > 1:
         notify(
             "Scan Screen",
-            (
-                "Multiple QR codes were found. Nothing was opened.\n\n"
-                "Keep only one QR code visible and try again."
-            ),
-            0x30,
+            "More than one QR code was found in the selected area. Select a "
+            "smaller area containing only the QR code you want.",
+            0x40,
         )
         return ScreenScanStatus.MULTIPLE_CODES
 
@@ -192,13 +202,14 @@ def run(
     auto_open: bool = True,
     exit_after_scan: bool = True,
     show_fps: bool = False,
-) -> None:
-    """Run the camera loop until Escape, window close, or a successful scan."""
+) -> CameraCloseReason:
+    """Run until the camera closes or the user requests a complete exit."""
     scan_gate = ScanGate()
     fps_counter = FPSCounter()
 
     print("Opening camera...")
-    print("Press ESC in the camera window to exit.")
+    print("Press ESC to close the camera or Ctrl+Q to exit completely.")
+    close_reason = CameraCloseReason.CAMERA_CLOSED
 
     with (
         CameraStream(CameraConfig(index=camera_index)) as camera,
@@ -248,12 +259,16 @@ def run(
             )
 
             key = cv2.waitKey(1) & 0xFF
+            if is_application_exit_key(key) and confirm_application_exit():
+                close_reason = CameraCloseReason.APPLICATION_EXIT
+                break
             if is_exit_key(key):
                 break
             if cv2.getWindowProperty(WINDOW_TITLE, cv2.WND_PROP_VISIBLE) < 1:
                 break
 
     cv2.destroyAllWindows()
+    return close_reason
 
 
 def _self_test_frame(value: str) -> np.ndarray:
@@ -296,7 +311,9 @@ def run_self_test(timeout: float = 3.0) -> bool:
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Scan QR codes with your computer camera.")
+    parser = argparse.ArgumentParser(
+        description="Scan QR codes with your computer camera."
+    )
     parser.add_argument(
         "--camera",
         type=int,
@@ -323,7 +340,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--screen",
         action="store_true",
-        help="Scan all connected screens once instead of opening the camera",
+        help="Select and scan one area from the connected screens",
     )
     parser.add_argument("--desktop", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--self-test", action="store_true", help=argparse.SUPPRESS)
@@ -341,12 +358,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             status = run_screen_scan()
             return 1 if status is ScreenScanStatus.OPEN_FAILED else 0
 
-        run(
+        close_reason = run(
             args.camera,
             auto_open=args.auto_open,
             exit_after_scan=args.exit_after_scan,
             show_fps=args.show_fps,
         )
+        if close_reason is CameraCloseReason.APPLICATION_EXIT:
+            return APPLICATION_EXIT_REQUESTED
     except CameraError as error:
         print(f"Camera error: {error}")
         if desktop_mode:
