@@ -3,7 +3,7 @@ param()
 
 $ErrorActionPreference = "Stop"
 
-$previewOrigin = "https://webcam-qr-scanner-git-codex-vercel-48147c-alpkonakcis-projects.vercel.app"
+$previewOrigin = "https://qrwebcam-git-codex-vercel-supabase-alpkonakcis-projects.vercel.app"
 $pythonPath = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
 $launcherPath = Join-Path $PSScriptRoot "launcher.py"
 
