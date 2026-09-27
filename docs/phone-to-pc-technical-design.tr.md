@@ -145,8 +145,9 @@ Mevcut Python uygulamasına `--bridge` çalışma modu, sistem tepsisi ve kalıc
 alıcısı eklenmiştir. Denetleyici kamera açmadan arka planda çalışır. Kayıtlı bir
 eşleşme varsa aynı relay cihazına ait telefonları tek dışa doğru bağlantı/poll
 grubunda dinler. Kullanıcının **Pair Phone...** işlemi yapılandırılmış relay'e
-bağlanır, iki dakikalık QR gösterir, varsayılan ret seçili PC onayını ister ve
-onaylanan eşleşmeyi DPAPI ile saklar.
+bağlanır ve iki dakikalık, tek kullanımlık QR gösterir. Telefon bu QR'ın gizli
+değerini kanıtlayan geçerli isteği gönderdiğinde ikinci bir masaüstü sorusu
+olmadan eşleşme tamamlanır ve DPAPI ile saklanır.
 
 Sorumlulukları:
 
@@ -222,7 +223,8 @@ Sorumlulukları:
 İlk sürümde kullanıcı **Scan QR** düğmesine basarak niyetini açıkça belirtir.
 Kararlı bir URL bulunduğunda PWA otomatik göndermek yerine **Open on this
 phone** ve **Send to PC** seçeneklerini gösterir. Ayrı bir altı haneli kod veya
-her gönderimde ikinci bir telefon onayı istenmez. PC onayı korunur.
+her gönderimde ikinci bir telefon onayı istenmez. URL'yi bilgisayarda açma
+onayı korunur.
 
 PWA:
 
@@ -542,18 +544,14 @@ değil HMAC özetini kaydeder. PWA onayı doğruladıktan sonra `root_key` değe
 non-extractable CryptoKey, `sender_token` değerini origin'e bağlı uygulama
 verisi olarak IndexedDB'ye yazar.
 
-### 9.4 Onay içeriği
+### 9.4 Kullanıcı niyeti
 
-PC onay penceresi şunları gösterir:
-
-- kullanıcının PWA'da verdiği cihaz etiketi;
-- istemci türü: **Mobile PWA**;
-- istek zamanı;
-- relay alan adı;
-- **Approve** ve varsayılan **Reject** düğmeleri.
-
-Cihaz etiketi güvenilir kimlik değildir; yalnızca kullanıcıya yardımcı etikettir.
-Güven, QR içindeki sır ve kriptografik doğrulamadan gelir.
+Kullanıcının masaüstünden **Pair Phone** işlemini başlatması ve telefonda iki
+dakikalık, tek kullanımlık QR'ı gönderme düğmesine basması açık eşleştirme
+niyetidir. Bu nedenle ikinci bir masaüstü onay penceresi gösterilmez. Cihaz
+etiketi güvenilir kimlik değildir; yalnızca kullanıcıya yardımcı etikettir.
+Güven, QR içindeki sır ve kriptografik doğrulamadan gelir. Telefondan gelen her
+URL yine bilgisayarda ayrı, varsayılan **No** seçili açma onayı ister.
 
 ### 9.5 Eşleştirme saldırılarına karşı koruma
 
@@ -564,8 +562,9 @@ Güven, QR içindeki sır ve kriptografik doğrulamadan gelir.
 - PC açık anahtarı QR'dan geldiği için relay anahtar değiştiremez.
 - AEAD ilişkili verisi PC anahtarı, telefon anahtarı, süre ve kimlikleri bağlar.
 - Oturum iki dakika sonra silinir.
-- İlk geçerli ve kullanıcı tarafından onaylanan istekten sonra oturum kapanır.
-- PC onayı olmadan kalıcı sender token üretilmez.
+- İlk geçerli ve kriptografik olarak doğrulanan istekten sonra oturum kapanır.
+- Geçerli, kısa ömürlü ve tek kullanımlık QR sırrı kanıtlanmadan kalıcı sender
+  token üretilmez.
 - Aynı eşleştirme isteğinin tekrarı reddedilir.
 
 ## 10. Normal URL gönderme protokolü
@@ -813,7 +812,7 @@ bırakmaz.
 | Sahte telefon mesajı | Sender token + eşleşme kök anahtarı |
 | Tahmin edilen cihaz kimliği | Kimlik tek başına yetki değildir |
 | Mesaj tekrarı | Rastgele `message_id`, süre ve kalıcı replay kaydı |
-| Eski pairing QR kullanımı | 120 saniye, tek kullanım, PC onayı |
+| Eski pairing QR kullanımı | 120 saniye, tek kullanım, doğrulanmış QR sırrı |
 | Relay API flood | Boyut sınırı, hız sınırı, timeout ve kota |
 | Zararlı URL şeması | Sıkı URL doğrulaması |
 | Ekran dışı otomatik açma | PC'de varsayılan No ile kullanıcı onayı |
@@ -835,7 +834,8 @@ bırakmaz.
 - Relay IP, zamanlama, mesaj boyutu ve eşleşme ilişkisi gibi metadatayı görebilir.
 - `wqrs/1` tam ileri gizlilik sağlamaz.
 - Ekran kaydedici veya fiziksel kamera eşleştirme QR'ını görebilir; kısa süre ve
-  PC onayı bu riski azaltır.
+  tek kullanım bu riski sınırlar. Kullanıcı QR'ı güvenilmeyen kişilere
+  göstermemelidir.
 
 Bu sınırlamalar pazarlama metninde “tam anonim” veya “relay hiçbir şey görmez”
 gibi yanlış iddialar kullanılmasını engeller.
@@ -900,7 +900,7 @@ Loglar URL, ciphertext gövdesi, Authorization başlığı veya anahtar içermez
 
 - PC QR'ında geri sayım gösterilir.
 - Süre dolunca QR anında geçersizleşir.
-- PC onayı varsayılan **Reject** olur.
+- Geçerli QR isteği ikinci bir masaüstü sorusu olmadan tamamlanır.
 - Onaylanan telefon açık bir adla listelenir.
 - Kullanıcı tek tıkla erişimi iptal edebilir.
 
@@ -1208,7 +1208,8 @@ Sürüm ancak aşağıdakilerin tamamı sağlanırsa hazır sayılır:
 - [ ] Kullanıcı hesabı olmadan eşleştirme çalışıyor
 - [ ] Altı haneli kod zorunlu değil
 - [ ] Pairing QR iki dakika ve tek kullanım ile sınırlı
-- [ ] PC onayı olmadan telefon eşleşemiyor
+- [ ] Geçerli, kısa ömürlü QR sırrı olmadan telefon eşleşemiyor
+- [ ] Geçerli QR gönderildiğinde ikinci bir masaüstü sorusu gösterilmiyor
 - [ ] Telefon mobil veri üzerinden PC'ye URL gönderebiliyor
 - [ ] Aynı ağ ve konum izni gerekmiyor
 - [ ] Relay URL düz metnini göremiyor

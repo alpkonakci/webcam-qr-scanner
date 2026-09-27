@@ -16,7 +16,8 @@ default browser, and closes the scanner automatically.
 
 > **Development status:** The latest stable GitHub release is `v0.1.1`. The
 > current branch is the `v0.2.0-beta.1` Phone-to-PC candidate, not a stable
-> release. It includes two-minute single-use pairing, default-No PC approval,
+> release. It includes two-minute single-use pairing initiated by scanning the
+> desktop QR,
 > Windows DPAPI credential protection, paired-phone access management, and an
 > install-free browser PWA that encrypts URLs end to end with WebCrypto. The
 > Vercel API, Supabase Postgres schema, private Realtime wake-up path, five-second
@@ -31,7 +32,7 @@ default browser, and closes the scanner automatically.
 
 - Live camera preview with a modern turquoise interface
 - A visible guide that is also the real QR analysis area
-- Drag-to-select, one-shot QR scanning across all connected screens
+- Multi-monitor selection followed by drag-to-select, one-shot screen scanning
 - Link confirmation showing the destination hostname for screen scans
 - Clear feedback when the selected area has no QR or more than one QR
 - Single and multiple QR-code detection
@@ -71,14 +72,16 @@ Keep the QR code visible and double-click `Scan Screen.vbs`.
 > inactive browser tab cannot be scanned. The application scans only what is
 > currently visible on the displays, not background window contents.
 
-1. The application captures all connected displays once and opens a frozen preview.
-2. Drag a rectangle around exactly one QR code. The image stays in memory and
+1. With multiple monitors, choose the screen that contains the QR. A
+   single-monitor system skips this question.
+2. The application captures only that display and opens a frozen preview.
+3. Drag a rectangle around exactly one QR code. The image stays in memory and
    is never saved.
-3. Only the selected area is scanned. If it contains no QR code or multiple
+4. Only the selected area is scanned. If it contains no QR code or multiple
    different QR codes, the application shows an error and opens nothing.
-4. If the QR contains a valid HTTP/HTTPS link, a confirmation dialog shows the
+5. If the QR contains a valid HTTP/HTTPS link, a confirmation dialog shows the
    destination hostname and full address.
-5. Select **Yes** to open it or **No** to cancel. The screen is not monitored
+6. Select **Yes** to open it or **No** to cancel. The screen is not monitored
    continuously.
 
 The first launch can take a few seconds longer because the single-file package
@@ -118,7 +121,8 @@ available through the `WQRS_RELAY_ORIGIN` environment variable.
 The public pairing QR is an HTTPS launch link that the phone's normal camera
 can open. Its single-use pairing material stays after `#`, is never sent in the
 HTTP request, and is removed from the address bar as soon as the PWA consumes
-it. The PWA requests PC approval, stores a non-extractable root key in IndexedDB,
+it. Submitting that short-lived, single-use QR completes pairing without a
+second desktop question. The PWA stores a non-extractable root key in IndexedDB,
 and enables **Send to PC**. If the browser is already paired, it offers
 **Continue** or an explicit **Replace pairing** action instead of silently
 creating another local credential. The PC authenticates and decrypts the URL,
@@ -128,10 +132,9 @@ transfer. The Vercel/Supabase candidate still requires preview deployment,
 iPhone and Android cutover tests, and an independent security review before
 v0.2 can be considered stable.
 
-Opening the pairing link sends only a short-lived lifecycle signal so the
-desktop can dismiss the QR window; it does not approve the phone. Incoming URL,
-pairing, and full-exit questions are serialized and brought to the foreground
-so a transient application window cannot cover a security decision.
+Opening the pairing link sends a short-lived lifecycle signal so the desktop
+can dismiss the QR window. Submitting its one-time pairing request completes
+the pairing automatically; incoming URLs still require explicit PC approval.
 
 **Scan Screen** shows a frozen in-memory preview before decoding. Drag around
 one QR and release to scan only that area. `Esc` cancels, and the existing
@@ -240,8 +243,9 @@ not the mobile feature and is not exposed to the local network or internet.
 
 ### Interactive tray pairing
 
-This test exercises the actual tray action, visible QR, default-reject PC
-dialog, and Windows DPAPI storage. Use three PowerShell windows:
+This test exercises the actual tray action, visible single-use QR, automatic
+completion after QR submission, and Windows DPAPI storage. Use three
+PowerShell windows:
 
 ```powershell
 # Terminal 1 — local development relay
@@ -256,10 +260,10 @@ dialog, and Windows DPAPI storage. Use three PowerShell windows:
 
 The fake phone captures the currently visible desktop once, requires exactly
 one `wqrs://pair` QR, and keeps the screenshot in memory only. It does not copy
-the pairing URI or any secret to the clipboard or console. Approving on the PC
+the pairing URI or any secret to the clipboard or console. Submitting the QR
 stores the relay registration and derived pair key in
 `%LOCALAPPDATA%\Webcam QR Scanner\phone-to-pc.dat`; the entire file is protected
-for the current Windows user by DPAPI. Rejecting creates no sender credentials.
+for the current Windows user by DPAPI.
 Restarting the in-memory local relay invalidates its routes, so the next pairing
 re-registers the local device and removes obsolete local pairs.
 
@@ -328,8 +332,9 @@ information and collect no analytics or telemetry. Once a valid URL is opened,
 the destination website is handled by the default browser and is subject to
 that browser's privacy settings.
 
-Screen scanning is explicitly started by the user and captures the virtual
-desktop only once. The captured pixels are processed locally in memory and are
+Screen scanning is explicitly started by the user. On multi-monitor systems
+the user first chooses a display; only that display is captured once. The
+captured pixels are processed locally in memory and are
 not written to disk. A screen QR link is never opened without confirmation.
 When different payloads are detected, the application requires the user to
 click a visible QR boundary instead of choosing automatically. Pointer
@@ -353,8 +358,9 @@ QR images, or ciphertext bodies.
 
 The pairing QR is generated in memory, expires after two minutes, and is
 single-use. Closing it invalidates the unfinished relay session immediately.
-The PC approval dialog shows the phone label and relay, defaults to **No**, and
-rejection creates no sender credentials. Approved relay and pair credentials
+Scanning and submitting the short-lived, single-use desktop QR is the explicit
+pairing authorization, so no redundant desktop confirmation is shown. Relay
+and pair credentials
 are stored only inside a Windows DPAPI-protected file bound to the current user;
 the application has no plaintext fallback. Public relay origins require HTTPS,
 and non-loopback plain HTTP origins are rejected. Removing phone access revokes
@@ -385,7 +391,7 @@ dialog before opening a screen QR link.
 ### v0.2.0-beta.1 — Install-free PWA Phone-to-PC bridge
 
 The v0.2 beta candidate provides account-free pairing with a short-lived QR
-code and one-time approval on the computer. Users open the mobile PWA over
+code explicitly displayed by the computer. Users open the mobile PWA over
 HTTPS without installing a native app. Browsers may technically allow adding
 the PWA to the Home Screen, but the interface does not promote installation.
 The PWA decodes QR codes on-device and offers **Open link in new tab** or
@@ -408,7 +414,8 @@ documented in the
 - [x] Explicit drag-to-select area for one screen QR code
 - [x] First encrypted end-to-end transfer through a localhost relay and fake phone
 - [x] Two-minute, single-use pairing HTTP flow with encrypted approval/rejection
-- [x] Show the pairing QR and default-reject approval dialog from the tray controller
+- [x] Use the short-lived, single-use desktop QR as the explicit pairing action
+- [x] Ask which display to capture on multi-monitor systems
 - [x] Protect approved desktop relay and pair credentials with Windows DPAPI
 - [x] Add the responsive, install-free browser UI, optional PWA metadata, icons, and
   static-only service worker

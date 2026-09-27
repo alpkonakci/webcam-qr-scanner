@@ -52,7 +52,7 @@ def main() -> int:
     parser.add_argument(
         "--phone-label",
         default="Local fake phone",
-        help="label shown in the PC approval dialog",
+        help="friendly phone label stored with the pairing",
     )
     args = parser.parse_args()
     try:

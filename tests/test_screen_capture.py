@@ -1,16 +1,45 @@
 import unittest
 
 from screen_capture import (
+    ConnectedDisplay,
     SM_CXVIRTUALSCREEN,
     SM_CYVIRTUALSCREEN,
     SM_XVIRTUALSCREEN,
     SM_YVIRTUALSCREEN,
     ScreenCaptureError,
+    ScreenBounds,
+    number_connected_displays,
     virtual_screen_bounds,
 )
 
 
 class ScreenBoundsTests(unittest.TestCase):
+    def test_numbers_displays_in_windows_device_order(self) -> None:
+        displays = number_connected_displays(
+            [
+                ("\\\\.\\DISPLAY2", ScreenBounds(1920, 0, 1280, 1024), False),
+                ("\\\\.\\DISPLAY1", ScreenBounds(0, 0, 1920, 1080), True),
+            ]
+        )
+
+        self.assertEqual(
+            displays,
+            (
+                ConnectedDisplay(
+                    1,
+                    "\\\\.\\DISPLAY1",
+                    ScreenBounds(0, 0, 1920, 1080),
+                    True,
+                ),
+                ConnectedDisplay(
+                    2,
+                    "\\\\.\\DISPLAY2",
+                    ScreenBounds(1920, 0, 1280, 1024),
+                    False,
+                ),
+            ),
+        )
+
     def test_reads_multi_monitor_virtual_desktop_with_negative_origin(self) -> None:
         metrics = {
             SM_XVIRTUALSCREEN: -1920,

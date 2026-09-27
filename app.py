@@ -23,7 +23,13 @@ from links import open_web_url, payload_kind
 from native_dialogs import confirm_application_exit, show_dialog, show_error_dialog
 from performance import FPSCounter
 from qr_reader import QRReader, QRResult
-from screen_capture import ScreenCaptureError, capture_virtual_screen
+from display_selector import select_display
+from screen_capture import (
+    ConnectedDisplay,
+    ScreenCaptureError,
+    capture_display,
+    connected_displays,
+)
 from screen_selector import select_screen_region
 from scan_geometry import scale_result, scan_region
 from scan_worker import QRScanWorker, ScanGate
@@ -103,17 +109,36 @@ def run_screen_scan(
     opener: Callable[[str], bool] | None = None,
     notify: Callable[[str, str, int], int] | None = None,
     select_region: Callable[[np.ndarray], np.ndarray | None] | None = None,
+    display_provider: Callable[[], Sequence[ConnectedDisplay]] | None = None,
+    choose_display: Callable[
+        [Sequence[ConnectedDisplay]], ConnectedDisplay | None
+    ] | None = None,
+    display_capture: Callable[[ConnectedDisplay], np.ndarray] | None = None,
 ) -> ScreenScanStatus:
     """Capture once, scan one user-selected area, and handle its payload."""
-    capture = capture or capture_virtual_screen
     reader = reader or QRReader()
     confirm = confirm or confirm_screen_url
     opener = opener or open_web_url
     notify = notify or show_dialog
     select_region = select_region or select_screen_region
 
+    if capture is not None:
+        # An explicit capture keeps tests and alternate capture providers simple.
+        screen = capture()
+    else:
+        displays = tuple((display_provider or connected_displays)())
+        if not displays:
+            raise ScreenCaptureError("Windows did not report a connected display.")
+        chosen_display = (
+            displays[0]
+            if len(displays) == 1
+            else (choose_display or select_display)(displays)
+        )
+        if chosen_display is None:
+            return ScreenScanStatus.CANCELLED
+        screen = (display_capture or capture_display)(chosen_display)
+
     print("Capture ready; select the screen area containing one QR code.")
-    screen = capture()
     selected_region = select_region(screen)
     if selected_region is None:
         return ScreenScanStatus.CANCELLED

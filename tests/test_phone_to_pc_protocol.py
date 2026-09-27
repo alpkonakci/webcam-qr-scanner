@@ -37,7 +37,6 @@ from native_dialogs import (
     MB_SETFOREGROUND,
     MB_TOPMOST,
     MB_YESNO,
-    confirm_phone_pairing,
     confirm_remove_phone_access,
     confirm_phone_url,
     show_dialog,
@@ -384,26 +383,6 @@ class PhoneToPcDialogTests(unittest.TestCase):
         self.assertEqual(title, "QR Scanner - Phone-to-PC")
         self.assertIn("Test phone", message)
         self.assertIn("xn--bcher-kva.example", message)
-        self.assertEqual(
-            style,
-            MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,
-        )
-
-    @patch("native_dialogs.show_dialog", return_value=7)
-    def test_pairing_confirmation_defaults_to_reject(
-        self,
-        show_dialog,
-    ) -> None:
-        approved = confirm_phone_pairing(
-            "My iPhone",
-            relay_origin="https://relay.example",
-        )
-        self.assertFalse(approved)
-        title, message, style = show_dialog.call_args.args
-        self.assertEqual(title, "QR Scanner - Pair Phone")
-        self.assertIn("My iPhone", message)
-        self.assertNotIn("Mobile PWA", message)
-        self.assertNotIn("https://relay.example", message)
         self.assertEqual(
             style,
             MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,

@@ -10,6 +10,7 @@ from camera import CameraConfig
 from links import open_web_url, payload_kind
 from performance import FPSCounter
 from qr_reader import QRResult
+from screen_capture import ConnectedDisplay, ScreenBounds
 from scan_geometry import scan_region, scale_result
 from scan_worker import QRScanWorker, ScanGate
 from ui import (
@@ -234,6 +235,75 @@ class AppHelpersTests(unittest.TestCase):
         confirm.assert_not_called()
         opener.assert_not_called()
         notify.assert_not_called()
+
+    def test_multi_monitor_scan_asks_which_display_to_capture(self) -> None:
+        displays = (
+            ConnectedDisplay(1, "DISPLAY1", ScreenBounds(0, 0, 1920, 1080), True),
+            ConnectedDisplay(
+                2,
+                "DISPLAY2",
+                ScreenBounds(1920, 0, 1280, 1024),
+                False,
+            ),
+        )
+        chosen_frame = np.zeros((80, 120, 3), dtype=np.uint8)
+        choose_display = Mock(return_value=displays[1])
+        display_capture = Mock(return_value=chosen_frame)
+        select_region = Mock(return_value=None)
+
+        status = run_screen_scan(
+            display_provider=lambda: displays,
+            choose_display=choose_display,
+            display_capture=display_capture,
+            select_region=select_region,
+        )
+
+        self.assertIs(status, ScreenScanStatus.CANCELLED)
+        choose_display.assert_called_once_with(displays)
+        display_capture.assert_called_once_with(displays[1])
+        select_region.assert_called_once_with(chosen_frame)
+
+    def test_single_monitor_scan_skips_display_question(self) -> None:
+        display = ConnectedDisplay(
+            1,
+            "DISPLAY1",
+            ScreenBounds(0, 0, 1920, 1080),
+            True,
+        )
+        choose_display = Mock()
+        display_capture = Mock(
+            return_value=np.zeros((80, 120, 3), dtype=np.uint8)
+        )
+
+        status = run_screen_scan(
+            display_provider=lambda: (display,),
+            choose_display=choose_display,
+            display_capture=display_capture,
+            select_region=lambda _: None,
+        )
+
+        self.assertIs(status, ScreenScanStatus.CANCELLED)
+        choose_display.assert_not_called()
+        display_capture.assert_called_once_with(display)
+
+    def test_cancelling_display_question_captures_nothing(self) -> None:
+        displays = (
+            ConnectedDisplay(1, "DISPLAY1", ScreenBounds(0, 0, 1920, 1080), True),
+            ConnectedDisplay(2, "DISPLAY2", ScreenBounds(1920, 0, 1920, 1080)),
+        )
+        display_capture = Mock()
+        select_region = Mock()
+
+        status = run_screen_scan(
+            display_provider=lambda: displays,
+            choose_display=lambda _: None,
+            display_capture=display_capture,
+            select_region=select_region,
+        )
+
+        self.assertIs(status, ScreenScanStatus.CANCELLED)
+        display_capture.assert_not_called()
+        select_region.assert_not_called()
 
     def test_screen_scan_decodes_only_the_selected_crop(self) -> None:
         reader = Mock()

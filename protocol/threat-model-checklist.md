@@ -17,8 +17,10 @@ explicit review note linked from the release work.
 - [ ] Relay stores only peppered HMAC token digests.
 - [ ] Relay cannot replace either P-256 public key without AEAD failure.
 - [ ] Replayed pairing requests are rejected.
-- [ ] A persistent sender token is created only after PC approval.
-- [ ] Reject is the default action in the PC pairing dialog.
+- [ ] A persistent sender token is created only after proof of the short-lived,
+  single-use QR secret and a valid authenticated pairing request.
+- [ ] Scanning and submitting the desktop QR is documented as the explicit
+  pairing authorization; no redundant second desktop prompt is shown.
 
 ## Message confidentiality and integrity
 

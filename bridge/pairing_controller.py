@@ -43,7 +43,6 @@ from bridge.secure_storage import (
     RelayDevice,
     StoredPair,
 )
-from native_dialogs import confirm_phone_pairing
 from pairing_ui import PairingWindowOutcome, show_pairing_qr_window
 
 
@@ -169,11 +168,6 @@ class PairingController:
         request_received.set()
         if not window_task.done():
             await window_task
-        approved = await asyncio.to_thread(
-            confirm_phone_pairing,
-            request.phone_label,
-            relay_origin=self.relay_origin,
-        )
 
         def persist_receiver(credentials: ReceiverCredentials) -> None:
             self.store.add_pair(
@@ -190,9 +184,11 @@ class PairingController:
         decision = await complete_pc_pairing(
             session,
             request,
-            approved=approved,
+            # Possession of this short-lived, single-use QR is the explicit
+            # pairing action. Incoming URLs still require a separate PC prompt.
+            approved=True,
             pc_label=self.pc_label,
-            persist_receiver=persist_receiver if approved else None,
+            persist_receiver=persist_receiver,
         )
         return PairingControllerResult(
             status=(

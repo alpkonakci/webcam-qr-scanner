@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import ctypes
 import os
+import re
 from collections.abc import Callable
-from dataclasses import dataclass
 from ctypes import wintypes
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -15,7 +16,7 @@ class ScreenCaptureError(RuntimeError):
     """Raised when Windows cannot capture the virtual desktop."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScreenBounds:
     """Position and size of the virtual desktop in Windows coordinates."""
 
@@ -23,6 +24,16 @@ class ScreenBounds:
     top: int
     width: int
     height: int
+
+
+@dataclass(frozen=True, slots=True)
+class ConnectedDisplay:
+    """One physical monitor exposed by Windows."""
+
+    number: int
+    device_name: str
+    bounds: ScreenBounds
+    primary: bool = False
 
 
 SM_XVIRTUALSCREEN = 76
@@ -34,6 +45,7 @@ SRCCOPY = 0x00CC0020
 CAPTUREBLT = 0x40000000
 BI_RGB = 0
 DIB_RGB_COLORS = 0
+MONITORINFOF_PRIMARY = 1
 
 
 class BITMAPINFOHEADER(ctypes.Structure):
@@ -68,6 +80,25 @@ class BITMAPINFO(ctypes.Structure):
     ]
 
 
+class RECT(ctypes.Structure):
+    _fields_ = [
+        ("left", wintypes.LONG),
+        ("top", wintypes.LONG),
+        ("right", wintypes.LONG),
+        ("bottom", wintypes.LONG),
+    ]
+
+
+class MONITORINFOEXW(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wintypes.DWORD),
+        ("rcMonitor", RECT),
+        ("rcWork", RECT),
+        ("dwFlags", wintypes.DWORD),
+        ("szDevice", wintypes.WCHAR * 32),
+    ]
+
+
 def virtual_screen_bounds(
     get_metric: Callable[[int], int],
 ) -> ScreenBounds:
@@ -81,6 +112,92 @@ def virtual_screen_bounds(
     if bounds.width <= 0 or bounds.height <= 0:
         raise ScreenCaptureError("Windows reported an invalid desktop size.")
     return bounds
+
+
+def _display_sort_key(
+    item: tuple[str, ScreenBounds, bool],
+) -> tuple[int, str]:
+    match = re.search(r"(\d+)$", item[0])
+    return (int(match.group(1)) if match else 2**31 - 1, item[0].casefold())
+
+
+def number_connected_displays(
+    displays: list[tuple[str, ScreenBounds, bool]],
+) -> tuple[ConnectedDisplay, ...]:
+    """Apply stable Windows display numbers to enumerated monitor records."""
+
+    ordered = sorted(displays, key=_display_sort_key)
+    return tuple(
+        ConnectedDisplay(
+            number=index,
+            device_name=device_name,
+            bounds=bounds,
+            primary=primary,
+        )
+        for index, (device_name, bounds, primary) in enumerate(ordered, start=1)
+    )
+
+
+def connected_displays() -> tuple[ConnectedDisplay, ...]:
+    """Return every connected physical monitor in Windows display order."""
+
+    if os.name != "nt":
+        raise ScreenCaptureError("Screen scanning currently supports Windows only.")
+
+    user32 = ctypes.windll.user32
+    _enable_dpi_awareness(user32)
+    callback_type = ctypes.WINFUNCTYPE(
+        wintypes.BOOL,
+        wintypes.HMONITOR,
+        wintypes.HDC,
+        ctypes.POINTER(RECT),
+        wintypes.LPARAM,
+    )
+    user32.GetMonitorInfoW.argtypes = [
+        wintypes.HMONITOR,
+        ctypes.POINTER(MONITORINFOEXW),
+    ]
+    user32.GetMonitorInfoW.restype = wintypes.BOOL
+    user32.EnumDisplayMonitors.argtypes = [
+        wintypes.HDC,
+        ctypes.POINTER(RECT),
+        callback_type,
+        wintypes.LPARAM,
+    ]
+    user32.EnumDisplayMonitors.restype = wintypes.BOOL
+    records: list[tuple[str, ScreenBounds, bool]] = []
+
+    def collect_monitor(
+        monitor: wintypes.HMONITOR,
+        _: wintypes.HDC,
+        __: ctypes.POINTER(RECT),
+        ___: wintypes.LPARAM,
+    ) -> bool:
+        info = MONITORINFOEXW()
+        info.cbSize = ctypes.sizeof(MONITORINFOEXW)
+        if not user32.GetMonitorInfoW(monitor, ctypes.byref(info)):
+            return True
+        rect = info.rcMonitor
+        bounds = ScreenBounds(
+            left=int(rect.left),
+            top=int(rect.top),
+            width=int(rect.right - rect.left),
+            height=int(rect.bottom - rect.top),
+        )
+        if bounds.width > 0 and bounds.height > 0:
+            records.append(
+                (
+                    str(info.szDevice),
+                    bounds,
+                    bool(info.dwFlags & MONITORINFOF_PRIMARY),
+                )
+            )
+        return True
+
+    callback = callback_type(collect_monitor)
+    if not user32.EnumDisplayMonitors(None, None, callback, 0) or not records:
+        raise ScreenCaptureError("Windows could not list the connected displays.")
+    return number_connected_displays(records)
 
 
 def _enable_dpi_awareness(user32: ctypes.WinDLL) -> None:
@@ -139,16 +256,18 @@ def _configure_gdi(user32: ctypes.WinDLL, gdi32: ctypes.WinDLL) -> None:
     gdi32.DeleteDC.restype = wintypes.BOOL
 
 
-def capture_virtual_screen() -> np.ndarray:
-    """Capture all connected displays as a BGR image held only in memory."""
+def capture_screen_bounds(bounds: ScreenBounds) -> np.ndarray:
+    """Capture one Windows screen rectangle as an in-memory BGR image."""
+
     if os.name != "nt":
         raise ScreenCaptureError("Screen scanning currently supports Windows only.")
+    if bounds.width <= 0 or bounds.height <= 0:
+        raise ScreenCaptureError("Windows reported an invalid screen size.")
 
     user32 = ctypes.windll.user32
     gdi32 = ctypes.windll.gdi32
     _enable_dpi_awareness(user32)
     _configure_gdi(user32, gdi32)
-    bounds = virtual_screen_bounds(user32.GetSystemMetrics)
 
     screen_dc = user32.GetDC(None)
     if not screen_dc:
@@ -227,3 +346,19 @@ def capture_virtual_screen() -> np.ndarray:
         if memory_dc:
             gdi32.DeleteDC(memory_dc)
         user32.ReleaseDC(None, screen_dc)
+
+
+def capture_display(display: ConnectedDisplay) -> np.ndarray:
+    """Capture one selected physical display."""
+
+    return capture_screen_bounds(display.bounds)
+
+
+def capture_virtual_screen() -> np.ndarray:
+    """Capture all connected displays as a BGR image held only in memory."""
+
+    if os.name != "nt":
+        raise ScreenCaptureError("Screen scanning currently supports Windows only.")
+    user32 = ctypes.windll.user32
+    _enable_dpi_awareness(user32)
+    return capture_screen_bounds(virtual_screen_bounds(user32.GetSystemMetrics))

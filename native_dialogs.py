@@ -127,28 +127,6 @@ def confirm_phone_url(
     )
 
 
-def confirm_phone_pairing(
-    phone_label: str,
-    *,
-    relay_origin: str,
-) -> bool:
-    """Ask before granting a mobile browser permission to send URLs."""
-
-    message = (
-        f"Pair with {phone_label}?\n\n"
-        "This phone will be able to send links to this PC. "
-        "Only continue if you just scanned the QR code."
-    )
-    return (
-        show_dialog(
-            "QR Scanner - Pair Phone",
-            message,
-            MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,
-        )
-        == IDYES
-    )
-
-
 def confirm_remove_phone_access(
     phone_label: str,
     short_pair_id: str,

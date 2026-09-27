@@ -57,7 +57,7 @@ export function PairingView({
   const beginPairing = async () => {
     if (!preview.ok || state === "waiting" || !pairStoreReady) return;
     setState("waiting");
-    setMessage("Approve this phone on your PC while the pairing code is still visible.");
+    setMessage("Connecting securely to your PC…");
     try {
       const credentials = await pairWithPc(pairingUri, phoneLabel.trim());
       if (existingPair && existingPair.pairId !== credentials.pairId) {
@@ -151,7 +151,7 @@ export function PairingView({
         </p>
         {replaceExisting && existingPair && (
           <p className="pairing-status pairing-status-error">
-            Replacing {existingPair.pcLabel} requires a new approval on the PC.
+            Replacing {existingPair.pcLabel} creates a new secure pairing.
           </p>
         )}
       </div>
@@ -172,7 +172,7 @@ export function PairingView({
             disabled={state === "waiting" || !phoneLabel.trim()}
             onClick={beginPairing}
           >
-            {state === "waiting" ? "Waiting for PC approval..." : "Pair this phone"}
+            {state === "waiting" ? "Connecting..." : "Pair this phone"}
           </button>
         )}
         {state !== "paired" && (

@@ -16,7 +16,8 @@ varsayılan tarayıcıda açılır ve QR Scanner otomatik olarak kapanır.
 
 > **Geliştirme durumu:** Güncel kararlı GitHub sürümü `v0.1.1`'dir. Mevcut dal
 > kararlı sürüm değil, `v0.2.0-beta.1` Telefon-PC adayıdır. İki dakikalık tek
-> kullanımlık eşleştirme, varsayılan **No** PC onayı, Windows DPAPI koruması,
+> kullanımlık ve masaüstünde gösterilen QR'ın okutulmasıyla başlatılan
+> eşleştirme, Windows DPAPI koruması,
 > eşleşmiş telefon yönetimi ve URL'yi WebCrypto ile uçtan uca şifreleyen,
 > kurulum gerektirmeyen tarayıcı PWA'sı hazırdır. Vercel API, Supabase Postgres
 > şeması, özel Realtime bildirim yolu, beş saniyelik kurtarma sorgusu ve 60
@@ -30,7 +31,7 @@ varsayılan tarayıcıda açılır ve QR Scanner otomatik olarak kapanır.
 
 - Modern turkuaz arayüzle canlı kamera görüntüsü
 - Aynı zamanda gerçek QR analiz alanı olan görünür tarama çerçevesi
-- Tüm bağlı ekranlarda sürükleyerek alan seçilen tek seferlik `Scan Screen`
+- Çoklu monitör seçimi ardından sürükleyerek alan seçilen tek seferlik ekran taraması
 - Ekran taramalarında hedef alan adını gösteren bağlantı onayı
 - Seçilen alanda QR yoksa veya birden fazlaysa açık hata bildirimi
 - Tek veya birden fazla QR kod algılama
@@ -70,14 +71,16 @@ QR kodu ekranda görünür bırakın ve `Scan Screen.vbs` dosyasına çift tıkl
 > bir tarayıcı sekmesindeki QR kod okunamaz. Uygulama arka plandaki pencere
 > içeriğini değil, ekranda o anda görünen görüntüyü tarar.
 
-1. Uygulama bağlı ekranların tamamını bir kez yakalayıp donmuş önizleme açar.
-2. Tek bir QR kodun çevresini fareyle sürükleyerek seçin. Görüntü yalnızca
+1. Birden fazla monitör varsa QR'ın bulunduğu ekranı seçin. Tek monitörde bu
+   soru gösterilmez.
+2. Uygulama yalnız seçilen ekranı bir kez yakalayıp donmuş önizleme açar.
+3. Tek bir QR kodun çevresini fareyle sürükleyerek seçin. Görüntü yalnızca
    bellekte tutulur ve hiçbir zaman kaydedilmez.
-3. Yalnız seçilen alan taranır. Alanda QR yoksa veya birden fazla farklı QR
+4. Yalnız seçilen alan taranır. Alanda QR yoksa veya birden fazla farklı QR
    varsa hata gösterilir ve hiçbir bağlantı açılmaz.
-4. QR geçerli bir HTTP/HTTPS bağlantısı içeriyorsa onay penceresinde hedef alan
+5. QR geçerli bir HTTP/HTTPS bağlantısı içeriyorsa onay penceresinde hedef alan
    adı ve tam adres gösterilir.
-5. Açmak için **Yes**, vazgeçmek için **No** seçin. Ekran sürekli izlenmez.
+6. Açmak için **Yes**, vazgeçmek için **No** seçin. Ekran sürekli izlenmez.
 
 Tek dosyalı paket, içindeki dosyaları hazırladığı için ilk açılış birkaç saniye
 daha uzun sürebilir. İnternetten indirilen imzasız EXE'ler için Windows
@@ -115,8 +118,9 @@ eski açık HTTPS betasını kullanır; yerel ve self-hosted geliştirme relay'l
 `WQRS_RELAY_ORIGIN` ortam değişkeniyle kullanılmaya devam edebilir. Açık
 eşleştirme QR'ı, telefonun normal kamerasının açabildiği bir HTTPS bağlantısıdır.
 Tek kullanımlık eşleştirme verisi `#` sonrasında kalır, HTTP isteğiyle sunucuya
-gitmez ve PWA tarafından alındığı anda adres çubuğundan temizlenir. PWA PC
-onayını ister, kök anahtarı IndexedDB'de dışa aktarılamayan CryptoKey olarak
+gitmez ve PWA tarafından alındığı anda adres çubuğundan temizlenir. Bu kısa
+ömürlü, tek kullanımlık QR'ın gönderilmesi ikinci bir masaüstü sorusu olmadan
+eşleştirmeyi tamamlar. PWA kök anahtarı IndexedDB'de dışa aktarılamayan CryptoKey olarak
 tutar ve **Send to PC** seçeneğini açar. Tarayıcı zaten eşleştirilmişse sessizce
 ikinci yerel kayıt oluşturmak yerine **Continue** veya açık **Replace pairing**
 seçimi sunulur. PC URL'yi doğrular ve çözer, şifreli teslim alındısı gönderir;
@@ -125,10 +129,10 @@ iPhone'dan Windows'a bir tam şifreli aktarım elle doğrulanmıştır.
 Vercel/Supabase adayı için önizleme dağıtımı, iPhone ve Android geçiş testleri
 ile bağımsız güvenlik incelemesi tamamlanmadan v0.2 kararlı sayılmayacaktır.
 
-Eşleştirme bağlantısının açılması yalnızca masaüstünün QR penceresini
-kapatabilmesi için kısa ömürlü bir yaşam döngüsü sinyali gönderir; telefonu
-onaylamaz. Gelen URL, eşleştirme ve tam çıkış soruları sıraya alınır ve geçici
-bir uygulama penceresinin güvenlik kararını örtememesi için öne getirilir.
+Eşleştirme bağlantısının açılması, masaüstünün QR penceresini kapatabilmesi için
+kısa ömürlü bir yaşam döngüsü sinyali gönderir. Tek kullanımlık eşleştirme
+isteğinin gönderilmesi eşleşmeyi otomatik tamamlar; gelen URL'ler PC'de açık
+onay istemeye devam eder.
 
 **Scan Screen**, QR çözümlemesinden önce yalnızca bellekte tutulan donmuş ekran
 önizlemesini gösterir. Tek bir QR'ın çevresini sürükleyip bıraktığınızda yalnız
@@ -201,7 +205,7 @@ Kullanışlı seçenekler:
 # Geliştirici FPS göstergesini aç
 .\.venv\Scripts\python.exe launcher.py --show-fps
 
-# Bağlı ekranların tamamını bir kez tara
+# QR'ın bulunduğu ekranı seçip alanı bir kez tara
 .\.venv\Scripts\python.exe launcher.py --screen
 ```
 
@@ -239,8 +243,9 @@ açılmaz.
 
 ### Etkileşimli tepsi eşleştirmesi
 
-Bu test gerçek tepsi işlemini, görünür QR'ı, varsayılan ret seçili PC onayını ve
-Windows DPAPI deposunu çalıştırır. Üç PowerShell penceresi kullanın:
+Bu test gerçek tepsi işlemini, görünür tek kullanımlık QR'ı, QR gönderildikten
+sonra otomatik tamamlamayı ve Windows DPAPI deposunu çalıştırır. Üç PowerShell
+penceresi kullanın:
 
 ```powershell
 # Terminal 1 — yerel geliştirme relay'i
@@ -255,11 +260,11 @@ Windows DPAPI deposunu çalıştırır. Üç PowerShell penceresi kullanın:
 
 Sahte telefon görünür masaüstünü bir kez yakalar, tam olarak bir tane
 `wqrs://pair` QR ister ve ekran görüntüsünü yalnızca bellekte tutar. Eşleştirme
-URI'sini veya herhangi bir gizli değeri panoya ya da terminale yazmaz. PC'de
-onay verildiğinde relay kaydı ve türetilen eşleşme anahtarı
+URI'sini veya herhangi bir gizli değeri panoya ya da terminale yazmaz. QR
+gönderildiğinde relay kaydı ve türetilen eşleşme anahtarı
 `%LOCALAPPDATA%\Webcam QR Scanner\phone-to-pc.dat` içine yazılır; dosyanın tamamı
-mevcut Windows kullanıcısı için DPAPI ile korunur. Ret halinde gönderici kimlik
-bilgisi oluşturulmaz. Bellekiçi yerel relay yeniden başlatılırsa rotaları
+mevcut Windows kullanıcısı için DPAPI ile korunur. Bellekiçi yerel relay yeniden
+başlatılırsa rotaları
 geçersiz olur; sonraki eşleştirme yerel cihazı yeniden kaydeder ve eski yerel
 eşleşmeleri kaldırır.
 
@@ -328,8 +333,9 @@ istemez; analiz veya telemetri toplamaz. Geçerli bir URL açıldıktan sonra he
 site varsayılan tarayıcı tarafından işlenir ve tarayıcının gizlilik ayarlarına
 tabidir.
 
-Ekran taraması kullanıcı tarafından açıkça başlatılır ve sanal masaüstünü
-yalnızca bir kez yakalar. Yakalanan pikseller yerel olarak bellekte işlenir,
+Ekran taraması kullanıcı tarafından açıkça başlatılır. Çoklu monitörde önce
+ekran seçilir ve yalnız seçilen ekran bir kez yakalanır. Yakalanan pikseller
+yerel olarak bellekte işlenir,
 diske yazılmaz. Ekrandaki bir QR bağlantısı onay alınmadan açılmaz. Farklı
 içerikler algılanırsa uygulama otomatik karar vermek yerine kullanıcının görünür
 QR sınırına tıklamasını ister. Fare yakınlığı yalnızca vurguyu değiştirir ve
@@ -352,9 +358,9 @@ başlığı, token, anahtar, QR görüntüsü veya ciphertext gövdesi bulunmama
 
 Eşleştirme QR'ı bellekte üretilir, iki dakika sonra geçersiz olur ve yalnızca bir
 kez kullanılabilir. Pencere kapatılırsa tamamlanmamış relay oturumu anında
-geçersizleştirilir. PC onayı telefon etiketini ve relay'i gösterir, varsayılan
-olarak **No** seçilidir ve ret halinde gönderici kimlik bilgisi oluşturulmaz.
-Onaylanan relay ve eşleşme kimlik bilgileri yalnızca mevcut kullanıcıya bağlı
+geçersizleştirilir. Kısa ömürlü masaüstü QR'ının okutulup gönderilmesi açık
+eşleştirme yetkisidir; gereksiz ikinci bir masaüstü onayı gösterilmez. Relay ve
+eşleşme kimlik bilgileri yalnızca mevcut kullanıcıya bağlı
 Windows DPAPI korumalı dosyada saklanır; uygulamanın düz metin geri dönüşü
 yoktur. Açık relay origin'leri HTTPS kullanmak zorundadır; loopback dışındaki
 düz HTTP adresleri reddedilir. Telefon erişimi kaldırılırken önce relay rotası
@@ -384,7 +390,7 @@ alan adını kontrol edin.
 
 ### v0.2.0-beta.1 — Kurulum gerektirmeyen PWA ile Telefon-PC köprüsü
 
-v0.2 beta adayı kısa süre geçerli QR kod ve bilgisayarda tek seferlik onay ile
+v0.2 beta adayı bilgisayarın açıkça gösterdiği kısa süre geçerli QR kod ile
 hesapsız eşleştirme sunuyor. Kullanıcı telefona native uygulama kurmadan mobil
 PWA'yı HTTPS üzerinden açabilir. Tarayıcı teknik olarak ana ekrana ekleme
 sunabilir ancak arayüz kurulumu teşvik etmez. PWA QR'ı cihazda çözüp **Open link
@@ -407,7 +413,8 @@ Ayrıntılı mimari, eşleştirme protokolü, tehdit modeli ve kabul ölçütler
 - [x] Tek ekran QR'ı için açık sürükle-seç alanı
 - [x] Localhost relay ve sahte telefonla ilk şifreli uçtan uca aktarım
 - [x] İki dakikalık, tek kullanımlık ve şifreli onay/ret içeren pairing HTTP akışı
-- [x] Eşleştirme QR'ını ve varsayılan ret seçili onayı tepsi denetleyicisinden gösterme
+- [x] Kısa ömürlü, tek kullanımlık masaüstü QR'ını açık eşleştirme eylemi olarak kullanma
+- [x] Çoklu monitörde görüntü alınacak ekranı kullanıcıya seçtirme
 - [x] Onaylanan masaüstü relay ve eşleşme kimlik bilgilerini Windows DPAPI ile koruma
 - [x] Mobil uyumlu, kurulum gerektirmeyen tarayıcı arayüzü, isteğe bağlı PWA
   metadatası, ikonlar ve yalnızca statik dosyaları önbellekleyen service worker
