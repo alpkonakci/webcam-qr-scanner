@@ -17,7 +17,7 @@ class PairingLinkTests(unittest.TestCase):
     ) -> None:
         self.assertEqual(
             PUBLIC_SERVICE_ORIGIN,
-            "https://project-e17uk.vercel.app",
+            "https://qrwebcam.vercel.app",
         )
 
     def setUp(self) -> None:

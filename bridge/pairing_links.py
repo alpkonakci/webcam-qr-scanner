@@ -12,7 +12,7 @@ from bridge.protocol import (
 )
 
 
-PUBLIC_SERVICE_ORIGIN = "https://project-e17uk.vercel.app"
+PUBLIC_SERVICE_ORIGIN = "https://qrwebcam.vercel.app"
 PAIRING_URI_PREFIX = "wqrs://pair?"
 COMPACT_FRAGMENT_PREFIX = "p1."
 COMPACT_PAYLOAD_BYTES = 138
