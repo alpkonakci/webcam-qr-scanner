@@ -27,7 +27,9 @@ The current PWA milestone includes:
   fragment and is cleared from the address bar after local consumption;
 - existing-pair detection with an explicit replacement choice;
 - short-lived browser-open and phone-cancel signals plus automatic completion
-  after the user submits the desktop's single-use pairing QR;
+  after the phone opens the desktop's single-use pairing QR;
+- saved-pair reuse for the same browser and PC without creating another local
+  pairing or asking for confirmation again;
 - non-extractable root-key persistence in IndexedDB;
 - end-to-end encrypted **Send to PC** with an authenticated delivery receipt;
 - automatic camera cleanup when the scanner closes or the page is hidden;

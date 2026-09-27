@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { defaultPhoneLabel, removePair } from "../lib/pair-store";
 import {
   cancelPairingFromPhone,
@@ -26,14 +26,20 @@ export function PairingView({
   onPaired,
   onCancel,
 }: PairingViewProps) {
-  const [phoneLabel, setPhoneLabel] = useState(defaultPhoneLabel);
+  const [phoneLabel] = useState(defaultPhoneLabel);
   const [state, setState] = useState<PairingState>("ready");
   const [message, setMessage] = useState("");
   const [replaceExisting, setReplaceExisting] = useState(false);
+  const automaticPairingStarted = useRef(false);
   const preview = useMemo(() => {
     try {
       const qr = parsePairingUri(pairingUri);
-      return { ok: true as const, hostname: new URL(qr.relayOrigin).hostname };
+      return {
+        ok: true as const,
+        hostname: new URL(qr.relayOrigin).hostname,
+        relayOrigin: qr.relayOrigin,
+        deviceId: qr.deviceId,
+      };
     } catch (error) {
       return {
         ok: false as const,
@@ -54,7 +60,7 @@ export function PairingView({
     onCancel();
   };
 
-  const beginPairing = async () => {
+  const beginPairing = useCallback(async () => {
     if (!preview.ok || state === "waiting" || !pairStoreReady) return;
     setState("waiting");
     setMessage("Connecting securely to your PC…");
@@ -70,7 +76,46 @@ export function PairingView({
       setState("error");
       setMessage(error instanceof Error ? error.message : "Pairing stopped safely.");
     }
-  };
+  }, [existingPair, onPaired, pairStoreReady, pairingUri, phoneLabel, preview.ok, state]);
+
+  const samePcAlreadyPaired = Boolean(
+    preview.ok &&
+    existingPair?.deviceId === preview.deviceId &&
+    existingPair.relayOrigin === preview.relayOrigin,
+  );
+
+  useEffect(() => {
+    if (
+      !preview.ok ||
+      !pairStoreReady ||
+      automaticPairingStarted.current ||
+      state !== "ready"
+    ) {
+      return;
+    }
+
+    if (samePcAlreadyPaired) {
+      automaticPairingStarted.current = true;
+      void cancelPairingFromPhone(pairingUri)
+        .catch(() => undefined)
+        .finally(onCancel);
+      return;
+    }
+
+    if (existingPair && !replaceExisting) return;
+    automaticPairingStarted.current = true;
+    queueMicrotask(() => void beginPairing());
+  }, [
+    beginPairing,
+    existingPair,
+    onCancel,
+    pairStoreReady,
+    pairingUri,
+    preview.ok,
+    replaceExisting,
+    samePcAlreadyPaired,
+    state,
+  ]);
 
   if (!preview.ok) {
     return (
@@ -92,6 +137,16 @@ export function PairingView({
         <div className="result-pill pairing-pill">Checking pairing</div>
         <h1>Preparing secure storage.</h1>
         <p className="pairing-status">Checking this browser for an existing PC pairing…</p>
+      </section>
+    );
+  }
+
+  if (samePcAlreadyPaired) {
+    return (
+      <section className="result-section pairing-section" aria-live="polite">
+        <div className="result-pill result-pill-success">Already paired</div>
+        <h1>Using your saved connection.</h1>
+        <p className="pairing-status">Returning to QR Scanner…</p>
       </section>
     );
   }
@@ -131,23 +186,20 @@ export function PairingView({
       <div className={`result-pill ${state === "paired" ? "result-pill-success" : "pairing-pill"}`}>
         {state === "paired" ? "Pairing complete" : "PC pairing code"}
       </div>
-      <h1>{state === "paired" ? "Connected." : "Pair this phone?"}</h1>
+      <h1>
+        {state === "paired"
+          ? "Connected."
+          : state === "error"
+            ? "Pairing stopped."
+            : "Connecting your phone."}
+      </h1>
 
       <div className="result-card pairing-card">
-        <p className="result-label">RELAY</p>
+        <p className="result-label">SECURE CONNECTION</p>
         <p className="result-hostname">{preview.hostname}</p>
-        <label className="pairing-label" htmlFor="phone-label">PHONE NAME</label>
-        <input
-          id="phone-label"
-          className="pairing-input"
-          value={phoneLabel}
-          maxLength={80}
-          disabled={state === "waiting" || state === "paired"}
-          onChange={(event) => setPhoneLabel(event.target.value)}
-          autoComplete="off"
-        />
         <p className="result-note">
-          The relay sees encrypted data only. Your PC still asks before opening every link.
+          {phoneLabel} will use this encrypted connection. Your PC still asks
+          before opening every link.
         </p>
         {replaceExisting && existingPair && (
           <p className="pairing-status pairing-status-error">
@@ -165,16 +217,18 @@ export function PairingView({
       <div className="result-actions">
         {state === "paired" ? (
           <button type="button" className="result-primary" onClick={onCancel}>Continue</button>
-        ) : (
+        ) : state === "error" ? (
           <button
             type="button"
             className="result-primary"
-            disabled={state === "waiting" || !phoneLabel.trim()}
-            onClick={beginPairing}
+            onClick={() => {
+              automaticPairingStarted.current = true;
+              void beginPairing();
+            }}
           >
-            {state === "waiting" ? "Connecting..." : "Pair this phone"}
+            Try again
           </button>
-        )}
+        ) : null}
         {state !== "paired" && (
           <button type="button" className="result-text-button" disabled={state === "waiting"} onClick={cancelUnusedPairing}>
             Cancel

@@ -122,7 +122,8 @@ The public pairing QR is an HTTPS launch link that the phone's normal camera
 can open. Its single-use pairing material stays after `#`, is never sent in the
 HTTP request, and is removed from the address bar as soon as the PWA consumes
 it. Submitting that short-lived, single-use QR completes pairing without a
-second desktop question. The PWA stores a non-extractable root key in IndexedDB,
+second phone or desktop question. The PWA starts this step automatically and
+stores a non-extractable root key in IndexedDB,
 and enables **Send to PC**. If the browser is already paired, it offers
 **Continue** or an explicit **Replace pairing** action instead of silently
 creating another local credential. The PC authenticates and decrypts the URL,

@@ -119,8 +119,9 @@ eski açık HTTPS betasını kullanır; yerel ve self-hosted geliştirme relay'l
 eşleştirme QR'ı, telefonun normal kamerasının açabildiği bir HTTPS bağlantısıdır.
 Tek kullanımlık eşleştirme verisi `#` sonrasında kalır, HTTP isteğiyle sunucuya
 gitmez ve PWA tarafından alındığı anda adres çubuğundan temizlenir. Bu kısa
-ömürlü, tek kullanımlık QR'ın gönderilmesi ikinci bir masaüstü sorusu olmadan
-eşleştirmeyi tamamlar. PWA kök anahtarı IndexedDB'de dışa aktarılamayan CryptoKey olarak
+ömürlü, tek kullanımlık QR'ın gönderilmesi ikinci bir telefon veya masaüstü
+sorusu olmadan eşleştirmeyi otomatik tamamlar. PWA kök anahtarı IndexedDB'de
+dışa aktarılamayan CryptoKey olarak
 tutar ve **Send to PC** seçeneğini açar. Tarayıcı zaten eşleştirilmişse sessizce
 ikinci yerel kayıt oluşturmak yerine **Continue** veya açık **Replace pairing**
 seçimi sunulur. PC URL'yi doğrular ve çözer, şifreli teslim alındısı gönderir;

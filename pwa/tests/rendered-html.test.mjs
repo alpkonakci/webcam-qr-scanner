@@ -112,3 +112,17 @@ test("opens decoded links without replacing the QR Scanner page", async () => {
   assert.match(home, /onPairRevoked=\{clearRevokedPair\}/);
   assert.match(home, /current\?\.pairId === pairId \? null : current/);
 });
+
+test("uses the desktop QR as the only pairing confirmation", async () => {
+  const pairingView = await readFile(
+    new URL("app/PairingView.tsx", root),
+    "utf8",
+  );
+
+  assert.match(pairingView, /automaticPairingStarted/);
+  assert.match(pairingView, /void beginPairing\(\)/);
+  assert.match(pairingView, /samePcAlreadyPaired/);
+  assert.match(pairingView, /Using your saved connection\./);
+  assert.doesNotMatch(pairingView, /Pair this phone\?/);
+  assert.doesNotMatch(pairingView, /Waiting for PC approval/);
+});
