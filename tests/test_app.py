@@ -246,7 +246,7 @@ class AppHelpersTests(unittest.TestCase):
                 False,
             ),
         )
-        chosen_frame = np.zeros((80, 120, 3), dtype=np.uint8)
+        chosen_frame = np.full((80, 120, 3), 30, dtype=np.uint8)
         choose_display = Mock(return_value=displays[1])
         display_capture = Mock(return_value=chosen_frame)
         select_region = Mock(return_value=None)
@@ -272,7 +272,7 @@ class AppHelpersTests(unittest.TestCase):
         )
         choose_display = Mock()
         display_capture = Mock(
-            return_value=np.zeros((80, 120, 3), dtype=np.uint8)
+            return_value=np.full((80, 120, 3), 30, dtype=np.uint8)
         )
 
         status = run_screen_scan(
@@ -285,6 +285,29 @@ class AppHelpersTests(unittest.TestCase):
         self.assertIs(status, ScreenScanStatus.CANCELLED)
         choose_display.assert_not_called()
         display_capture.assert_called_once_with(display)
+
+    def test_blanked_fullscreen_capture_explains_how_to_retry(self) -> None:
+        display = ConnectedDisplay(
+            2,
+            "DISPLAY2",
+            ScreenBounds(1920, 0, 1280, 720),
+        )
+        notify = Mock(return_value=1)
+        select_region = Mock()
+
+        status = run_screen_scan(
+            display_provider=lambda: (display,),
+            display_capture=lambda _: np.zeros((720, 1280, 3), dtype=np.uint8),
+            notify=notify,
+            select_region=select_region,
+        )
+
+        self.assertIs(status, ScreenScanStatus.CAPTURE_UNAVAILABLE)
+        select_region.assert_not_called()
+        title, message, _ = notify.call_args.args
+        self.assertIn("Capture unavailable", title)
+        self.assertIn("borderless or windowed", message)
+        self.assertIn("protected video", message)
 
     def test_cancelling_display_question_captures_nothing(self) -> None:
         displays = (

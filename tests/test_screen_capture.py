@@ -1,4 +1,8 @@
 import unittest
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
+
+import numpy as np
 
 from screen_capture import (
     ConnectedDisplay,
@@ -8,6 +12,9 @@ from screen_capture import (
     SM_YVIRTUALSCREEN,
     ScreenCaptureError,
     ScreenBounds,
+    capture_display,
+    capture_display_dxgi,
+    is_probably_blanked_frame,
     number_connected_displays,
     virtual_screen_bounds,
 )
@@ -63,6 +70,69 @@ class ScreenBoundsTests(unittest.TestCase):
 
         with self.assertRaises(ScreenCaptureError):
             virtual_screen_bounds(metrics.__getitem__)
+
+    def test_dxgi_capture_maps_the_exact_windows_display_name(self) -> None:
+        frame = np.full((60, 80, 3), 127, dtype=np.uint8)
+        camera = Mock()
+        camera.grab.return_value = frame
+        dxcam_module = SimpleNamespace(
+            create=Mock(return_value=camera),
+            __factory=SimpleNamespace(
+                outputs=[
+                    [SimpleNamespace(devicename="\\\\.\\DISPLAY1")],
+                    [SimpleNamespace(devicename="\\\\.\\DISPLAY2")],
+                ]
+            ),
+        )
+        display = ConnectedDisplay(
+            2,
+            "\\\\.\\DISPLAY2",
+            ScreenBounds(1920, 0, 80, 60),
+        )
+
+        result = capture_display_dxgi(display, dxcam_module=dxcam_module)
+
+        np.testing.assert_array_equal(result, frame)
+        dxcam_module.create.assert_called_once_with(
+            device_idx=1,
+            output_idx=0,
+            output_color="BGR",
+            backend="dxgi",
+            processor_backend="cv2",
+        )
+        camera.grab.assert_called_once_with(new_frame_only=False)
+        camera.release.assert_called_once_with()
+
+    def test_selected_display_falls_back_to_gdi_when_dxgi_fails(self) -> None:
+        display = ConnectedDisplay(
+            2,
+            "\\\\.\\DISPLAY2",
+            ScreenBounds(1920, 0, 80, 60),
+        )
+        fallback = np.full((60, 80, 3), 42, dtype=np.uint8)
+
+        with (
+            patch(
+                "screen_capture.capture_display_dxgi",
+                side_effect=ScreenCaptureError("DXGI unavailable"),
+            ),
+            patch(
+                "screen_capture.capture_screen_bounds",
+                return_value=fallback,
+            ) as gdi_capture,
+        ):
+            result = capture_display(display)
+
+        np.testing.assert_array_equal(result, fallback)
+        gdi_capture.assert_called_once_with(display.bounds)
+
+    def test_recognizes_a_blanked_protected_surface(self) -> None:
+        self.assertTrue(
+            is_probably_blanked_frame(np.zeros((60, 80, 3), dtype=np.uint8))
+        )
+        self.assertFalse(
+            is_probably_blanked_frame(np.full((60, 80, 3), 30, dtype=np.uint8))
+        )
 
 
 if __name__ == "__main__":

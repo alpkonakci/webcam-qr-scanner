@@ -14,6 +14,8 @@ remain subject to their own licenses and are not relicensed under MIT.
 - **pystray 0.19.5** — GNU Lesser General Public License v3.0
 - **six 1.17.0** — MIT License
 - **cryptography 49.0.0** — Apache License 2.0 or BSD 3-Clause License
+- **comtypes 1.4.17** — MIT License
+- **DXcam 0.3.0** — MIT License; DXGI desktop capture
 - **cffi 2.1.0** — MIT No Attribution License
 - **HTTPX 0.28.1** — BSD 3-Clause License
 - **HTTPCore 1.0.9** — BSD 3-Clause License
@@ -36,6 +38,8 @@ THIRD_PARTY_LICENSES/
 |-- certifi/
 |-- cffi/
 |-- cryptography/
+|-- comtypes/
+|-- DXcam/
 |-- h11/
 |-- httpcore/
 |-- HTTPX/

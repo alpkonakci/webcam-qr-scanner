@@ -107,6 +107,8 @@ Copy-Item -LiteralPath `
     @("certifi-2026.7.22.dist-info", "certifi"),
     @("cffi-2.1.0.dist-info", "cffi"),
     @("cryptography-49.0.0.dist-info", "cryptography"),
+    @("comtypes-1.4.17.dist-info", "comtypes"),
+    @("dxcam-0.3.0.dist-info", "DXcam"),
     @("h11-0.16.0.dist-info", "h11"),
     @("httpcore-1.0.9.dist-info", "httpcore"),
     @("httpx-0.28.1.dist-info", "HTTPX"),

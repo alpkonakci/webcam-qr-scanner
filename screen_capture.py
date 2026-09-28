@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import ctypes
+import importlib
 import os
 import re
+import time
 from collections.abc import Callable
 from ctypes import wintypes
 from dataclasses import dataclass
@@ -349,9 +351,101 @@ def capture_screen_bounds(bounds: ScreenBounds) -> np.ndarray:
 
 
 def capture_display(display: ConnectedDisplay) -> np.ndarray:
-    """Capture one selected physical display."""
+    """Capture one selected physical display, preferring Windows DXGI."""
 
-    return capture_screen_bounds(display.bounds)
+    try:
+        return capture_display_dxgi(display)
+    except (ImportError, ScreenCaptureError, OSError, RuntimeError):
+        # GDI remains a useful fallback for remote sessions, older display
+        # drivers, and development environments where Desktop Duplication is
+        # unavailable.
+        return capture_screen_bounds(display.bounds)
+
+
+def _dxcam_output_indices(
+    dxcam_module: object,
+    device_name: str,
+) -> tuple[int, int]:
+    """Resolve a Windows display name to DXcam's adapter/output indices."""
+
+    factory = vars(dxcam_module).get("__factory")
+    outputs = getattr(factory, "outputs", ())
+    expected = device_name.casefold()
+    for device_index, device_outputs in enumerate(outputs):
+        for output_index, output in enumerate(device_outputs):
+            if str(getattr(output, "devicename", "")).casefold() == expected:
+                return device_index, output_index
+    raise ScreenCaptureError(
+        f"Windows display {device_name} was not available to the DXGI capturer."
+    )
+
+
+def capture_display_dxgi(
+    display: ConnectedDisplay,
+    *,
+    dxcam_module: object | None = None,
+) -> np.ndarray:
+    """Capture a display through Desktop Duplication as an in-memory BGR image."""
+
+    if os.name != "nt":
+        raise ScreenCaptureError("Screen scanning currently supports Windows only.")
+
+    dxcam_module = dxcam_module or importlib.import_module("dxcam")
+    device_index, output_index = _dxcam_output_indices(
+        dxcam_module,
+        display.device_name,
+    )
+    camera = None
+    try:
+        camera = dxcam_module.create(
+            device_idx=device_index,
+            output_idx=output_index,
+            output_color="BGR",
+            backend="dxgi",
+            processor_backend="cv2",
+        )
+        frame = None
+        for _ in range(3):
+            frame = camera.grab(new_frame_only=False)
+            if frame is not None:
+                break
+            time.sleep(0.03)
+        if frame is None:
+            raise ScreenCaptureError("DXGI did not return a desktop image.")
+
+        image = np.asarray(frame)
+        expected_shape = (
+            display.bounds.height,
+            display.bounds.width,
+            3,
+        )
+        if image.shape != expected_shape or image.dtype != np.uint8:
+            raise ScreenCaptureError("DXGI returned an invalid desktop image.")
+        return np.ascontiguousarray(image)
+    except ScreenCaptureError:
+        raise
+    except Exception as error:
+        raise ScreenCaptureError("DXGI could not capture the selected display.") from error
+    finally:
+        if camera is not None:
+            try:
+                camera.release()
+            except Exception:
+                # Capture has already finished or failed. Cleanup must not
+                # replace the useful capture error with a driver-specific one.
+                pass
+
+
+def is_probably_blanked_frame(frame: np.ndarray) -> bool:
+    """Detect the near-uniform black frame returned for protected surfaces."""
+
+    if frame.ndim != 3 or frame.shape[2] < 3 or frame.size == 0:
+        return False
+    pixels = frame[:, :, :3]
+    black_ratio = float(np.count_nonzero(np.all(pixels <= 6, axis=2))) / (
+        pixels.shape[0] * pixels.shape[1]
+    )
+    return black_ratio >= 0.995 and float(pixels.std()) <= 3.0
 
 
 def capture_virtual_screen() -> np.ndarray:

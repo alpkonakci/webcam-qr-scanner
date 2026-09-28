@@ -29,6 +29,7 @@ from screen_capture import (
     ScreenCaptureError,
     capture_display,
     connected_displays,
+    is_probably_blanked_frame,
 )
 from screen_selector import select_screen_region
 from scan_geometry import scale_result, scan_region
@@ -52,6 +53,7 @@ class ScreenScanStatus(Enum):
     CANCELLED = auto()
     OPENED = auto()
     OPEN_FAILED = auto()
+    CAPTURE_UNAVAILABLE = auto()
 
 
 class CameraCloseReason(Enum):
@@ -137,6 +139,18 @@ def run_screen_scan(
         if chosen_display is None:
             return ScreenScanStatus.CANCELLED
         screen = (display_capture or capture_display)(chosen_display)
+        if is_probably_blanked_frame(screen):
+            notify(
+                "Scan Screen - Capture unavailable",
+                (
+                    f"Screen {chosen_display.number} returned a black image.\n\n"
+                    "Switch the full-screen app to borderless or windowed mode "
+                    "and try again. Windows does not allow protected video to "
+                    "be captured."
+                ),
+                0x30,
+            )
+            return ScreenScanStatus.CAPTURE_UNAVAILABLE
 
     print("Capture ready; select the screen area containing one QR code.")
     selected_region = select_region(screen)

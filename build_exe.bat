@@ -26,6 +26,7 @@ echo Building terminal-free QR-Scanner.exe for v0.2.0-beta.1...
     --hidden-import bridge.pairing_controller ^
     --hidden-import bridge.realtime ^
     --hidden-import pystray._win32 ^
+    --collect-all dxcam ^
     --name QR-Scanner ^
     launcher.py
 

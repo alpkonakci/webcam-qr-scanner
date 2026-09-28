@@ -82,6 +82,12 @@ QR kodu ekranda görünür bırakın ve `Scan Screen.vbs` dosyasına çift tıkl
    adı ve tam adres gösterilir.
 6. Açmak için **Yes**, vazgeçmek için **No** seçin. Ekran sürekli izlenmez.
 
+Ekran yakalamada önce Windows Desktop Duplication kullanılır; bu yöntem ikinci
+monitördeki çoğu tam ekran ve donanım hızlandırmalı uygulamayı da destekler.
+Windows korumalı bir yüzeyi siyah döndürürse QR Scanner siyah seçim ekranı
+açmak yerine kısa bir açıklama gösterir. Uygulamayı kenarlıksız veya pencereli
+kipe geçirip yeniden deneyin. DRM korumalı video Windows tarafından yakalanamaz.
+
 Tek dosyalı paket, içindeki dosyaları hazırladığı için ilk açılış birkaç saniye
 daha uzun sürebilir. İnternetten indirilen imzasız EXE'ler için Windows
 SmartScreen uyarı gösterebilir.

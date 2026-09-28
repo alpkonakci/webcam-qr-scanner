@@ -84,6 +84,12 @@ Keep the QR code visible and double-click `Scan Screen.vbs`.
 6. Select **Yes** to open it or **No** to cancel. The screen is not monitored
    continuously.
 
+Screen capture uses Windows Desktop Duplication first, which also supports most
+full-screen, hardware-accelerated applications on a second monitor. If Windows
+returns a black protected surface, QR Scanner explains the limitation instead
+of opening a black selector. Switch the application to borderless or windowed
+mode and retry. DRM-protected video cannot be captured by Windows.
+
 The first launch can take a few seconds longer because the single-file package
 needs to prepare its bundled files. Windows SmartScreen may warn about unsigned
 executables downloaded from the internet.
