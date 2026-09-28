@@ -121,23 +121,24 @@ one `QR-Scanner.exe`, but the executable starts separate internal modes:
 If at least one approved phone is stored, the controller keeps a lightweight
 outbound Phone-to-PC receiver alive while the camera stays off. It never opens
 an inbound port. Choosing **Pair Phone...** explicitly contacts the configured
-relay and displays a two-minute pairing QR. Until cutover succeeds, this branch
-defaults to the legacy public HTTPS beta; local and self-hosted development relays remain
-available through the `WQRS_RELAY_ORIGIN` environment variable.
+relay and displays a two-minute pairing QR. The controller defaults to the
+stable `https://qrwebcam.vercel.app` production service. Local and self-hosted
+development relays remain available through the `WQRS_RELAY_ORIGIN`
+environment variable.
 The public pairing QR is an HTTPS launch link that the phone's normal camera
 can open. Its single-use pairing material stays after `#`, is never sent in the
 HTTP request, and is removed from the address bar as soon as the PWA consumes
-it. Submitting that short-lived, single-use QR completes pairing without a
-second phone or desktop question. The PWA starts this step automatically and
-stores a non-extractable root key in IndexedDB,
+it. If an Android manufacturer's camera does not recognize the dense pairing
+QR, scan it with Google Lens instead. Submitting that short-lived, single-use
+QR completes pairing without a second phone or desktop question. The PWA
+starts this step automatically, stores a non-extractable root key in IndexedDB,
 and enables **Send to PC**. If the browser is already paired, it offers
 **Continue** or an explicit **Replace pairing** action instead of silently
 creating another local credential. The PC authenticates and decrypts the URL,
 sends an encrypted delivery receipt, and still asks the user before opening the
-address. The legacy public beta completed one iPhone-to-Windows encrypted
-transfer. The Vercel/Supabase candidate still requires preview deployment,
-iPhone and Android cutover tests, and an independent security review before
-v0.2 can be considered stable.
+address. The Vercel/Supabase production candidate completed manual encrypted
+transfer tests on iPhone Safari and Android Chrome. An independent security
+review is still required before v0.2 can be considered stable.
 
 Opening the pairing link sends a short-lived lifecycle signal so the desktop
 can dismiss the QR window. Submitting its one-time pairing request completes

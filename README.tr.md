@@ -119,22 +119,25 @@ Mevcut kaynak kod ve yerel olarak oluşturulan `v0.2.0-beta.1` paketi yine tek b
 En az bir onaylı telefon kayıtlıysa denetleyici, kamera kapalı kalırken hafif
 bir dışa doğru Telefon-PC alıcısı çalıştırır; bilgisayarda dışarıya açık port
 oluşturmaz. **Pair Phone...** yapılandırılmış relay'e bağlanır ve iki dakikalık
-eşleştirme QR'ını gösterir. Geçiş doğrulanana kadar bu dal varsayılan olarak
-eski açık HTTPS betasını kullanır; yerel ve self-hosted geliştirme relay'leri
-`WQRS_RELAY_ORIGIN` ortam değişkeniyle kullanılmaya devam edebilir. Açık
+eşleştirme QR'ını gösterir. Denetleyici varsayılan olarak kararlı
+`https://qrwebcam.vercel.app` production hizmetini kullanır. Yerel ve
+self-hosted geliştirme relay'leri `WQRS_RELAY_ORIGIN` ortam değişkeniyle
+kullanılmaya devam edebilir. Açık
 eşleştirme QR'ı, telefonun normal kamerasının açabildiği bir HTTPS bağlantısıdır.
 Tek kullanımlık eşleştirme verisi `#` sonrasında kalır, HTTP isteğiyle sunucuya
-gitmez ve PWA tarafından alındığı anda adres çubuğundan temizlenir. Bu kısa
+gitmez ve PWA tarafından alındığı anda adres çubuğundan temizlenir. Android
+üreticisinin kamera uygulaması yoğun eşleştirme QR'ını algılamazsa kod Google
+Lens ile okutulabilir. Bu kısa
 ömürlü, tek kullanımlık QR'ın gönderilmesi ikinci bir telefon veya masaüstü
 sorusu olmadan eşleştirmeyi otomatik tamamlar. PWA kök anahtarı IndexedDB'de
 dışa aktarılamayan CryptoKey olarak
 tutar ve **Send to PC** seçeneğini açar. Tarayıcı zaten eşleştirilmişse sessizce
 ikinci yerel kayıt oluşturmak yerine **Continue** veya açık **Replace pairing**
 seçimi sunulur. PC URL'yi doğrular ve çözer, şifreli teslim alındısı gönderir;
-adresi açmadan önce yine kullanıcıdan onay ister. Eski açık beta ile
-iPhone'dan Windows'a bir tam şifreli aktarım elle doğrulanmıştır.
-Vercel/Supabase adayı için önizleme dağıtımı, iPhone ve Android geçiş testleri
-ile bağımsız güvenlik incelemesi tamamlanmadan v0.2 kararlı sayılmayacaktır.
+adresi açmadan önce yine kullanıcıdan onay ister. Vercel/Supabase production
+adayıyla iPhone Safari ve Android Chrome üzerinde şifreli aktarım akışları elle
+doğrulanmıştır. Bağımsız güvenlik incelemesi tamamlanmadan v0.2 kararlı
+sayılmayacaktır.
 
 Eşleştirme bağlantısının açılması, masaüstünün QR penceresini kapatabilmesi için
 kısa ömürlü bir yaşam döngüsü sinyali gönderir. Tek kullanımlık eşleştirme

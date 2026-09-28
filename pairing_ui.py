@@ -119,7 +119,7 @@ def build_pairing_canvas(
     )
     draw.text(
         (28, 58),
-        "Scan this code with your phone camera.",
+        "Scan with your camera or Google Lens.",
         font=body_font,
         fill=SECONDARY_TEXT,
     )
