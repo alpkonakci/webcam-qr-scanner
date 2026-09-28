@@ -131,6 +131,34 @@ export function pairingUriFromLaunchFragment(
   return `wqrs://pair?${parameters.toString()}`;
 }
 
+export function pairingUriFromScannedValue(
+  value: string,
+  launchOrigin: string,
+): string | null {
+  if (isPairingUri(value)) return value;
+
+  let scannedUrl: URL;
+  let trustedOrigin: string;
+  try {
+    scannedUrl = new URL(value);
+    trustedOrigin = normalizeRelayOrigin(launchOrigin);
+  } catch {
+    return null;
+  }
+
+  if (
+    scannedUrl.origin !== trustedOrigin ||
+    scannedUrl.pathname !== "/" ||
+    scannedUrl.search !== "" ||
+    scannedUrl.username !== "" ||
+    scannedUrl.password !== ""
+  ) {
+    return null;
+  }
+
+  return pairingUriFromLaunchFragment(scannedUrl.hash, trustedOrigin);
+}
+
 export function parsePairingUri(value: string, now = unixTime()): PairingQrData {
   if (!value || value !== value.trim()) fail("Pairing code is malformed.");
   let parsed: URL;

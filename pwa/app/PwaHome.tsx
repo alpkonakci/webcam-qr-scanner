@@ -6,8 +6,8 @@ import { parseWebUrl } from "../lib/url-policy.mjs";
 import type { WebUrlResult } from "../lib/url-policy.mjs";
 import { getMostRecentPair } from "../lib/pair-store";
 import {
-  isPairingUri,
   pairingUriFromLaunchFragment,
+  pairingUriFromScannedValue,
   type SenderCredentials,
 } from "../lib/wqrs";
 import { PairingView } from "./PairingView";
@@ -69,8 +69,12 @@ export function PwaHome() {
 
   const handleDecoded = useCallback((value: string) => {
     setScannerOpen(false);
-    if (isPairingUri(value)) {
-      setPairingUri(value);
+    const scannedPairingUri = pairingUriFromScannedValue(
+      value,
+      window.location.origin,
+    );
+    if (scannedPairingUri) {
+      setPairingUri(scannedPairingUri);
       return;
     }
     setPairingUri(null);

@@ -8,6 +8,7 @@ import {
   decodeBase64Url,
   encodeBase64Url,
   pairingUriFromLaunchFragment,
+  pairingUriFromScannedValue,
   parsePairingUri,
   verifyDeliveryAck,
   type SenderCredentials,
@@ -91,6 +92,34 @@ test("HTTPS launch fragments expose only the embedded WQRS value", () => {
     pairingUriFromLaunchFragment(
       vector.derived.pairing_uri,
       "https://relay.example",
+    ),
+    null,
+  );
+});
+
+test("the in-app scanner accepts only same-origin pairing launch URLs", () => {
+  const launchOrigin = "https://qrwebcam.vercel.app";
+  const launchUrl = `${launchOrigin}/#${vector.derived.pairing_uri}`;
+
+  assert.equal(
+    pairingUriFromScannedValue(launchUrl, launchOrigin),
+    vector.derived.pairing_uri,
+  );
+  assert.equal(
+    pairingUriFromScannedValue(vector.derived.pairing_uri, launchOrigin),
+    vector.derived.pairing_uri,
+  );
+  assert.equal(
+    pairingUriFromScannedValue(
+      `https://example.com/#${vector.derived.pairing_uri}`,
+      launchOrigin,
+    ),
+    null,
+  );
+  assert.equal(
+    pairingUriFromScannedValue(
+      `${launchOrigin}/unexpected#${vector.derived.pairing_uri}`,
+      launchOrigin,
     ),
     null,
   );
