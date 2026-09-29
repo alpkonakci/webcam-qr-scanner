@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   RelayClientError,
   abortableDelay,
+  checkStoredPair,
   isPairRevokedError,
   removePairIfRevoked,
   sendUrlToPc,
@@ -118,4 +119,43 @@ test("recognizes only the dedicated pair_revoked relay code", () => {
   assert.equal(isPairRevokedError(new RelayClientError("pair_revoked", "Pair revoked")), true);
   assert.equal(isPairRevokedError(new RelayClientError("unauthorized", "Unauthorized")), false);
   assert.equal(isPairRevokedError(new Error("Pair revoked")), false);
+});
+
+test("checks a saved pairing before reusing it and clears only invalid credentials", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  const credentials = {
+    relayOrigin: "https://relay.example",
+    pairId: vector.inputs.pair_id,
+    senderToken: vector.inputs.sender_token,
+  } as SenderCredentials;
+  const removed: string[] = [];
+  const removeStoredPair = async (pairId: string) => { removed.push(pairId); };
+  let status = 200;
+  let code = "";
+  globalThis.fetch = async (url, options) => {
+    assert.equal(String(url), `https://relay.example/v1/pairs/${credentials.pairId}`);
+    assert.equal(new Headers(options?.headers).get("authorization"), `Bearer ${credentials.senderToken}`);
+    return status === 200
+      ? Response.json({ status: "active", pair_id: credentials.pairId })
+      : Response.json({ error: { code } }, { status });
+  };
+
+  assert.equal(await checkStoredPair(credentials, { removeStoredPair }), "active");
+  assert.deepEqual(removed, []);
+
+  status = 410;
+  code = "pair_revoked";
+  assert.equal(await checkStoredPair(credentials, { removeStoredPair }), "revoked");
+  assert.deepEqual(removed, [credentials.pairId]);
+
+  status = 401;
+  code = "unauthorized";
+  assert.equal(await checkStoredPair(credentials, { removeStoredPair }), "revoked");
+  assert.deepEqual(removed, [credentials.pairId, credentials.pairId]);
+
+  status = 503;
+  code = "relay_unavailable";
+  await assert.rejects(checkStoredPair(credentials, { removeStoredPair }), { code });
+  assert.equal(removed.length, 2);
 });

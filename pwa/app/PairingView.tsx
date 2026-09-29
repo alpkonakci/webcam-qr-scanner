@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { defaultPhoneLabel, removePair } from "../lib/pair-store";
 import {
   cancelPairingFromPhone,
+  checkStoredPair,
   notifyPairingOpened,
   pairWithPc,
 } from "../lib/relay-client";
@@ -14,22 +15,25 @@ interface PairingViewProps {
   existingPair: SenderCredentials | null;
   pairStoreReady: boolean;
   onPaired(credentials: SenderCredentials): void;
+  onPairInvalid(pairId: string): void;
   onCancel(): void;
 }
 
-type PairingState = "ready" | "waiting" | "paired" | "error";
+type PairingState = "ready" | "check_error" | "waiting" | "error";
 
 export function PairingView({
   pairingUri,
   existingPair,
   pairStoreReady,
   onPaired,
+  onPairInvalid,
   onCancel,
 }: PairingViewProps) {
   const [phoneLabel] = useState(defaultPhoneLabel);
   const [state, setState] = useState<PairingState>("ready");
   const [message, setMessage] = useState("");
   const [replaceExisting, setReplaceExisting] = useState(false);
+  const [checkAttempt, setCheckAttempt] = useState(0);
   const automaticPairingStarted = useRef(false);
   const preview = useMemo(() => {
     try {
@@ -66,17 +70,16 @@ export function PairingView({
     setMessage("Connecting securely to your PC…");
     try {
       const credentials = await pairWithPc(pairingUri, phoneLabel.trim());
-      if (existingPair && existingPair.pairId !== credentials.pairId) {
-        await removePair(existingPair.pairId).catch(() => undefined);
-      }
       onPaired(credentials);
-      setState("paired");
-      setMessage(`Paired securely with ${credentials.pcLabel}.`);
+      onCancel();
+      if (existingPair && existingPair.pairId !== credentials.pairId) {
+        void removePair(existingPair.pairId).catch(() => undefined);
+      }
     } catch (error) {
       setState("error");
       setMessage(error instanceof Error ? error.message : "Pairing stopped safely.");
     }
-  }, [existingPair, onPaired, pairStoreReady, pairingUri, phoneLabel, preview.ok, state]);
+  }, [existingPair, onCancel, onPaired, pairStoreReady, pairingUri, phoneLabel, preview.ok, state]);
 
   const samePcAlreadyPaired = Boolean(
     preview.ok &&
@@ -85,27 +88,38 @@ export function PairingView({
   );
 
   useEffect(() => {
+    if (!preview.ok || !pairStoreReady || !samePcAlreadyPaired || !existingPair) return;
+    let cancelled = false;
+    const controller = new AbortController();
+    void checkStoredPair(existingPair, { signal: controller.signal }).then((status) => {
+      if (cancelled) return;
+      if (status === "active") {
+        cancelUnusedPairing();
+        return;
+      }
+      onPairInvalid(existingPair.pairId);
+      setState("ready");
+    }).catch((error) => {
+      if (cancelled) return;
+      setMessage(error instanceof Error ? error.message : "The saved connection could not be checked.");
+      setState("check_error");
+    });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [cancelUnusedPairing, checkAttempt, existingPair, onPairInvalid, pairStoreReady, preview.ok, samePcAlreadyPaired]);
+
+  useEffect(() => {
     if (
-      !preview.ok ||
-      !pairStoreReady ||
-      automaticPairingStarted.current ||
-      state !== "ready"
-    ) {
-      return;
-    }
-
-    if (samePcAlreadyPaired) {
-      automaticPairingStarted.current = true;
-      cancelUnusedPairing();
-      return;
-    }
-
+      !preview.ok || !pairStoreReady || samePcAlreadyPaired ||
+      automaticPairingStarted.current || state !== "ready"
+    ) return;
     if (existingPair && !replaceExisting) return;
     automaticPairingStarted.current = true;
     queueMicrotask(() => void beginPairing());
   }, [
     beginPairing,
-    cancelUnusedPairing,
     existingPair,
     pairStoreReady,
     preview.ok,
@@ -138,12 +152,26 @@ export function PairingView({
     );
   }
 
-  if (samePcAlreadyPaired) {
+  if (samePcAlreadyPaired && state !== "waiting") {
     return (
       <section className="result-section pairing-section" aria-live="polite">
-        <div className="result-pill result-pill-success">Already paired</div>
-        <h1>Using your saved connection.</h1>
-        <p className="pairing-status">Returning to QR Scanner…</p>
+        <div className="result-pill result-pill-success">Saved connection</div>
+        <h1>{state === "check_error" ? "Connection check stopped." : "Checking your PC connection."}</h1>
+        <p className="pairing-status" role={state === "check_error" ? "alert" : "status"}>
+          {state === "check_error" ? message : "Checking whether this phone still has access…"}
+        </p>
+        {state === "check_error" && (
+          <div className="result-actions">
+            <button type="button" className="result-primary" onClick={() => {
+              setState("ready");
+              setCheckAttempt((attempt) => attempt + 1);
+            }}>Try again</button>
+            <button type="button" className="result-text-button" onClick={cancelUnusedPairing}>Cancel</button>
+          </div>
+        )}
+        {state === "ready" && (
+          <button type="button" className="result-text-button" onClick={cancelUnusedPairing}>Cancel</button>
+        )}
       </section>
     );
   }
@@ -180,13 +208,9 @@ export function PairingView({
 
   return (
     <section className="result-section pairing-section" aria-live="polite">
-      <div className={`result-pill ${state === "paired" ? "result-pill-success" : "pairing-pill"}`}>
-        {state === "paired" ? "Pairing complete" : "PC pairing code"}
-      </div>
+      <div className="result-pill pairing-pill">PC pairing code</div>
       <h1>
-        {state === "paired"
-          ? "Connected."
-          : state === "error"
+        {state === "error"
             ? "Pairing stopped."
             : "Connecting your phone."}
       </h1>
@@ -212,9 +236,7 @@ export function PairingView({
       )}
 
       <div className="result-actions">
-        {state === "paired" ? (
-          <button type="button" className="result-primary" onClick={onCancel}>Continue</button>
-        ) : state === "error" ? (
+        {state === "error" ? (
           <button
             type="button"
             className="result-primary"
@@ -226,11 +248,9 @@ export function PairingView({
             Try again
           </button>
         ) : null}
-        {state !== "paired" && (
-          <button type="button" className="result-text-button" disabled={state === "waiting"} onClick={cancelUnusedPairing}>
-            Cancel
-          </button>
-        )}
+        <button type="button" className="result-text-button" disabled={state === "waiting"} onClick={cancelUnusedPairing}>
+          Cancel
+        </button>
       </div>
     </section>
   );

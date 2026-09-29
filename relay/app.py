@@ -323,6 +323,23 @@ def create_app(relay_state: RelayState | None = None) -> FastAPI:
             ) from None
         return {"status": "paired", "pair_id": body["pair_id"]}
 
+    @app.get("/v1/pairs/{pair_id}")
+    async def get_pair_status(pair_id: str, request: Request) -> dict[str, str]:
+        sender_token = _bearer_token(request.headers.get("authorization"))
+        route = routes.authenticate_sender(
+            pair_id=pair_id,
+            sender_token=sender_token,
+        )
+        if route is None:
+            raise RelayApiError(401, "unauthorized", "Sender token is invalid.")
+        if route.revoked:
+            raise RelayApiError(
+                410,
+                "pair_revoked",
+                "This phone no longer has access to the paired computer.",
+            )
+        return {"status": "active", "pair_id": pair_id}
+
     @app.delete("/v1/pairs/{pair_id}")
     async def revoke_pair(pair_id: str, request: Request) -> dict[str, str]:
         receiver_token = _bearer_token(request.headers.get("authorization"))

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 
 process.env.SUPABASE_URL = "https://example.supabase.co";
@@ -127,6 +128,50 @@ test("a revoked sender receives pair_revoked without creating a delivery", async
     },
   });
   assert.equal(deliveryWriteAttempted, false);
+});
+
+test("pair status distinguishes active, revoked and invalid sender credentials", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  const pairId = base64Url(16, 81);
+  const deviceId = base64Url(16, 91);
+  const senderToken = base64Url(32, 101);
+  const tokenHash = createHash("sha256").update(senderToken).digest("hex");
+  let revokedAt: number | null = null;
+  globalThis.fetch = async (input, init = {}) => {
+    const url = String(input);
+    if (url.includes("/rest/v1/rpc/relay_cleanup")) return Response.json(null);
+    assert.equal(init.method, "GET");
+    if (url.includes("/rest/v1/relay_pairs?")) {
+      const hashFilter = new URL(url).searchParams.get("sender_token_hash");
+      return Response.json(hashFilter === `eq.${tokenHash}` ? [{
+        pair_id: pairId,
+        device_id: deviceId,
+        sender_token_hash: tokenHash,
+        revoked_at: revokedAt,
+      }] : []);
+    }
+    if (url.includes("/rest/v1/relay_devices?")) {
+      return Response.json([{ device_id: deviceId, last_seen_at: null }]);
+    }
+    throw new Error(`Unexpected test request: ${url}`);
+  };
+  const statusRequest = (token: string) => new Request(`https://scanner.example/v1/pairs/${pairId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const active = await handleRelayRequest(statusRequest(senderToken));
+  assert.equal(active.status, 200);
+  assert.deepEqual(await active.json(), { status: "active", pair_id: pairId });
+
+  revokedAt = Math.floor(Date.now() / 1000);
+  const revoked = await handleRelayRequest(statusRequest(senderToken));
+  assert.equal(revoked.status, 410);
+  assert.equal((await revoked.json() as { error: { code: string } }).error.code, "pair_revoked");
+
+  const invalid = await handleRelayRequest(statusRequest(base64Url(32, 111)));
+  assert.equal(invalid.status, 401);
+  assert.equal((await invalid.json() as { error: { code: string } }).error.code, "unauthorized");
 });
 
 test("unexpected relay failures never log raw exception data", async (context) => {

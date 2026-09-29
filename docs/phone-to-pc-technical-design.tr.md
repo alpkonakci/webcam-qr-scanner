@@ -721,6 +721,7 @@ Kesin OpenAPI dosyası uygulama aşamasında oluşturulacaktır. İlk yüzey:
 | Pairing sonucunu yazma | `POST /v1/pairings/{pairing_id}/result` | Receiver bearer token |
 | Pairing sonucunu alma | `GET /v1/pairings/{pairing_id}/result` | Pairing bearer token |
 | Pair onayı kaydı | `POST /v1/pairs` | Receiver bearer token |
+| Kayıtlı pair geçerlilik kontrolü | `GET /v1/pairs/{pair_id}` | Sender bearer token |
 | URL gönderme | `POST /v1/pairs/{pair_id}/messages` | Sender bearer token |
 | Teslim durumunu alma | `GET /v1/pairs/{pair_id}/deliveries/{delivery_id}` | Sender bearer token |
 | Teslim alındısı yazma | `POST /v1/devices/{device_id}/deliveries/{delivery_id}` | Receiver bearer token |

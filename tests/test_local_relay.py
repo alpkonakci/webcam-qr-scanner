@@ -414,6 +414,32 @@ class LocalRelayEndToEndTests(unittest.IsolatedAsyncioTestCase):
                 relay_origin=live.origin,
                 credentials=pairing.sender,
             )
+            async with httpx.AsyncClient(
+                base_url=live.origin,
+                timeout=5,
+            ) as client:
+                active = await client.get(
+                    f"/v1/pairs/{pairing.sender.pair_id}",
+                    headers={
+                        "Authorization": (
+                            f"Bearer {pairing.sender.sender_token}"
+                        )
+                    },
+                )
+            self.assertEqual(active.status_code, 200)
+            self.assertEqual(
+                active.json(),
+                {"status": "active", "pair_id": pairing.sender.pair_id},
+            )
+            async with httpx.AsyncClient(
+                base_url=live.origin,
+                timeout=5,
+            ) as client:
+                invalid_sender = await client.get(
+                    f"/v1/pairs/{pairing.sender.pair_id}",
+                    headers={"Authorization": f"Bearer {random_b64url(32)}"},
+                )
+            self.assertEqual(invalid_sender.status_code, 401)
             with self.assertRaises(DeliveryFailed) as offline:
                 await phone.send_url("https://example.com/offline")
             self.assertEqual(offline.exception.code, "receiver_offline")
@@ -432,6 +458,21 @@ class LocalRelayEndToEndTests(unittest.IsolatedAsyncioTestCase):
                 )
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json()["status"], "revoked")
+
+            async with httpx.AsyncClient(
+                base_url=live.origin,
+                timeout=5,
+            ) as client:
+                revoked_status = await client.get(
+                    f"/v1/pairs/{pairing.sender.pair_id}",
+                    headers={
+                        "Authorization": (
+                            f"Bearer {pairing.sender.sender_token}"
+                        )
+                    },
+                )
+            self.assertEqual(revoked_status.status_code, 410)
+            self.assertEqual(revoked_status.json()["error"]["code"], "pair_revoked")
 
             with self.assertRaises(DeliveryFailed) as revoked:
                 await phone.send_url("https://example.com/revoked")

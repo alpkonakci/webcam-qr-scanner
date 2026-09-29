@@ -5,10 +5,10 @@ Scanner and the Vercel-hosted relay API. The WQRS/1 cryptographic contract stays
 shared with the Python desktop application while deployment-specific code stays
 inside this directory.
 
-> **Migration status:** `codex/vercel-supabase` contains the tested first
-> Vercel + Supabase migration slice. A protected Vercel Preview deployment is
-> ready, but it has not passed real-device acceptance tests. The existing
-> Sites/Cloudflare beta remains live; this branch is not the production endpoint.
+> **Beta status:** Vercel + Supabase is deployed at
+> `https://qrwebcam.vercel.app`. Real-device acceptance is ongoing; this is not
+> a stable release. The legacy Sites/Cloudflare beta remains available during
+> the transition.
 
 ## Current scope
 
@@ -28,8 +28,8 @@ The current PWA milestone includes:
 - existing-pair detection with an explicit replacement choice;
 - short-lived browser-open and phone-cancel signals plus automatic completion
   after the phone opens the desktop's single-use pairing QR;
-- saved-pair reuse for the same browser and PC without creating another local
-  pairing or asking for confirmation again;
+- saved-pair validation before reuse, with first-scan re-pairing after desktop
+  access is revoked;
 - non-extractable root-key persistence in IndexedDB;
 - end-to-end encrypted **Send to PC** with an authenticated delivery receipt;
 - automatic camera cleanup when the scanner closes or the page is hidden;
@@ -42,12 +42,10 @@ The current PWA milestone includes:
 - automated shell, URL-policy, protocol-vector, D1 compatibility, Vercel relay,
   manifest, cache-policy and security-header tests.
 
-**Open link in new tab**, browser pairing, and encrypted **Send to PC** remain
-available through the existing public beta endpoint. The Vercel + Supabase
-replacement is locally built and automatically tested, with an access-protected
-Preview deployment; it is not the production endpoint yet.
-Broad Android Chrome and iOS Safari testing plus an independent security review
-are still required, so this remains a preview rather than a stable service.
+**Open link in new tab**, browser pairing, and encrypted **Send to PC** are
+available through the Vercel production beta. The revised remove-and-repair
+flow still needs an iPhone Safari and Android Chrome retest. An independent
+security review is required before a stable release.
 
 ## Local development
 

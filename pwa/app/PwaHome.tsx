@@ -66,6 +66,7 @@ export function PwaHome() {
   }, []);
 
   const closeScanner = useCallback(() => setScannerOpen(false), []);
+  const closePairing = useCallback(() => setPairingUri(null), []);
 
   const handleDecoded = useCallback((value: string) => {
     setScannerOpen(false);
@@ -119,7 +120,8 @@ export function PwaHome() {
             existingPair={pairedPc}
             pairStoreReady={pairStoreReady}
             onPaired={setPairedPc}
-            onCancel={() => setPairingUri(null)}
+            onPairInvalid={clearRevokedPair}
+            onCancel={closePairing}
           />
         ) : scanResult ? (
           <QrResultView

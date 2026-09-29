@@ -208,6 +208,9 @@ async function routeRelayRequest(
     return registerPair(request, admin);
   }
   const pairMatch = path.match(/^\/v1\/pairs\/([A-Za-z0-9_-]{22})$/);
+  if (pairMatch && method === "GET") {
+    return getPairStatus(request, admin, pairMatch[1]);
+  }
   if (pairMatch && method === "DELETE") {
     return revokePair(request, admin, pairMatch[1]);
   }
@@ -483,6 +486,15 @@ async function revokePair(
   );
   await admin.delete("relay_deliveries", filters({ pair_id: `eq.${pairId}` }));
   return json({ status: "revoked", pair_id: pair.pair_id });
+}
+
+async function getPairStatus(
+  request: Request,
+  admin: SupabaseAdmin,
+  pairId: string,
+): Promise<Response> {
+  await senderPair(request, admin, pairId);
+  return json({ status: "active", pair_id: pairId });
 }
 
 async function submitMessage(

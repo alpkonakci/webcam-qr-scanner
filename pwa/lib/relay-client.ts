@@ -33,6 +33,35 @@ export async function removePairIfRevoked(
   return true;
 }
 
+export async function checkStoredPair(
+  credentials: SenderCredentials,
+  options: {
+    signal?: AbortSignal;
+    removeStoredPair?: (pairId: string) => Promise<void>;
+  } = {},
+): Promise<"active" | "revoked"> {
+  try {
+    const response = await relayFetch(
+      `${credentials.relayOrigin}/v1/pairs/${credentials.pairId}`,
+      credentials.senderToken,
+      { method: "GET", expectedStatus: 200, signal: options.signal },
+    );
+    if (response.body.status !== "active" || response.body.pair_id !== credentials.pairId) {
+      throw new RelayClientError("invalid_relay_response", "The relay returned an invalid response.");
+    }
+    return "active";
+  } catch (error) {
+    if (
+      error instanceof RelayClientError &&
+      (error.code === "pair_revoked" || error.code === "unauthorized")
+    ) {
+      await (options.removeStoredPair ?? removePair)(credentials.pairId);
+      return "revoked";
+    }
+    throw error;
+  }
+}
+
 export async function pairWithPc(
   pairingUri: string,
   phoneLabel: string,
