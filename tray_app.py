@@ -79,14 +79,6 @@ class PairManager(Protocol):
     ) -> object:
         """Revoke remotely before removing protected local credentials."""
 
-    def forget_local_pair(
-        self,
-        *,
-        relay_origin: str,
-        pair_id: str,
-    ) -> object:
-        """Remove a protected local record after explicit user approval."""
-
 
 def create_tray_image(size: int = 64) -> Image.Image:
     """Create a small high-contrast QR-style tray icon."""
@@ -387,7 +379,14 @@ class TrayApplication:
         _: pystray.Icon,
         __: pystray.MenuItem,
     ) -> None:
-        self._request_full_exit()
+        # pystray invokes menu actions on the Windows tray message loop.
+        # Keep the modal confirmation and shutdown off that loop so it can
+        # process the stop message after the user confirms.
+        threading.Thread(
+            target=self._request_full_exit,
+            name="tray-exit-confirmation",
+            daemon=True,
+        ).start()
 
     def _launch_camera(
         self,
@@ -599,13 +598,16 @@ class TrayApplication:
                 "QR Scanner",
             )
         except PairRevocationError:
-            if not self._forget_pair_locally(request):
-                return
-            self._notify(
-                "Online revocation could not be confirmed. The protected "
-                f"record for {request.phone_label} was removed from this PC.",
-                "QR Scanner",
+            show_dialog(
+                "QR Scanner - Removal unavailable",
+                "Could not confirm removal with the relay. This phone is "
+                "still saved on this PC. Check your connection and try "
+                "again.",
+                MB_ICONWARNING,
+                owner_title=None,
             )
+            self._launch_paired_phones()
+            return
         except SecureStorageError:
             show_dialog(
                 "QR Scanner - Removal unavailable",
@@ -643,40 +645,6 @@ class TrayApplication:
             self._launch_paired_phones()
         else:
             self._launch_home()
-
-    def _forget_pair_locally(self, request: RemovePhoneRequest) -> bool:
-        """Forget one unreachable legacy pair and refresh desktop state."""
-
-        try:
-            self.pair_manager.forget_local_pair(
-                relay_origin=request.relay_origin,
-                pair_id=request.pair_id,
-            )
-        except PairNotStoredError:
-            pass
-        except SecureStorageError:
-            show_dialog(
-                "QR Scanner - Local cleanup unavailable",
-                "Windows could not update the protected pairing store. "
-                "The saved pairing was kept unchanged.",
-                MB_ICONWARNING,
-                owner_title=None,
-            )
-            self._launch_paired_phones()
-            return False
-        except Exception as error:
-            show_dialog(
-                "QR Scanner - Local cleanup unavailable",
-                "The saved pairing was kept unchanged.\n\n"
-                f"Technical reason: {error.__class__.__name__}",
-                MB_ICONWARNING,
-                owner_title=None,
-            )
-            self._launch_paired_phones()
-            return False
-        self.receiver_service.request_refresh()
-        self._refresh_pairing_status()
-        return True
 
     def _request_full_exit(self) -> None:
         """Serialize full-exit requests and keep their question accessible."""

@@ -136,11 +136,25 @@ class TrayApplicationTests(unittest.TestCase):
             patch.object(application, "_prepare_for_foreground_dialog") as prepare,
             patch.object(application, "_finish_foreground_dialog") as finish,
         ):
-            application._exit_from_menu(self.icon, Mock())
+            application._request_full_exit()
 
         confirm.assert_called_once_with()
         prepare.assert_called_once_with()
         finish.assert_called_once_with(False)
+        self.icon.stop.assert_not_called()
+
+    @patch("tray_app.threading.Thread")
+    def test_tray_exit_does_not_block_menu_message_loop(self, thread_type) -> None:
+        application = self._application()
+
+        application._exit_from_menu(self.icon, Mock())
+
+        thread_type.assert_called_once_with(
+            target=application._request_full_exit,
+            name="tray-exit-confirmation",
+            daemon=True,
+        )
+        thread_type.return_value.start.assert_called_once_with()
         self.icon.stop.assert_not_called()
 
     def test_approved_pairing_notifies_with_verified_phone_label(self) -> None:
@@ -340,7 +354,7 @@ class TrayApplicationTests(unittest.TestCase):
         launch_home.assert_called_once_with()
 
     @patch("tray_app.consume_phone_removal_request")
-    def test_remote_failure_falls_back_to_local_cleanup_after_one_approval(
+    def test_remote_failure_preserves_local_pair_and_reopens_manager(
         self,
         consume_request,
     ) -> None:
@@ -351,12 +365,9 @@ class TrayApplicationTests(unittest.TestCase):
         )
         consume_request.return_value = request
         pair_manager = Mock()
-        pair_manager.list_pairs.return_value = ()
+        pair_manager.list_pairs.return_value = (Mock(),)
         pair_manager.remove_pair.side_effect = PairRevocationError(
             code="network_error"
-        )
-        pair_manager.forget_local_pair.return_value = SimpleNamespace(
-            summary=SimpleNamespace(phone_label="My iPhone")
         )
         receiver = Mock()
         receiver.has_paired_phones.return_value = True
@@ -366,8 +377,8 @@ class TrayApplicationTests(unittest.TestCase):
         )
 
         with (
-            patch.object(application, "_refresh_pairing_status"),
-            patch.object(application, "_launch_home"),
+            patch("tray_app.show_dialog") as show_dialog,
+            patch.object(application, "_launch_paired_phones") as launch_manager,
         ):
             application._remove_requested_phone()
 
@@ -375,11 +386,11 @@ class TrayApplicationTests(unittest.TestCase):
             relay_origin=request.relay_origin,
             pair_id=request.pair_id,
         )
-        pair_manager.forget_local_pair.assert_called_once_with(
-            relay_origin=request.relay_origin,
-            pair_id=request.pair_id,
-        )
-        receiver.request_refresh.assert_called_once_with()
+        pair_manager.forget_local_pair.assert_not_called()
+        receiver.request_refresh.assert_not_called()
+        show_dialog.assert_called_once()
+        self.assertIn("still saved", show_dialog.call_args.args[1])
+        launch_manager.assert_called_once_with()
 
 
 if __name__ == "__main__":
