@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import cv2
 import numpy as np
@@ -11,7 +11,10 @@ from home_ui import (
     WINDOW_HEIGHT,
     WINDOW_WIDTH,
     HomeAction,
+    WindowCloseChoice,
     _bring_home_window_to_front,
+    _disable_home_maximize,
+    _home_window_closed,
     action_at_point,
     build_home_canvas,
     show_home_window,
@@ -81,6 +84,79 @@ class HomeUiTests(unittest.TestCase):
                 unittest.mock.call("QR Scanner", cv2.WND_PROP_TOPMOST, 0),
             ],
         )
+
+    def test_maximize_is_disabled_for_fixed_size_control_center(self) -> None:
+        user32 = Mock()
+        user32.FindWindowW.return_value = 123
+        user32.GetWindowLongPtrW.return_value = 0x00010000 | 0x00040000 | 0x10000000
+        with (
+            patch("home_ui.os.name", "nt"),
+            patch("home_ui.ctypes.windll.user32", user32),
+        ):
+            _disable_home_maximize()
+
+        user32.SetWindowLongPtrW.assert_called_once_with(123, -16, 0x10000000)
+        user32.SetWindowPos.assert_called_once()
+
+    def test_closed_window_property_error_still_opens_close_choice(self) -> None:
+        with patch("home_ui.cv2.getWindowProperty", side_effect=cv2.error):
+            self.assertTrue(_home_window_closed())
+
+    def test_titlebar_close_can_hide_to_tray(self) -> None:
+        with (
+            patch("home_ui.cv2.namedWindow"),
+            patch("home_ui.cv2.setMouseCallback"),
+            patch("home_ui.cv2.moveWindow"),
+            patch("home_ui.cv2.imshow"),
+            patch("home_ui.cv2.waitKey", return_value=-1),
+            patch("home_ui.cv2.getWindowProperty", return_value=-1),
+            patch("home_ui.cv2.destroyWindow"),
+            patch("home_ui._bring_home_window_to_front"),
+        ):
+            choose_close = Mock(return_value=WindowCloseChoice.BACKGROUND)
+            result = show_home_window(choose_close=choose_close)
+
+        self.assertIs(result, HomeAction.BACKGROUND)
+        choose_close.assert_called_once_with()
+
+    def test_titlebar_close_can_exit_without_second_confirmation(self) -> None:
+        with (
+            patch("home_ui.cv2.namedWindow"),
+            patch("home_ui.cv2.setMouseCallback"),
+            patch("home_ui.cv2.moveWindow"),
+            patch("home_ui.cv2.imshow"),
+            patch("home_ui.cv2.waitKey", return_value=-1),
+            patch("home_ui.cv2.getWindowProperty", return_value=-1),
+            patch("home_ui.cv2.destroyWindow"),
+            patch("home_ui._bring_home_window_to_front"),
+        ):
+            confirm_exit = Mock()
+            result = show_home_window(
+                choose_close=lambda: WindowCloseChoice.EXIT,
+                confirm_exit=confirm_exit,
+            )
+
+        self.assertIs(result, HomeAction.EXIT)
+        confirm_exit.assert_not_called()
+
+    def test_cancelling_titlebar_close_reopens_home(self) -> None:
+        with (
+            patch("home_ui.cv2.namedWindow") as named_window,
+            patch("home_ui.cv2.setMouseCallback"),
+            patch("home_ui.cv2.moveWindow"),
+            patch("home_ui.cv2.imshow"),
+            patch("home_ui.cv2.waitKey", side_effect=[-1, 27]),
+            patch("home_ui.cv2.getWindowProperty", return_value=-1),
+            patch("home_ui.cv2.destroyWindow"),
+            patch("home_ui._bring_home_window_to_front") as bring_forward,
+        ):
+            result = show_home_window(
+                choose_close=lambda: WindowCloseChoice.CANCEL,
+            )
+
+        self.assertIs(result, HomeAction.BACKGROUND)
+        self.assertEqual(named_window.call_count, 2)
+        self.assertEqual(bring_forward.call_count, 2)
 
     def test_cancelled_exit_keeps_control_center_open(self) -> None:
         mouse_callback = None

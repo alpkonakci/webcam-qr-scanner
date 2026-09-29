@@ -5,16 +5,27 @@ from __future__ import annotations
 import ctypes
 import os
 import threading
+from enum import Enum
 
 
 MB_OK = 0x00
 MB_YESNO = 0x04
+MB_YESNOCANCEL = 0x03
 MB_ICONERROR = 0x10
 MB_ICONWARNING = 0x30
+MB_ICONINFORMATION = 0x40
 MB_DEFBUTTON2 = 0x100
+MB_DEFBUTTON3 = 0x200
 MB_SETFOREGROUND = 0x10000
 MB_TOPMOST = 0x40000
 IDYES = 6
+IDNO = 7
+
+
+class WindowCloseChoice(Enum):
+    BACKGROUND = "background"
+    EXIT = "exit"
+    CANCEL = "cancel"
 
 
 _DIALOG_LOCK = threading.RLock()
@@ -94,6 +105,25 @@ def confirm_application_exit() -> bool:
         )
         == IDYES
     )
+
+
+def choose_home_window_close() -> WindowCloseChoice:
+    """Ask what the title-bar X should do, with Cancel as the default."""
+
+    response = show_dialog(
+        "QR Scanner - Close",
+        "Keep QR Scanner running in the background?\n\n"
+        "Yes — Keep in the tray\n"
+        "No — Exit completely\n"
+        "Cancel — Return to QR Scanner",
+        MB_YESNOCANCEL | MB_ICONINFORMATION | MB_DEFBUTTON3,
+        owner_title=None,
+    )
+    if response == IDYES:
+        return WindowCloseChoice.BACKGROUND
+    if response == IDNO:
+        return WindowCloseChoice.EXIT
+    return WindowCloseChoice.CANCEL
 
 
 def confirm_phone_url(

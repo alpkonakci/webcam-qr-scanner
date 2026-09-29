@@ -13,6 +13,8 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+from native_dialogs import WindowCloseChoice, choose_home_window_close
+
 
 WINDOW_TITLE = "QR Scanner"
 WINDOW_WIDTH = 620
@@ -169,7 +171,7 @@ def build_home_canvas(
 
     draw.text(
         (32, 478),
-        "Close this window to keep QR Scanner running in the tray.",
+        "ESC hides to tray  ·  X shows close options",
         font=small_font,
         fill=SECONDARY_TEXT,
     )
@@ -201,9 +203,10 @@ def build_home_canvas(
 def show_home_window(
     *,
     confirm_exit: Callable[[], bool] | None = None,
+    choose_close: Callable[[], WindowCloseChoice] = choose_home_window_close,
     pair_count: int = 0,
 ) -> HomeAction:
-    """Show the control center; Escape and window close keep the tray alive."""
+    """Show the control center; title-bar close asks how to leave it."""
 
     state = HomeWindowState()
 
@@ -218,14 +221,7 @@ def show_home_window(
         if event == cv2.EVENT_LBUTTONUP:
             state.selected_action = state.hover_action
 
-    cv2.namedWindow(WINDOW_TITLE, cv2.WINDOW_AUTOSIZE)
-    cv2.setMouseCallback(WINDOW_TITLE, handle_mouse)
-    screen_width, screen_height = _primary_screen_size()
-    cv2.moveWindow(
-        WINDOW_TITLE,
-        max(0, (screen_width - WINDOW_WIDTH) // 2),
-        max(0, (screen_height - WINDOW_HEIGHT) // 3),
-    )
+    _open_home_window(handle_mouse)
 
     try:
         first_frame = True
@@ -242,14 +238,17 @@ def show_home_window(
                 first_frame = False
             if cv2.waitKey(16) & 0xFF == 27:
                 return HomeAction.BACKGROUND
-            if (
-                cv2.getWindowProperty(
-                    WINDOW_TITLE,
-                    cv2.WND_PROP_VISIBLE,
-                )
-                < 1
-            ):
-                return HomeAction.BACKGROUND
+            if _home_window_closed():
+                choice = choose_close()
+                if choice is WindowCloseChoice.BACKGROUND:
+                    return HomeAction.BACKGROUND
+                if choice is WindowCloseChoice.EXIT:
+                    return HomeAction.EXIT
+                state.hover_action = None
+                state.selected_action = None
+                _open_home_window(handle_mouse)
+                first_frame = True
+                continue
             if state.selected_action is None:
                 continue
             if (
@@ -266,6 +265,78 @@ def show_home_window(
             cv2.destroyWindow(WINDOW_TITLE)
         except cv2.error:
             pass
+
+
+def _open_home_window(mouse_callback: Callable[..., None]) -> None:
+    cv2.namedWindow(WINDOW_TITLE, cv2.WINDOW_AUTOSIZE)
+    cv2.setMouseCallback(WINDOW_TITLE, mouse_callback)
+    _disable_home_maximize()
+    screen_width, screen_height = _primary_screen_size()
+    cv2.moveWindow(
+        WINDOW_TITLE,
+        max(0, (screen_width - WINDOW_WIDTH) // 2),
+        max(0, (screen_height - WINDOW_HEIGHT) // 3),
+    )
+
+
+def _home_window_closed() -> bool:
+    try:
+        return cv2.getWindowProperty(WINDOW_TITLE, cv2.WND_PROP_VISIBLE) < 1
+    except cv2.error:
+        return True
+
+
+def _disable_home_maximize() -> None:
+    """Keep OpenCV's fixed-size canvas from becoming a tiny maximized island."""
+
+    if os.name != "nt":
+        return
+    try:
+        user32 = ctypes.windll.user32
+        find_window = user32.FindWindowW
+        get_style = user32.GetWindowLongPtrW
+        set_style = user32.SetWindowLongPtrW
+        set_position = user32.SetWindowPos
+        find_window.argtypes = (ctypes.c_wchar_p, ctypes.c_wchar_p)
+        find_window.restype = ctypes.c_void_p
+        get_style.argtypes = (ctypes.c_void_p, ctypes.c_int)
+        get_style.restype = ctypes.c_ssize_t
+        set_style.argtypes = (
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.c_ssize_t,
+        )
+        set_style.restype = ctypes.c_ssize_t
+        set_position.argtypes = (
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_uint,
+        )
+        set_position.restype = ctypes.c_bool
+        window_handle = find_window(None, WINDOW_TITLE)
+        if not window_handle:
+            return
+        style = int(get_style(window_handle, -16))  # GWL_STYLE
+        if not style:
+            return
+        fixed_style = style & ~0x00010000 & ~0x00040000
+        if fixed_style == style:
+            return
+        set_style(window_handle, -16, fixed_style)
+        set_position(
+            window_handle,
+            None,
+            0, 0, 0, 0,
+            0x0001 | 0x0002 | 0x0004 | 0x0020,
+        )
+    except (AttributeError, OSError, TypeError, ValueError):
+        # The app remains usable if a Windows theme/backend does not expose
+        # the expected native window style.
+        pass
 
 
 def _contains(
