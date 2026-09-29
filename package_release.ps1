@@ -1,16 +1,33 @@
 param(
-    [string]$Version = "v0.2.0-beta.1"
+    [string]$Version = "v0.2.0-beta.1",
+    [string]$ExecutablePath = "",
+    [string]$OutputDirectory = "",
+    [switch]$FailIfExists
 )
 
 $ErrorActionPreference = "Stop"
 
 $projectDirectory = [System.IO.Path]::GetFullPath($PSScriptRoot)
 $distDirectory = Join-Path $projectDirectory "dist"
-$executablePath = Join-Path $distDirectory "QR-Scanner.exe"
+if (-not $ExecutablePath) {
+    $ExecutablePath = Join-Path $distDirectory "QR-Scanner.exe"
+}
+if (-not $OutputDirectory) {
+    $OutputDirectory = $distDirectory
+}
+$executablePath = [System.IO.Path]::GetFullPath($ExecutablePath)
+$outputDirectory = [System.IO.Path]::GetFullPath($OutputDirectory)
+if (-not ($outputDirectory.Equals($distDirectory, [System.StringComparison]::OrdinalIgnoreCase) -or
+    $outputDirectory.StartsWith(
+        $distDirectory + [System.IO.Path]::DirectorySeparatorChar,
+        [System.StringComparison]::OrdinalIgnoreCase
+    ))) {
+    throw "Output directory must be inside dist: $outputDirectory"
+}
 $packageName = "Webcam-QR-Scanner-$Version-windows-x64"
-$packageDirectory = Join-Path $distDirectory $packageName
-$archivePath = Join-Path $distDirectory "$packageName.zip"
-$checksumsPath = Join-Path $distDirectory "SHA256SUMS.txt"
+$packageDirectory = Join-Path $outputDirectory $packageName
+$archivePath = Join-Path $outputDirectory "$packageName.zip"
+$checksumsPath = Join-Path $outputDirectory "SHA256SUMS.txt"
 $pythonPath = Join-Path $projectDirectory ".venv\Scripts\python.exe"
 
 if (-not (Test-Path -LiteralPath $executablePath)) {
@@ -20,15 +37,20 @@ if (-not (Test-Path -LiteralPath $pythonPath)) {
     throw "Virtual environment not found: $pythonPath"
 }
 
+New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
+
 foreach ($target in @($packageDirectory, $archivePath, $checksumsPath)) {
     $resolvedTarget = [System.IO.Path]::GetFullPath($target)
     if (-not $resolvedTarget.StartsWith(
-        $distDirectory + [System.IO.Path]::DirectorySeparatorChar,
+        $outputDirectory + [System.IO.Path]::DirectorySeparatorChar,
         [System.StringComparison]::OrdinalIgnoreCase
     )) {
-        throw "Refusing to replace a path outside the dist directory: $resolvedTarget"
+        throw "Refusing to replace a path outside the output directory: $resolvedTarget"
     }
     if (Test-Path -LiteralPath $resolvedTarget) {
+        if ($FailIfExists) {
+            throw "Release output already exists: $resolvedTarget"
+        }
         Remove-Item -LiteralPath $resolvedTarget -Recurse -Force
     }
 }
