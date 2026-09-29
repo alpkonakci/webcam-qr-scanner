@@ -332,18 +332,18 @@ class TrayApplication:
         ).run()
 
     def _prepare_for_foreground_dialog(self) -> None:
-        """Remove transient UI before a modal security decision appears."""
+        """Keep the app visible while presenting a topmost security dialog."""
 
         with self._children_lock:
             self._foreground_dialog_count += 1
+        # The native question is topmost and owned by the home window when it
+        # exists. Closing that window here leaves only the tray icon after an
+        # approved link opens in the browser, which looks like the app vanished.
         self._pairing_cancel_event.set()
         self._pairing_window_closed.wait(timeout=1.0)
-        processes = self._dismiss_control_windows()
-        for process in processes:
-            self._wait_for_child_exit(process)
 
     def _finish_foreground_dialog(self, opened_external_window: bool) -> None:
-        """Restore the control center only when no browser took focus."""
+        """Restore an absent control center without covering an opened browser."""
 
         with self._children_lock:
             self._foreground_dialog_count = max(

@@ -186,26 +186,21 @@ class TrayApplicationTests(unittest.TestCase):
             "QR Scanner",
         )
 
-    def test_incoming_security_dialog_cancels_pairing_window_first(self) -> None:
+    def test_incoming_security_dialog_keeps_home_visible(self) -> None:
         application = self._application()
         closed = Mock()
         application._pairing_window_closed = closed
 
         with (
-            patch.object(
-                application,
-                "_dismiss_control_windows",
-                return_value=(Mock(),),
-            ) as dismiss_windows,
+            patch.object(application, "_dismiss_control_windows") as dismiss,
             patch.object(application, "_wait_for_child_exit") as wait_for_exit,
         ):
             application._prepare_for_foreground_dialog()
 
         self.assertTrue(application._pairing_cancel_event.is_set())
         closed.wait.assert_called_once_with(timeout=1.0)
-        wait_for_exit.assert_called_once_with(
-            dismiss_windows.return_value[0]
-        )
+        dismiss.assert_not_called()
+        wait_for_exit.assert_not_called()
 
     def test_rejected_security_dialog_restores_home(self) -> None:
         application = self._application()
@@ -219,11 +214,16 @@ class TrayApplicationTests(unittest.TestCase):
     def test_opened_browser_does_not_cover_it_with_home(self) -> None:
         application = self._application()
         application._foreground_dialog_count = 1
+        home_process = Mock()
+        home_process.poll.return_value = None
+        application._home_process = home_process
 
         with patch.object(application, "_launch_home") as launch_home:
             application._finish_foreground_dialog(True)
 
         launch_home.assert_not_called()
+        self.assertIs(application._home_process, home_process)
+        home_process.terminate.assert_not_called()
 
     def test_full_exit_also_cancels_an_active_pairing_window(self) -> None:
         application = self._application()
