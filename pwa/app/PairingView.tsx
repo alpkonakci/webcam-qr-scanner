@@ -55,10 +55,10 @@ export function PairingView({
     return () => controller.abort();
   }, [pairingUri, preview.ok]);
 
-  const cancelUnusedPairing = async () => {
-    await cancelPairingFromPhone(pairingUri).catch(() => undefined);
+  const cancelUnusedPairing = useCallback(() => {
     onCancel();
-  };
+    void cancelPairingFromPhone(pairingUri).catch(() => undefined);
+  }, [onCancel, pairingUri]);
 
   const beginPairing = useCallback(async () => {
     if (!preview.ok || state === "waiting" || !pairStoreReady) return;
@@ -96,9 +96,7 @@ export function PairingView({
 
     if (samePcAlreadyPaired) {
       automaticPairingStarted.current = true;
-      void cancelPairingFromPhone(pairingUri)
-        .catch(() => undefined)
-        .finally(onCancel);
+      cancelUnusedPairing();
       return;
     }
 
@@ -107,10 +105,9 @@ export function PairingView({
     queueMicrotask(() => void beginPairing());
   }, [
     beginPairing,
+    cancelUnusedPairing,
     existingPair,
-    onCancel,
     pairStoreReady,
-    pairingUri,
     preview.ok,
     replaceExisting,
     samePcAlreadyPaired,

@@ -123,6 +123,10 @@ test("uses the desktop QR as the only pairing confirmation", async () => {
   assert.match(pairingView, /void beginPairing\(\)/);
   assert.match(pairingView, /samePcAlreadyPaired/);
   assert.match(pairingView, /Using your saved connection\./);
+  assert.match(
+    pairingView,
+    /const cancelUnusedPairing = useCallback\(\(\) => \{\s*onCancel\(\);\s*void cancelPairingFromPhone/s,
+  );
   assert.doesNotMatch(pairingView, /Pair this phone\?/);
   assert.doesNotMatch(pairingView, /Waiting for PC approval/);
 });
