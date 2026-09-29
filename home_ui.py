@@ -14,6 +14,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 from native_dialogs import WindowCloseChoice, choose_home_window_close
+from window_icon import set_window_icon
 
 
 WINDOW_TITLE = "QR Scanner"
@@ -269,6 +270,7 @@ def show_home_window(
 
 def _open_home_window(mouse_callback: Callable[..., None]) -> None:
     cv2.namedWindow(WINDOW_TITLE, cv2.WINDOW_AUTOSIZE)
+    set_window_icon(WINDOW_TITLE)
     cv2.setMouseCallback(WINDOW_TITLE, mouse_callback)
     _disable_home_maximize()
     screen_width, screen_height = _primary_screen_size()

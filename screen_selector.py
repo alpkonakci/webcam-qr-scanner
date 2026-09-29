@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 
 from ui import COLOR_ACCENT, COLOR_MUTED, COLOR_PANEL, COLOR_TEXT
+from window_icon import set_window_icon
 
 
 WINDOW_TITLE = "Scan Screen - Select Area"
@@ -254,6 +255,7 @@ def select_screen_region(frame: np.ndarray) -> np.ndarray | None:
                 )
 
     cv2.namedWindow(WINDOW_TITLE, cv2.WINDOW_AUTOSIZE)
+    set_window_icon(WINDOW_TITLE)
     cv2.setMouseCallback(WINDOW_TITLE, handle_mouse)
     screen_width, screen_height = primary_screen_size()
     cv2.moveWindow(

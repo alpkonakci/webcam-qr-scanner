@@ -42,6 +42,7 @@ from ui import (
     is_exit_key,
     show_instructions,
 )
+from window_icon import set_window_icon
 
 
 class ScreenScanStatus(Enum):
@@ -259,6 +260,7 @@ def run(
             f"at approximately {camera.measured_fps:.1f} FPS."
         )
         cv2.namedWindow(WINDOW_TITLE, cv2.WINDOW_NORMAL)
+        set_window_icon(WINDOW_TITLE)
         cv2.resizeWindow(WINDOW_TITLE, *DISPLAY_SIZE)
 
         result_version = 0

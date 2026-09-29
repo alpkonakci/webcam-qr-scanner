@@ -6,6 +6,7 @@ from PIL import Image, ImageDraw
 
 
 OUTPUT_DIR = Path(__file__).resolve().parents[1] / "public" / "icons"
+WINDOWS_ICON_PATH = Path(__file__).resolve().parents[2] / "assets" / "QR-Scanner.ico"
 BACKGROUND = "#08111f"
 PANEL = "#0e1b2d"
 ACCENT = "#32d7cc"
@@ -61,6 +62,20 @@ def main() -> None:
     draw_icon(512).save(OUTPUT_DIR / "icon-512.png", optimize=True)
     draw_icon(512, maskable=True).save(OUTPUT_DIR / "maskable-512.png", optimize=True)
     draw_icon(180).save(OUTPUT_DIR / "apple-touch-icon.png", optimize=True)
+    WINDOWS_ICON_PATH.parent.mkdir(parents=True, exist_ok=True)
+    draw_icon(256).save(
+        WINDOWS_ICON_PATH,
+        format="ICO",
+        sizes=(
+            (16, 16),
+            (24, 24),
+            (32, 32),
+            (48, 48),
+            (64, 64),
+            (128, 128),
+            (256, 256),
+        ),
+    )
 
 
 if __name__ == "__main__":
