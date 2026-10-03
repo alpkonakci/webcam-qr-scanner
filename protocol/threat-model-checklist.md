@@ -9,9 +9,10 @@ explicit review note linked from the release work.
 Checked items below mean source/test evidence, not independent certification.
 The [2026-10-04 local fix follow-up](../docs/main-readiness-fixes-2026-10-04.md)
 records a passing restart probe and separate-process Windows DPAPI test.
-These changes and the database migration are not deployed. Plain SHA-256 token
-hashing, Postgres envelope retention and inline-script CSP exceptions still
-do not meet their original requirement wording; those items remain open.
+The [beta.3 publication record](../docs/v0.2.0-beta.3-verification-2026-10-04.md)
+records the applied migration and matching production deployment. Plain SHA-256
+token hashing, Postgres envelope retention and inline-script CSP exceptions
+still do not meet their original requirement wording; those items remain open.
 
 ## Pairing
 
