@@ -7,4 +7,6 @@ __pycache__/
 .vscode/
 dist/
 build/
+!pwa/build/
+!pwa/build/sites-vite-plugin.ts
 *.spec

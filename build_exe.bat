@@ -17,14 +17,28 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo Building terminal-free QR-Scanner.exe...
+if not exist "assets\QR-Scanner.ico" (
+    echo Windows application icon not found.
+    echo Run: .venv\Scripts\python.exe pwa\scripts\generate_icons.py
+    pause
+    exit /b 1
+)
+
+echo Building terminal-free QR-Scanner.exe for v0.2.0-beta.2...
 ".venv\Scripts\python.exe" -m PyInstaller ^
     --noconfirm ^
     --clean ^
     --onefile ^
     --windowed ^
+    --icon "assets\QR-Scanner.ico" ^
+    --version-file "assets\windows-version-info.txt" ^
+    --add-data "assets\QR-Scanner.ico;assets" ^
+    --hidden-import bridge.pairing_controller ^
+    --hidden-import bridge.realtime ^
+    --hidden-import pystray._win32 ^
+    --collect-all dxcam ^
     --name QR-Scanner ^
-    app.py
+    launcher.py
 
 if errorlevel 1 (
     echo.
@@ -49,7 +63,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "package_release.ps1" -Version "v0.1.1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "package_release.ps1" -Version "v0.2.0-beta.2"
 if errorlevel 1 (
     echo.
     echo Release package creation failed.

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/alpkonakci/webcam-qr-scanner/protocol/schemas/url-payload.schema.json",
+  "title": "WQRS/1 URL payload",
+  "type": "object",
+  "required": [
+    "payload_version",
+    "kind",
+    "url"
+  ],
+  "properties": {
+    "payload_version": {
+      "const": 1
+    },
+    "kind": {
+      "const": "url"
+    },
+    "url": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^https?://",
+      "$comment": "maxLength counts characters; implementations must separately enforce the 4096 UTF-8 byte limit and the complete URL rules."
+    }
+  },
+  "additionalProperties": false
+}

@@ -9,7 +9,7 @@ Set fileSystem = CreateObject("Scripting.FileSystemObject")
 appDirectory = fileSystem.GetParentFolderName(WScript.ScriptFullName)
 packagedApplication = appDirectory & "\QR-Scanner.exe"
 pythonWindowed = appDirectory & "\.venv\Scripts\pythonw.exe"
-sourceApplication = appDirectory & "\app.py"
+sourceApplication = appDirectory & "\launcher.py"
 
 If fileSystem.FileExists(packagedApplication) Then
     command = Chr(34) & packagedApplication & Chr(34) & " --screen --desktop"
