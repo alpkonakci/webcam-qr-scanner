@@ -591,7 +591,7 @@ async function acknowledgeDelivery(
     await admin.update(
       "relay_deliveries",
       filters({ delivery_id: `eq.${deliveryId}` }),
-      { status: "rejected", lease_until: null },
+      { status: "rejected", envelope: {}, lease_until: null },
     );
     return json({ status: "rejected", delivery_id: deliveryId }, 202);
   }
@@ -612,8 +612,10 @@ async function acknowledgeDelivery(
     filters({ delivery_id: `eq.${deliveryId}` }),
     {
       status: "delivered",
+      envelope: {},
       ack_envelope: body.envelope,
-      expires_at: Math.min(delivery.expires_at, body.envelope.expires_at as number),
+      // Keep (pair_id, message_id) until the original URL expiry. ACK lifetime
+      // is separate; clearing ciphertext must not delete the replay tombstone.
       lease_until: null,
     },
   );
@@ -636,7 +638,10 @@ async function getDeliveryStatus(
   if (delivery.expires_at < unixTime()) {
     throw new RelayError(410, "delivery_expired", "Delivery expired before acknowledgement.");
   }
-  if (delivery.status === "delivered" && delivery.ack_envelope !== null) {
+  if (delivery.status === "delivered") {
+    if (delivery.ack_envelope === null || !isTimestamp(delivery.ack_envelope.expires_at) || delivery.ack_envelope.expires_at < unixTime()) {
+      throw new RelayError(409, "delivery_receipt_expired", "The receipt is no longer available. Check your PC before sending again.");
+    }
     return json({ status: "delivered", envelope: delivery.ack_envelope });
   }
   if (delivery.status === "rejected") {

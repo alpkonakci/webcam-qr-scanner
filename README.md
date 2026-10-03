@@ -15,14 +15,14 @@ default browser, and closes the scanner automatically.
 ![Webcam QR Scanner usage demo](docs/assets/webcam-qr-scanner-demo.gif)
 
 > **Development status:** The latest stable GitHub release is `v0.1.1`. The
-> current branch targets `v0.2.0-beta.2`, a limited Phone-to-PC pre-release,
+> current branch targets `v0.2.0-beta.3`, a limited Phone-to-PC pre-release,
 > not a stable release. Normal use runs through the public
 > [qrwebcam.vercel.app](https://qrwebcam.vercel.app/) service without a Vercel
 > login, bypass secret or PowerShell setup. iPhone and Android core flows,
 > separate-Windows-account pairing/sending and cross-network delivery have
 > user-confirmed evidence; the full acceptance/security matrix remains open.
-> Beta.2 adds a return-to-phone-scanner QR and small screen-QR retries. See the
-> [beta.2 release notes](docs/v0.2.0-beta.2-release-notes.md) and
+> Beta.3 adds persistent replay protection and automatic receipt-status checks.
+> See the [beta.3 release notes](docs/v0.2.0-beta.3-release-notes.md) and
 > [beta release checklist](docs/v0.2-beta-release-checklist.md).
 
 ## Features
@@ -93,7 +93,7 @@ executables downloaded from the internet.
 
 ### v0.2 beta: background behavior
 
-The current source and locally generated `v0.2.0-beta.2` package still distribute
+The current source and locally generated `v0.2.0-beta.3` package still distribute
 one `QR-Scanner.exe`, but the executable starts separate internal modes:
 
 - A lightweight controller stays visible in the Windows system tray.
@@ -291,7 +291,7 @@ The self-test verifies OpenCV imports and QR decoding without opening a camera.
 The build produces the terminal-free executable and a distributable ZIP:
 
 ```text
-dist\Webcam-QR-Scanner-v0.2.0-beta.2-windows-x64.zip
+dist\Webcam-QR-Scanner-v0.2.0-beta.3-windows-x64.zip
 ```
 
 The ZIP contains `QR-Scanner.exe`, the `Scan Screen.vbs` launcher, the project

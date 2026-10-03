@@ -14,4 +14,7 @@ test("rendered pending/checking results disable sending and expose receipt-only 
   const delivered = await renderResult("delivered", "My PC received and verified the link.");
   assert.match(delivered, /disabled=""[^>]*><span>Received by PC/);
   assert.doesNotMatch(delivered, /Check delivery status/);
+  const unconfirmed = await renderResult("unconfirmed", "The receipt is no longer available. Check your PC.");
+  assert.match(unconfirmed, /disabled=""[^>]*><span>Check your PC/);
+  assert.doesNotMatch(unconfirmed, /Check delivery status|Received by PC/);
 });

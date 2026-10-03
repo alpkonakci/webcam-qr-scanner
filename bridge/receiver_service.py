@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from bridge.protocol import ReceivedUrl, ReceiverCredentials
 from bridge.receiver import PcReceiver
 from bridge.realtime import RealtimeSession
+from bridge.replay import PersistentReplayGuard, REPLAY_FILENAME
 from bridge.secure_storage import (
     PairingStore,
     PairingStoreSnapshot,
@@ -128,6 +129,7 @@ class ReceiverService:
                 on_url=self._handle_url,
                 realtime_session=current_realtime_session,
                 on_realtime_session=persist_realtime_session,
+                replay_guards=self.replay_guards_for(group),
             )
             try:
                 await receiver.run()
@@ -138,6 +140,17 @@ class ReceiverService:
                 ]
                 attempt += 1
                 await self._interruptible_delay(delay)
+
+    def replay_guards_for(self, group: ReceiverGroup) -> dict[str, PersistentReplayGuard]:
+        """Build guards backed by the same ledger across reconnects/restarts."""
+        return {
+            credential.pair_id: PersistentReplayGuard(
+                self.store.path.with_name(REPLAY_FILENAME),
+                scope=group.relay_origin + "\0" + credential.pair_id,
+                protector=self.store.protector,
+            )
+            for credential in group.credentials
+        }
 
     async def _wait_for_refresh_or_stop(self) -> None:
         while not self._stop_event.is_set() and not self._refresh_event.is_set():

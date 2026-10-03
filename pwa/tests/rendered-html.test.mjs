@@ -146,7 +146,8 @@ test("pending receipts have a GET-only check action and duplicate-tap guard", as
   const resultView = await readFile(new URL("app/QrResultView.tsx", root), "utf8");
   assert.match(resultView, /error instanceof PendingDeliveryError/);
   assert.match(resultView, /setDeliveryState\("pending"\)/);
-  assert.match(resultView, /await checkUrlDelivery\(pairedPc, result.href\)/);
+  assert.match(resultView, /await checkUrlDelivery\(pairedPc, result.href, controller.signal\)/);
+  assert.match(resultView, /watchUrlDelivery\(pairedPc, result.href, controller.signal\)/);
   assert.match(resultView, /deliveryBusy.current/);
   assert.match(resultView, /Check delivery status/);
   assert.match(resultView, /No new link will be sent/);

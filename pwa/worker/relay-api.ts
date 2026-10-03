@@ -502,7 +502,7 @@ async function acknowledgeDelivery(
     requireExactFields(body, ["event", "delivery_id"]);
     if (body.delivery_id !== deliveryId) invalidRequest("Delivery ID does not match.");
     await db
-      .prepare("UPDATE relay_deliveries SET status = 'rejected', lease_until = NULL WHERE delivery_id = ?")
+      .prepare("UPDATE relay_deliveries SET status = 'rejected', envelope = '{}', lease_until = NULL WHERE delivery_id = ?")
       .bind(deliveryId)
       .run();
     return json({ status: "rejected", delivery_id: deliveryId }, 202);
@@ -517,9 +517,9 @@ async function acknowledgeDelivery(
   }
   await db
     .prepare(
-      "UPDATE relay_deliveries SET status = 'delivered', ack_envelope = ?, expires_at = MIN(expires_at, ?), lease_until = NULL WHERE delivery_id = ?",
+      "UPDATE relay_deliveries SET status = 'delivered', envelope = '{}', ack_envelope = ?, lease_until = NULL WHERE delivery_id = ?",
     )
-    .bind(JSON.stringify(body.envelope), body.envelope.expires_at, deliveryId)
+    .bind(JSON.stringify(body.envelope), deliveryId)
     .run();
   return json({ status: "delivered", delivery_id: deliveryId }, 202);
 }
@@ -541,8 +541,12 @@ async function getDeliveryStatus(
   if (delivery.expires_at < unixTime()) {
     throw new RelayError(410, "delivery_expired", "Delivery expired before acknowledgement.");
   }
-  if (delivery.status === "delivered" && delivery.ack_envelope !== null) {
-    return json({ status: "delivered", envelope: JSON.parse(delivery.ack_envelope) });
+  if (delivery.status === "delivered") {
+    const ack = delivery.ack_envelope === null ? null : JSON.parse(delivery.ack_envelope);
+    if (!isObject(ack) || !isTimestamp(ack.expires_at) || ack.expires_at < unixTime()) {
+      throw new RelayError(409, "delivery_receipt_expired", "The receipt is no longer available. Check your PC before sending again.");
+    }
+    return json({ status: "delivered", envelope: ack });
   }
   if (delivery.status === "rejected") {
     throw new RelayError(409, "delivery_rejected", "The PC rejected the encrypted message.");
@@ -717,9 +721,10 @@ async function enforceRateLimit(
   }
 }
 
-async function cleanExpiredState(db: D1Database, now: number): Promise<void> {
+export async function cleanExpiredState(db: D1Database, now: number): Promise<void> {
   await db.batch([
     db.prepare("DELETE FROM relay_pairings WHERE expires_at < ?").bind(now),
+    db.prepare("UPDATE relay_deliveries SET ack_envelope = NULL WHERE status = 'delivered' AND ack_envelope IS NOT NULL AND json_extract(ack_envelope, '$.expires_at') < ?").bind(now),
     db.prepare("DELETE FROM relay_deliveries WHERE expires_at < ?").bind(now),
     db.prepare("DELETE FROM relay_rate_limits WHERE expires_at < ?").bind(now),
   ]);

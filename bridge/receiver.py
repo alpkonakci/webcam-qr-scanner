@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
@@ -20,7 +20,7 @@ from bridge.protocol import (
     decrypt_url_envelope,
     normalize_relay_origin,
 )
-from bridge.replay import InMemoryReplayGuard
+from bridge.replay import InMemoryReplayGuard, PersistentReplayGuard
 from bridge.relay_http import relay_protection_headers
 from bridge.realtime import (
     RealtimeConfig,
@@ -46,6 +46,7 @@ class PcReceiver:
         credentials: ReceiverCredentials | Sequence[ReceiverCredentials],
         on_url: UrlCallback,
         replay_guard: InMemoryReplayGuard | None = None,
+        replay_guards: Mapping[str, PersistentReplayGuard] | None = None,
         realtime_session: RealtimeSession | None = None,
         on_realtime_session: SessionCallback | None = None,
     ) -> None:
@@ -75,7 +76,15 @@ class PcReceiver:
             item.pair_id: item for item in credential_items
         }
         self.on_url = on_url
-        self.replay_guard = replay_guard or InMemoryReplayGuard()
+        if (
+            replay_guards is not None
+            and set(replay_guards) != set(self._credentials_by_pair)
+        ):
+            raise ValueError("replay guards must cover exactly the receiver's pairs")
+        self.replay_guard = (
+            replay_guard if replay_guard is not None else InMemoryReplayGuard()
+        )
+        self._replay_guards = replay_guards
         self.realtime_session = realtime_session
         self.on_realtime_session = on_realtime_session
         self.connected = asyncio.Event()
@@ -272,10 +281,15 @@ class PcReceiver:
         credentials = self._credentials_by_pair.get(pair_id)
         if credentials is None:
             raise ProtocolViolation("message belongs to an unknown pair")
+        guard = (
+            self._replay_guards[credentials.pair_id]
+            if self._replay_guards is not None
+            else self.replay_guard
+        )
         received = decrypt_url_envelope(
             credentials,
             event["envelope"],
-            replay_guard=self.replay_guard,
+            replay_guard=guard,
         )
         return (
             received,

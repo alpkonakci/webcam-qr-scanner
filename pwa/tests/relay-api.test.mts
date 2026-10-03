@@ -3,11 +3,13 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { Miniflare } from "miniflare";
-import { handleRelayRequest } from "../worker/relay-api.ts";
+import { cleanExpiredState, handleRelayRequest } from "../worker/relay-api.ts";
 
 const PROTOCOL = "wqrs/1";
 
 test("D1 relay routes only opaque envelopes and returns an authenticated receipt", async (context) => {
+  let clock = Date.now();
+  context.mock.method(Date, "now", () => clock);
   const miniflare = new Miniflare({
     modules: true,
     script: "export default { fetch() { return new Response('unused') } }",
@@ -188,6 +190,31 @@ test("D1 relay routes only opaque envelopes and returns an authenticated receipt
     .first<{ envelope: string }>();
   assert.ok(stored);
   assert.doesNotMatch(stored.envelope, /https?:\/\//i);
+  assert.equal(stored.envelope, "{}");
+  // Exercise the actual SQLite cleanup/unique constraint after ACK expiry.
+  clock += 11_000;
+  await cleanExpiredState(database, Math.floor(clock / 1000));
+  const tombstone = await database.prepare("SELECT envelope, ack_envelope, expires_at FROM relay_deliveries WHERE delivery_id = ?")
+    .bind(deliveryId).first<{ envelope: string; ack_envelope: string | null; expires_at: number }>();
+  assert.ok(tombstone);
+  assert.equal(tombstone.expires_at, now + 300);
+  assert.equal(tombstone.ack_envelope, null);
+  assert.equal(tombstone.envelope, "{}");
+  const expiredReceipt = await request(`/v1/pairs/${pairId}/deliveries/${deliveryId}`, {
+    headers: { Authorization: `Bearer ${senderToken}` },
+  });
+  assert.equal(expiredReceipt.response.status, 409);
+  assert.equal((expiredReceipt.body.error as { code: string }).code, "delivery_receipt_expired");
+  const replay = await request(`/v1/pairs/${pairId}/messages`, {
+    method: "POST", headers: { Authorization: `Bearer ${senderToken}` },
+    body: JSON.stringify(encryptedMessage),
+  });
+  assert.equal(replay.response.status, 409);
+  assert.equal((replay.body.error as { code: string }).code, "replay_rejected");
+  clock += 290_000;
+  await cleanExpiredState(database, Math.floor(clock / 1000));
+  assert.equal(await database.prepare("SELECT delivery_id FROM relay_deliveries WHERE delivery_id = ?")
+    .bind(deliveryId).first(), null);
   await Promise.all(pending);
 });
 

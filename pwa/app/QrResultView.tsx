@@ -1,12 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   checkUrlDelivery,
   isPairRevokedError,
   PendingDeliveryError,
+  RelayClientError,
   removePairIfRevoked,
   sendUrlToPc,
+  watchUrlDelivery,
 } from "../lib/relay-client";
 import type { SenderCredentials } from "../lib/wqrs";
 import type { WebUrlResult } from "../lib/url-policy.mjs";
@@ -20,7 +22,7 @@ interface QrResultViewProps {
   onScanAgain(): void;
 }
 
-type DeliveryState = "idle" | "sending" | "checking" | "pending" | "delivered" | "error";
+type DeliveryState = "idle" | "sending" | "checking" | "pending" | "unconfirmed" | "delivered" | "error";
 
 export function QrResultView({
   result,
@@ -33,6 +35,28 @@ export function QrResultView({
   const [deliveryState, setDeliveryState] = useState<DeliveryState>("idle");
   const [deliveryMessage, setDeliveryMessage] = useState("");
   const deliveryBusy = useRef(false);
+  const activeRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => activeRequest.current?.abort(), []);
+  const awaitingReceipt = deliveryState === "pending" || deliveryState === "checking";
+  useEffect(() => {
+    if (!awaitingReceipt || !pairedPc || !result.ok) return;
+    const controller = new AbortController();
+    void watchUrlDelivery(pairedPc, result.href, controller.signal).then(() => {
+      if (controller.signal.aborted) return;
+      setDeliveryState("delivered");
+      setDeliveryMessage(`${pairedPc.pcLabel} received and verified the link.`);
+    }).catch(async (error: unknown) => {
+      if (controller.signal.aborted) return;
+      if (isPairRevokedError(error)) {
+        try { await removePairIfRevoked(error, pairedPc.pairId); } catch { /* Clear this session below. */ }
+        if (controller.signal.aborted) return;
+        onPairRevoked(pairedPc.pairId);
+      }
+      setDeliveryState(error instanceof RelayClientError && error.code === "delivery_receipt_expired" ? "unconfirmed" : "error");
+      setDeliveryMessage(error instanceof Error ? error.message : "Delivery could not be verified. Check your PC.");
+    });
+    return () => controller.abort();
+  }, [awaitingReceipt, onPairRevoked, pairedPc, result]);
   if (!result.ok) {
     return (
       <section className="result-section" aria-live="polite">
@@ -54,18 +78,27 @@ export function QrResultView({
   };
 
   const sendToPc = async (checkOnly = false) => {
-    if (!pairedPc || deliveryBusy.current || deliveryState === "delivered") return;
+    if (!pairedPc || deliveryBusy.current || deliveryState === "delivered" || deliveryState === "unconfirmed") return;
     deliveryBusy.current = true;
+    const controller = new AbortController();
+    activeRequest.current = controller;
     setDeliveryState(checkOnly ? "checking" : "sending");
     setDeliveryMessage(checkOnly ? "Checking the existing delivery..." : `Sending securely to ${pairedPc.pcLabel}...`);
     try {
-      if (checkOnly) await checkUrlDelivery(pairedPc, result.href);
-      else await sendUrlToPc(pairedPc, result.href);
+      if (checkOnly) await checkUrlDelivery(pairedPc, result.href, controller.signal);
+      else await sendUrlToPc(pairedPc, result.href, controller.signal);
+      if (controller.signal.aborted) return;
       setDeliveryState("delivered");
       setDeliveryMessage(`${pairedPc.pcLabel} received and verified the link.`);
     } catch (error) {
+      if (controller.signal.aborted) return;
       if (error instanceof PendingDeliveryError) {
         setDeliveryState("pending");
+        setDeliveryMessage(error.message);
+        return;
+      }
+      if (error instanceof RelayClientError && error.code === "delivery_receipt_expired") {
+        setDeliveryState("unconfirmed");
         setDeliveryMessage(error.message);
         return;
       }
@@ -86,6 +119,7 @@ export function QrResultView({
       setDeliveryState("error");
       setDeliveryMessage(error instanceof Error ? error.message : "The link was not delivered.");
     } finally {
+      if (activeRequest.current === controller) activeRequest.current = null;
       deliveryBusy.current = false;
     }
   };
@@ -118,10 +152,10 @@ export function QrResultView({
             <button
               type="button"
               className="result-secondary result-secondary-enabled"
-              disabled={deliveryState === "sending" || deliveryState === "checking" || deliveryState === "pending" || deliveryState === "delivered"}
+              disabled={deliveryState === "sending" || deliveryState === "checking" || deliveryState === "pending" || deliveryState === "unconfirmed" || deliveryState === "delivered"}
               onClick={() => { void sendToPc(); }}
             >
-              <span>{deliveryState === "sending" ? "Sending..." : deliveryState === "delivered" ? "Received by PC" : deliveryState === "pending" || deliveryState === "checking" ? "Awaiting receipt" : "Send to PC"}</span>
+              <span>{deliveryState === "sending" ? "Sending..." : deliveryState === "delivered" ? "Received by PC" : deliveryState === "unconfirmed" ? "Check your PC" : deliveryState === "pending" || deliveryState === "checking" ? "Awaiting receipt" : "Send to PC"}</span>
               <small>{pairedPc.pcLabel}</small>
             </button>
           ) : (
@@ -140,6 +174,7 @@ export function QrResultView({
             role={deliveryState === "error" ? "alert" : "status"}
           >
             {deliveryMessage}
+            {awaitingReceipt && <span className="result-note"> Status is checked automatically while this page is open.</span>}
           </p>
         )}
         {pairedPc && (deliveryState === "pending" || deliveryState === "checking") && (

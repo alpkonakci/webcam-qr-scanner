@@ -451,6 +451,7 @@ footer {
 
 .delivery-status-error,
 .delivery-status-pending,
+.delivery-status-unconfirmed,
 .pairing-status-error {
   border-color: rgba(255, 189, 53, 0.3);
   color: #ffd98a;

@@ -10,6 +10,8 @@ import {
 
 const POLL_INTERVAL_MS = 500;
 const DELIVERY_WAIT_MS = 15_000;
+const RECEIPT_WATCH_INTERVAL_MS = 1_500;
+const RECEIPT_REQUEST_TIMEOUT_MS = 8_000;
 
 interface DeliveryAttempt {
   messageId: string;
@@ -211,6 +213,25 @@ export async function checkUrlDelivery(
   return attempt.inFlight;
 }
 
+export async function watchUrlDelivery(
+  credentials: SenderCredentials,
+  url: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  // GET-only, bounded by the existing attempt's authenticated URL expiry.
+  // No new message, persistent URL history or browser-background guarantee.
+  while (true) {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    try {
+      await checkUrlDelivery(credentials, url, signal);
+      return;
+    } catch (error) {
+      if (!(error instanceof PendingDeliveryError)) throw error;
+    }
+    await abortableDelay(RECEIPT_WATCH_INTERVAL_MS, signal);
+  }
+}
+
 function deliveryAttemptKey(credentials: SenderCredentials, url: string): string {
   return JSON.stringify([credentials.relayOrigin, credentials.pairId, url]);
 }
@@ -267,11 +288,16 @@ async function readDeliveryReceipt(
     throw new RelayClientError("delivery_expired", "The delivery window ended. Check your PC before sending again.");
   }
   if (!attempt.deliveryId) throw new PendingDeliveryError();
+  const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  if (signal?.aborted) onAbort();
+  else signal?.addEventListener("abort", onAbort, { once: true });
+  const timeout = setTimeout(() => controller.abort(), RECEIPT_REQUEST_TIMEOUT_MS);
   try {
     const response = await relayFetch(
       `${credentials.relayOrigin}/v1/pairs/${credentials.pairId}/deliveries/${attempt.deliveryId}`,
       credentials.senderToken,
-      { method: "GET", expectedStatus: [200, 202], signal },
+      { method: "GET", expectedStatus: [200, 202], signal: controller.signal },
     );
     if (response.status === 200) {
       await verifyDeliveryAck(credentials, attempt.messageId, objectField(response.body, "envelope"));
@@ -279,11 +305,15 @@ async function readDeliveryReceipt(
       return;
     }
   } catch (error) {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
     if (error instanceof RelayClientError && [
-      "pair_revoked", "unauthorized", "delivery_rejected", "delivery_expired",
+      "pair_revoked", "unauthorized", "delivery_rejected", "delivery_expired", "delivery_receipt_expired",
     ].includes(error.code)) throw error;
     // A failed status request or invalid receipt must not permit a duplicate POST
     // or be presented as verified delivery.
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener("abort", onAbort);
   }
   throw new PendingDeliveryError();
 }
@@ -352,6 +382,8 @@ function relayErrorMessage(code: string): string {
       return "The PC rejected the encrypted delivery.";
     case "delivery_expired":
       return "The delivery window ended. Check your PC before sending again.";
+    case "delivery_receipt_expired":
+      return "The receipt is no longer available. The link may already be on your PC. Check your PC before sending again.";
     default:
       return "The relay rejected the request safely.";
   }

@@ -7,6 +7,8 @@ remain subject to their own licenses and are not relicensed under MIT.
 ## Components included in the Windows package
 
 - **CPython 3.12.14** — Python Software Foundation License
+- **SQLite 3.53.1** — public domain; bundled with CPython for the encrypted
+  replay ledger. [Upstream copyright statement](https://sqlite.org/copyright.html).
 - **NumPy 2.5.1** — BSD 3-Clause License and licenses of bundled components
 - **opencv-python 5.0.0.93** — Apache License 2.0 and licenses of bundled
   third-party components
