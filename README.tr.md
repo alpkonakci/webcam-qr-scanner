@@ -15,16 +15,14 @@ varsayılan tarayıcıda açılır ve QR Scanner otomatik olarak kapanır.
 ![Webcam QR Scanner kullanım videosu](docs/assets/webcam-qr-scanner-demo.gif)
 
 > **Geliştirme durumu:** Güncel kararlı GitHub sürümü `v0.1.1`'dir. Mevcut dal
-> kararlı sürüm değil, `v0.2.0-beta.1` Telefon-PC adayıdır. İki dakikalık tek
-> kullanımlık ve masaüstünde gösterilen QR'ın okutulmasıyla başlatılan
-> eşleştirme, Windows DPAPI koruması,
-> eşleşmiş telefon yönetimi ve URL'yi WebCrypto ile uçtan uca şifreleyen,
-> kurulum gerektirmeyen tarayıcı PWA'sı hazırdır. Vercel API, Supabase Postgres
-> şeması, özel Realtime bildirim yolu, beş saniyelik kurtarma sorgusu ve 60
-> saniyelik güvenlik eşitlemesi yerel olarak doğrulandı. Vercel önizleme
-> dağıtımı hazır, ancak giriş koruması altında; `/healthz` ve iPhone/Android
-> akışı gerçek cihazlarda henüz doğrulanmadı. Mevcut Sites/D1 betasına
-> dokunulmadı. Ayrıntılar için [geçiş planına](docs/vercel-supabase-migration.tr.md)
+> kararlı sürüm değil, `v0.2.0-beta.2` sınırlı Telefon-PC ön sürümünü hedefler.
+> Normal kullanım açık [qrwebcam.vercel.app](https://qrwebcam.vercel.app/)
+> hizmetinde çalışır; Vercel girişi, bypass secret veya PowerShell kurulumu
+> gerekmez. iPhone/Android temel akışları, ayrı Windows hesabında eşleştirme ve
+> gönderim, ayrıca farklı ağlar arasında teslim kullanıcı tarafından doğrulandı.
+> Tam kabul ve güvenlik matrisi henüz tamamlanmadı. Beta.2, telefondaki tarama
+> sayfasına dönüş QR'ı ve küçük ekran QR'ları için tekrar okumayı ekler.
+> Ayrıntılar için [beta.2 sürüm notlarına](docs/v0.2.0-beta.2-release-notes.md)
 > ve [beta yayın kontrol listesine](docs/v0.2-beta-release-checklist.tr.md) bakın.
 
 ## Özellikler
@@ -92,9 +90,9 @@ Tek dosyalı paket, içindeki dosyaları hazırladığı için ilk açılış bi
 daha uzun sürebilir. İnternetten indirilen imzasız EXE'ler için Windows
 SmartScreen uyarı gösterebilir.
 
-### v0.2.0-beta.1 adayı: arka plan davranışı
+### v0.2 beta: arka plan davranışı
 
-Mevcut kaynak kod ve yerel olarak oluşturulan `v0.2.0-beta.1` paketi yine tek bir
+Mevcut kaynak kod ve yerel olarak oluşturulan `v0.2.0-beta.2` paketi yine tek bir
 `QR-Scanner.exe` dağıtır; EXE kendi içinde ayrı çalışma kipleri başlatır:
 
 - Hafif masaüstü denetleyicisi Windows sistem tepsisinde görünür kalır.
@@ -105,12 +103,12 @@ Mevcut kaynak kod ve yerel olarak oluşturulan `v0.2.0-beta.1` paketi yine tek b
 - Kontrol ekranı, gizli tepsi simgesini bulmayı gerektirmeden **Scan with
   Camera**, **Select a Screen Area** ve duruma göre **Pair Phone** veya
   **Paired Phones (N)** seçeneklerini sunar.
-- Kontrol ekranını kapatmak uygulamayı tepside çalışır bırakır. Ekrandaki
+- Kontrol ekranını kapatmak arka planda kalma veya tam çıkış seçeneği sunar. Ekrandaki
   **Exit** işlemi tam kapanmadan önce mevcut onayı korur.
 - Tepsi menüsünde **Open QR Scanner**, doğrudan tarama/eşleştirme işlemleri,
   **Start with Windows** ve **Exit QR Scanner** seçenekleri bulunur.
 - EXE yeniden açılırsa ikinci bir denetleyici veya ikinci kamera oluşturmak
-  yerine mevcut tepsi örneğinden kamera açılması istenir.
+  yerine mevcut tepsi örneğinden ana ekranın açılması istenir.
 - Kameradayken `Ctrl+Q` veya tepsideki **Exit QR Scanner**, her şeyi durdurmadan
   önce onay ister.
 - **Start with Windows** varsayılan kapalıdır; açılırsa Windows oturumunda
@@ -297,7 +295,7 @@ Self-test, kamera açmadan OpenCV yüklemesini ve QR çözümlemeyi doğrular.
 Build sonunda terminal göstermeyen EXE ile dağıtıma hazır arşiv oluşturulur:
 
 ```text
-dist\Webcam-QR-Scanner-v0.2.0-beta.1-windows-x64.zip
+dist\Webcam-QR-Scanner-v0.2.0-beta.2-windows-x64.zip
 ```
 
 ZIP içinde `QR-Scanner.exe`, `Scan Screen.vbs` başlatıcısı, proje MIT lisansı,

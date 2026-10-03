@@ -40,12 +40,14 @@ VISIBLE_ROWS = 4
 PAIR_ANOTHER_BOUNDS = (32, 436, 242, 484)
 BACK_BOUNDS = (258, 436, 382, 484)
 REMOVE_BOUNDS = (398, 436, 588, 484)
+OPEN_SCANNER_BOUNDS = (32, 494, 588, 530)
 
 
 class PairedPhonesAction(Enum):
     BACK = "back"
     PAIR_ANOTHER = "pair_another"
     REMOVE = "remove"
+    OPEN_SCANNER = "open_scanner"
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,6 +106,8 @@ def action_at_point(
         return PairedPhonesAction.BACK
     if has_selection and _contains(REMOVE_BOUNDS, x, y):
         return PairedPhonesAction.REMOVE
+    if _contains(OPEN_SCANNER_BOUNDS, x, y):
+        return PairedPhonesAction.OPEN_SCANNER
     return None
 
 
@@ -201,11 +205,10 @@ def build_paired_phones_canvas(
         accent=WARNING,
         enabled=selected_index is not None,
     )
-    draw.text(
-        (32, 512),
-        "ESC  Back",
-        font=small_font,
-        fill=SECONDARY_TEXT,
+    _draw_button(
+        draw, OPEN_SCANNER_BOUNDS, "Open scanner on phone", button_font,
+        hovered=hover_action is PairedPhonesAction.OPEN_SCANNER,
+        accent=ACCENT,
     )
 
     rgb = np.asarray(canvas, dtype=np.uint8)

@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 import cv2
 import numpy as np
@@ -81,6 +82,37 @@ class QRReaderTests(unittest.TestCase):
         results = self.reader.scan_all(frame)
 
         self.assertEqual({result.data for result in results}, set(values))
+
+    def test_small_screen_crop_keeps_original_coordinates(self) -> None:
+        value = "https://example.com/small"
+        small = cv2.resize(make_qr_code(value), (70, 70), interpolation=cv2.INTER_NEAREST)
+        self.assertEqual(self.reader._scan_once(small), [])
+        results = self.reader.scan_all(small)
+        self.assertEqual([result.data for result in results], [value])
+        self.assertTrue(np.all(results[0].corners >= 0))
+        self.assertTrue(np.all(results[0].corners < 70))
+
+    def test_enlargement_fallback_preserves_ambiguity_and_maps_border(self) -> None:
+        from qr_reader import QRResult
+        frame = np.full((80, 80), 255, dtype=np.uint8)
+
+        def decode(image, *, limit=12):
+            if image.shape[0] != 224:
+                return []
+            corners = np.array([[40, 40], [100, 40], [100, 100], [40, 100]])
+            return [QRResult("https://example.com/one", corners),
+                    QRResult("https://example.com/two", corners + 20)]
+
+        with patch.object(self.reader, "_scan_repeated", side_effect=decode):
+            results = self.reader.scan_all(frame)
+        self.assertEqual(len(results), 2)
+        np.testing.assert_array_equal(results[0].corners,
+                                      np.array([[4, 4], [34, 4], [34, 34], [4, 34]]))
+
+    def test_large_screen_does_not_use_expensive_upscale_fallback(self) -> None:
+        with patch.object(self.reader, "_scan_repeated", return_value=[]) as scan:
+            self.reader.scan_all(np.full((600, 600), 255, dtype=np.uint8))
+        self.assertEqual(scan.call_count, 2)
 
 
 if __name__ == "__main__":

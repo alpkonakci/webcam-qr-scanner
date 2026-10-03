@@ -113,6 +113,17 @@ test("opens decoded links without replacing the QR Scanner page", async () => {
   assert.match(home, /current\?\.pairId === pairId \? null : current/);
 });
 
+test("explains how to return without replacing the saved phone pairing", async () => {
+  const home = await readFile(new URL("app/PwaHome.tsx", root), "utf8");
+  assert.match(home, /Your connection is saved in this browser/);
+  assert.match(home, /Bookmark this page/);
+  assert.match(home, /Closing the tab does not/);
+  assert.match(home, /Open scanner/);
+  assert.match(home, /normal camera opens websites directly/);
+  assert.match(home, /same browser/);
+  assert.doesNotMatch(home, /navigator\.clipboard|localStorage\.setItem/);
+});
+
 test("uses the desktop QR as the only pairing confirmation", async () => {
   const pairingView = await readFile(
     new URL("app/PairingView.tsx", root),

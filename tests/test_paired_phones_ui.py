@@ -9,6 +9,7 @@ import numpy as np
 from paired_phone_ipc import PairedPhoneView
 from paired_phones_ui import (
     REMOVE_BOUNDS,
+    OPEN_SCANNER_BOUNDS,
     WINDOW_HEIGHT,
     WINDOW_WIDTH,
     PairedPhonesAction,
@@ -58,6 +59,11 @@ class PairedPhonesUiTests(unittest.TestCase):
 
         self.assertEqual(canvas.shape, (WINDOW_HEIGHT, WINDOW_WIDTH, 3))
         self.assertEqual(canvas.dtype, np.uint8)
+
+    def test_return_to_phone_scanner_does_not_require_selection(self) -> None:
+        left, top, right, bottom = OPEN_SCANNER_BOUNDS
+        self.assertIs(action_at_point((left + right) // 2, (top + bottom) // 2,
+                                    has_selection=False), PairedPhonesAction.OPEN_SCANNER)
 
     def test_remove_requires_confirmation_with_short_identifier(self) -> None:
         callback = None

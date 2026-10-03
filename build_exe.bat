@@ -24,13 +24,14 @@ if not exist "assets\QR-Scanner.ico" (
     exit /b 1
 )
 
-echo Building terminal-free QR-Scanner.exe for v0.2.0-beta.1...
+echo Building terminal-free QR-Scanner.exe for v0.2.0-beta.2...
 ".venv\Scripts\python.exe" -m PyInstaller ^
     --noconfirm ^
     --clean ^
     --onefile ^
     --windowed ^
     --icon "assets\QR-Scanner.ico" ^
+    --version-file "assets\windows-version-info.txt" ^
     --add-data "assets\QR-Scanner.ico;assets" ^
     --hidden-import bridge.pairing_controller ^
     --hidden-import bridge.realtime ^
@@ -62,7 +63,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "package_release.ps1" -Version "v0.2.0-beta.1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "package_release.ps1" -Version "v0.2.0-beta.2"
 if errorlevel 1 (
     echo.
     echo Release package creation failed.

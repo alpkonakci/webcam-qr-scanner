@@ -126,7 +126,17 @@ def run_paired_phones() -> int:
     )
     from paired_phones_ui import PairedPhonesAction, show_paired_phones_window
 
-    decision = show_paired_phones_window(consume_paired_phones_snapshot())
+    phones = consume_paired_phones_snapshot()
+    while True:
+        decision = show_paired_phones_window(phones)
+        if decision.action is not PairedPhonesAction.OPEN_SCANNER:
+            break
+        from phone_scanner_ui import show_phone_scanner_window
+
+        # This public homepage QR contains no pairing material and cannot grant
+        # access. The phone must still possess its own saved browser credentials.
+        if phones:
+            show_phone_scanner_window(phones[0].relay_origin)
     if decision.action is PairedPhonesAction.REMOVE:
         if decision.phone is None:
             return CONTROL_BACK_HOME

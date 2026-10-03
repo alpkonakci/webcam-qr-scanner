@@ -159,6 +159,36 @@ class QRReader:
                 limit=limit - len(collected),
             )
         )
+        # Selected screen areas can contain sharp but very small QR modules.
+        # Blur destroys those modules, so retry the unblurred crop at a bounded
+        # larger scale with a quiet border. Never synthesize/guess a payload.
+        if max(height, width) <= 512:
+            for interpolation in (cv2.INTER_NEAREST, cv2.INTER_CUBIC):
+                for scale in (2, 4):
+                    enlarged = cv2.resize(
+                        gray, None, fx=scale, fy=scale,
+                        interpolation=interpolation,
+                    )
+                    border = 16 * scale
+                    padded = cv2.copyMakeBorder(
+                        enlarged, border, border, border, border,
+                        cv2.BORDER_CONSTANT, value=255,
+                    )
+                    variants = (padded, cv2.threshold(
+                        padded, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU,
+                    )[1])
+                    for variant in variants:
+                        for result in self._scan_repeated(variant, limit=limit):
+                            corners = np.rint(
+                                (result.corners.astype(np.float32) - border)
+                                / scale
+                            ).astype(np.int32)
+                            corners[:, 0] = np.clip(corners[:, 0], 0, width - 1)
+                            corners[:, 1] = np.clip(corners[:, 1], 0, height - 1)
+                            collected.append(QRResult(result.data, corners))
+                        collected = self._unique(collected)
+                        if len(collected) >= limit:
+                            return collected[:limit]
         return self._unique(collected)[:limit]
 
     def scan(self, frame: np.ndarray, thorough: bool = True) -> list[QRResult]:

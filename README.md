@@ -15,17 +15,14 @@ default browser, and closes the scanner automatically.
 ![Webcam QR Scanner usage demo](docs/assets/webcam-qr-scanner-demo.gif)
 
 > **Development status:** The latest stable GitHub release is `v0.1.1`. The
-> current branch is the `v0.2.0-beta.1` Phone-to-PC candidate, not a stable
-> release. It includes two-minute single-use pairing initiated by scanning the
-> desktop QR,
-> Windows DPAPI credential protection, paired-phone access management, and an
-> install-free browser PWA that encrypts URLs end to end with WebCrypto. The
-> Vercel API, Supabase Postgres schema, private Realtime wake-up path, five-second
-> recovery poll, and 60-second safety resync are locally tested. The Vercel
-> Preview deployment is ready behind Vercel Authentication, but `/healthz` and
-> the complete iPhone/Android flow have not yet been validated on real devices.
-> The existing Sites/D1 beta remains untouched. See the
-> [migration runbook](docs/vercel-supabase-migration.tr.md) and
+> current branch targets `v0.2.0-beta.2`, a limited Phone-to-PC pre-release,
+> not a stable release. Normal use runs through the public
+> [qrwebcam.vercel.app](https://qrwebcam.vercel.app/) service without a Vercel
+> login, bypass secret or PowerShell setup. iPhone and Android core flows,
+> separate-Windows-account pairing/sending and cross-network delivery have
+> user-confirmed evidence; the full acceptance/security matrix remains open.
+> Beta.2 adds a return-to-phone-scanner QR and small screen-QR retries. See the
+> [beta.2 release notes](docs/v0.2.0-beta.2-release-notes.md) and
 > [beta release checklist](docs/v0.2-beta-release-checklist.md).
 
 ## Features
@@ -94,9 +91,9 @@ The first launch can take a few seconds longer because the single-file package
 needs to prepare its bundled files. Windows SmartScreen may warn about unsigned
 executables downloaded from the internet.
 
-### v0.2.0-beta.1 candidate: background behavior
+### v0.2 beta: background behavior
 
-The current source and locally generated `v0.2.0-beta.1` package still distribute
+The current source and locally generated `v0.2.0-beta.2` package still distribute
 one `QR-Scanner.exe`, but the executable starts separate internal modes:
 
 - A lightweight controller stays visible in the Windows system tray.
@@ -107,11 +104,11 @@ one `QR-Scanner.exe`, but the executable starts separate internal modes:
 - The control center offers **Scan with Camera**, **Select a Screen Area**, and
   either **Pair Phone** or **Paired Phones (N)** without requiring the
   user to find a hidden tray icon.
-- Closing the control center keeps the app available in the tray. Its explicit
+- Closing the control center offers background or full-exit options. Its explicit
   **Exit** action preserves the existing confirmation before full shutdown.
 - The tray offers **Open QR Scanner**, direct scan/pair actions,
   **Start with Windows**, and **Exit QR Scanner**.
-- Reopening the EXE asks the existing tray instance to open the camera instead
+- Reopening the EXE asks the existing tray instance to open the home screen instead
   of creating a second controller or a second camera window.
 - `Ctrl+Q` in the camera or **Exit QR Scanner** in the tray asks for
   confirmation before stopping everything.
@@ -294,7 +291,7 @@ The self-test verifies OpenCV imports and QR decoding without opening a camera.
 The build produces the terminal-free executable and a distributable ZIP:
 
 ```text
-dist\Webcam-QR-Scanner-v0.2.0-beta.1-windows-x64.zip
+dist\Webcam-QR-Scanner-v0.2.0-beta.2-windows-x64.zip
 ```
 
 The ZIP contains `QR-Scanner.exe`, the `Scan Screen.vbs` launcher, the project

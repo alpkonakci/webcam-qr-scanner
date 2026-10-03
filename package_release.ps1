@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "v0.2.0-beta.1",
+    [string]$Version = "v0.2.0-beta.2",
     [string]$ExecutablePath = "",
     [string]$OutputDirectory = "",
     [switch]$FailIfExists

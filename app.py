@@ -163,8 +163,11 @@ def run_screen_scan(
     if not results:
         notify(
             "Scan Screen",
-            "No QR code was found in the selected area. Select the entire QR "
-            "code and try again.",
+            "QR could not be read.\n\n"
+            "Enlarge the original image or page, then select the whole QR "
+            "with a little space around it.\n"
+            "Tiny or blurry thumbnail images may not contain enough detail; "
+            "use the full-size image or scan the printed code with your phone.",
             0x40,
         )
         return ScreenScanStatus.NO_CODE

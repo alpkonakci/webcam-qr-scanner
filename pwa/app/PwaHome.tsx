@@ -111,7 +111,7 @@ export function PwaHome() {
             <p className="eyebrow">PHONE-TO-PC</p>
             <p className="brand-name">QR Scanner</p>
           </div>
-          <span className="dev-badge">v0.2 beta</span>
+          <span className="dev-badge">v0.2 beta.2</span>
         </header>
 
         {pairingUri ? (
@@ -164,6 +164,30 @@ export function PwaHome() {
               </button>
 
             </section>
+
+            {pairedPc && (
+              <aside className="return-panel" aria-label="Return to your scanner">
+                <strong>Your connection is saved in this browser.</strong>
+                <p>
+                  Bookmark this page to return later. Closing the tab does not
+                  remove your pairing.
+                </p>
+                <p className="return-address">{pairedPc.relayOrigin}</p>
+                <details>
+                  <summary>How do I send another QR?</summary>
+                  <p>
+                    Open this page in the same browser and tap Scan QR. Your
+                    phone&apos;s normal camera opens websites directly; it does
+                    not send them to your PC.
+                  </p>
+                  <p>
+                    Lost the tab? On your PC, open Paired Phones → Open scanner
+                    on phone and scan that code. If you use another browser,
+                    private browsing or clear site data, you may need to pair again.
+                  </p>
+                </details>
+              </aside>
+            )}
 
             <section className="privacy-panel" aria-labelledby="privacy-title">
               <div>

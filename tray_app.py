@@ -179,7 +179,7 @@ class TrayApplication:
             pystray.MenuItem("Select a Screen Area", self._scan_screen),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
-                "Phone-to-PC: v0.2 beta",
+                "Phone-to-PC: v0.2 beta.2",
                 lambda *_: None,
                 enabled=False,
             ),
