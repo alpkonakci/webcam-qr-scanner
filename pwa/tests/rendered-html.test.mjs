@@ -141,3 +141,22 @@ test("uses the desktop QR as the only pairing confirmation", async () => {
   assert.doesNotMatch(pairingView, /Pair this phone\?/);
   assert.doesNotMatch(pairingView, /Waiting for PC approval/);
 });
+
+test("pending receipts have a GET-only check action and duplicate-tap guard", async () => {
+  const resultView = await readFile(new URL("app/QrResultView.tsx", root), "utf8");
+  assert.match(resultView, /error instanceof PendingDeliveryError/);
+  assert.match(resultView, /setDeliveryState\("pending"\)/);
+  assert.match(resultView, /await checkUrlDelivery\(pairedPc, result.href\)/);
+  assert.match(resultView, /deliveryBusy.current/);
+  assert.match(resultView, /Check delivery status/);
+  assert.match(resultView, /No new link will be sent/);
+  assert.match(resultView, /disabled=\{[^}]*deliveryState === "pending"/);
+});
+
+test("camera permission help is site-specific and refresh does not auto-open the camera", async () => {
+  const home = await readFile(new URL("app/PwaHome.tsx", root), "utf8");
+  assert.match(home, /\[scannerOpen, setScannerOpen\] = useState\(false\)/);
+  assert.match(home, /Camera permission after refreshing/);
+  assert.match(home, /You do not need to allow all websites/);
+  assert.match(home, /Camera permission is separate from your saved PC pairing/);
+});

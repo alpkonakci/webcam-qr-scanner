@@ -199,6 +199,15 @@ export function PwaHome() {
                 <li><span aria-hidden="true">✓</span>No location access</li>
                 <li><span aria-hidden="true">✓</span>Camera only while the scanner is open</li>
               </ul>
+              <details className="camera-permission-help">
+                <summary>Camera permission after refreshing?</summary>
+                <p>
+                  Your browser controls this permission. If it asks each time,
+                  you can choose Camera → Allow for this site in the browser&apos;s
+                  website settings. You do not need to allow all websites.
+                  Camera permission is separate from your saved PC pairing.
+                </p>
+              </details>
             </section>
 
             <footer>

@@ -9,6 +9,29 @@ import {
 } from "./wqrs.ts";
 
 const POLL_INTERVAL_MS = 500;
+const DELIVERY_WAIT_MS = 15_000;
+
+interface DeliveryAttempt {
+  messageId: string;
+  expiresAt: number;
+  deliveryId: string | null;
+  submitted: boolean;
+  verified: boolean;
+  inFlight?: Promise<void>;
+  envelope: Record<string, unknown>;
+}
+
+// Page-memory only: no URL, token or delivery data is written to browser storage.
+// A rescan of the same link in this page reuses its attempt instead of POSTing twice.
+const deliveryAttempts = new Map<string, Promise<DeliveryAttempt>>();
+
+export class PendingDeliveryError extends Error {
+  readonly code = "delivery_pending";
+
+  constructor() {
+    super("Delivery is not confirmed yet. This link may still arrive. Keep this page open and check its status before sending again.");
+  }
+}
 
 export class RelayClientError extends Error {
   readonly code: string;
@@ -128,30 +151,141 @@ export async function sendUrlToPc(
   url: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  const message = await buildUrlEnvelope(credentials, url);
-  const accepted = await relayFetch(
-    `${credentials.relayOrigin}/v1/pairs/${credentials.pairId}/messages`,
-    credentials.senderToken,
-    { method: "POST", body: message.envelope, expectedStatus: 202, signal },
-  );
-  const deliveryId = stringField(accepted.body, "delivery_id");
-  const deadline = Date.now() + 15_000;
+  const key = deliveryAttemptKey(credentials, url);
+  for (const [storedKey, stored] of deliveryAttempts) {
+    try {
+      const attempt = await stored;
+      if (attempt.expiresAt < Math.floor(Date.now() / 1000)) deliveryAttempts.delete(storedKey);
+    } catch {
+      deliveryAttempts.delete(storedKey);
+    }
+  }
+  let stored = deliveryAttempts.get(key);
+  if (!stored) {
+    stored = buildUrlEnvelope(credentials, url).then((message) => ({
+      messageId: message.messageId,
+      expiresAt: message.envelope.expires_at as number,
+      deliveryId: null,
+      submitted: false,
+      verified: false,
+      envelope: message.envelope,
+    }));
+    deliveryAttempts.set(key, stored);
+  }
+  let attempt: DeliveryAttempt;
+  try {
+    attempt = await stored;
+  } catch (error) {
+    deliveryAttempts.delete(key);
+    throw error;
+  }
+  if (attempt.verified) return;
+  if (attempt.inFlight) return attempt.inFlight;
+  attempt.inFlight = submitOrCheckDelivery(credentials, attempt, signal).catch((error) => {
+    // Explicit rejection before enqueueing is safe to retry. A lost response is
+    // not proof that the POST failed, so uncertain attempts remain locked.
+    if ((!attempt.deliveryId && isDefiniteSubmissionRejection(error)) || isTerminalDeliveryError(error)) {
+      deliveryAttempts.delete(key);
+    }
+    throw error;
+  }).finally(() => { attempt.inFlight = undefined; });
+  return attempt.inFlight;
+}
+
+export async function checkUrlDelivery(
+  credentials: SenderCredentials,
+  url: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  const stored = deliveryAttempts.get(deliveryAttemptKey(credentials, url));
+  if (!stored) throw new RelayClientError("delivery_expired", "The delivery window ended. Check your PC before sending again.");
+  const attempt = await stored;
+  if (attempt.verified) return;
+  if (attempt.inFlight) return attempt.inFlight;
+  attempt.inFlight = readDeliveryReceipt(credentials, attempt, signal)
+    .catch((error) => {
+      if (isTerminalDeliveryError(error)) deliveryAttempts.delete(deliveryAttemptKey(credentials, url));
+      throw error;
+    })
+    .finally(() => { attempt.inFlight = undefined; });
+  return attempt.inFlight;
+}
+
+function deliveryAttemptKey(credentials: SenderCredentials, url: string): string {
+  return JSON.stringify([credentials.relayOrigin, credentials.pairId, url]);
+}
+
+function isDefiniteSubmissionRejection(error: unknown): boolean {
+  return error instanceof RelayClientError && [
+    "receiver_offline", "pair_revoked", "unauthorized", "rate_limited",
+    "invalid_request", "invalid_envelope", "message_expired",
+  ].includes(error.code);
+}
+
+function isTerminalDeliveryError(error: unknown): boolean {
+  return error instanceof RelayClientError && ["delivery_expired", "delivery_rejected"].includes(error.code);
+}
+
+async function submitOrCheckDelivery(
+  credentials: SenderCredentials,
+  attempt: DeliveryAttempt,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (attempt.submitted) return readDeliveryReceipt(credentials, attempt, signal);
+  attempt.submitted = true;
+  try {
+    const accepted = await relayFetch(
+      `${credentials.relayOrigin}/v1/pairs/${credentials.pairId}/messages`,
+      credentials.senderToken,
+      { method: "POST", body: attempt.envelope, expectedStatus: 202, signal },
+    );
+    attempt.deliveryId = stringField(accepted.body, "delivery_id");
+    if (!attempt.deliveryId) throw new PendingDeliveryError();
+  } catch (error) {
+    if (isDefiniteSubmissionRejection(error)) throw error;
+    throw new PendingDeliveryError();
+  }
+  const deadline = Date.now() + DELIVERY_WAIT_MS;
   while (Date.now() < deadline) {
+    try {
+      await readDeliveryReceipt(credentials, attempt, signal);
+      return;
+    } catch (error) {
+      if (!(error instanceof PendingDeliveryError)) throw error;
+    }
+    await abortableDelay(350, signal);
+  }
+  throw new PendingDeliveryError();
+}
+
+async function readDeliveryReceipt(
+  credentials: SenderCredentials,
+  attempt: DeliveryAttempt,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (attempt.expiresAt < Math.floor(Date.now() / 1000)) {
+    throw new RelayClientError("delivery_expired", "The delivery window ended. Check your PC before sending again.");
+  }
+  if (!attempt.deliveryId) throw new PendingDeliveryError();
+  try {
     const response = await relayFetch(
-      `${credentials.relayOrigin}/v1/pairs/${credentials.pairId}/deliveries/${deliveryId}`,
+      `${credentials.relayOrigin}/v1/pairs/${credentials.pairId}/deliveries/${attempt.deliveryId}`,
       credentials.senderToken,
       { method: "GET", expectedStatus: [200, 202], signal },
     );
     if (response.status === 200) {
-      await verifyDeliveryAck(credentials, message.messageId, objectField(response.body, "envelope"));
+      await verifyDeliveryAck(credentials, attempt.messageId, objectField(response.body, "envelope"));
+      attempt.verified = true;
       return;
     }
-    await abortableDelay(350, signal);
+  } catch (error) {
+    if (error instanceof RelayClientError && [
+      "pair_revoked", "unauthorized", "delivery_rejected", "delivery_expired",
+    ].includes(error.code)) throw error;
+    // A failed status request or invalid receipt must not permit a duplicate POST
+    // or be presented as verified delivery.
   }
-  throw new RelayClientError(
-    "delivery_timeout",
-    "The PC did not confirm receipt in time. The link was not reported as delivered.",
-  );
+  throw new PendingDeliveryError();
 }
 
 interface RelayFetchOptions {
@@ -216,6 +350,8 @@ function relayErrorMessage(code: string): string {
       return "Too many requests were made. Wait briefly and try again.";
     case "delivery_rejected":
       return "The PC rejected the encrypted delivery.";
+    case "delivery_expired":
+      return "The delivery window ended. Check your PC before sending again.";
     default:
       return "The relay rejected the request safely.";
   }

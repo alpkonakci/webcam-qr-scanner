@@ -450,6 +450,7 @@ footer {
 }
 
 .delivery-status-error,
+.delivery-status-pending,
 .pairing-status-error {
   border-color: rgba(255, 189, 53, 0.3);
   color: #ffd98a;
@@ -698,3 +699,12 @@ footer {
 .return-panel p { margin: 8px 0; color: var(--muted); }
 .return-panel .return-address { color: var(--accent); overflow-wrap: anywhere; }
 .return-panel summary { cursor: pointer; color: var(--ink); min-height: 32px; }
+
+.camera-permission-help {
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.camera-permission-help summary { cursor: pointer; min-height: 32px; color: var(--ink); }
+.camera-permission-help p { margin: 6px 0 0; }

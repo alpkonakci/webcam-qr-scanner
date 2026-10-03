@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
+  checkUrlDelivery,
   isPairRevokedError,
+  PendingDeliveryError,
   removePairIfRevoked,
   sendUrlToPc,
 } from "../lib/relay-client";
@@ -18,7 +20,7 @@ interface QrResultViewProps {
   onScanAgain(): void;
 }
 
-type DeliveryState = "idle" | "sending" | "delivered" | "error";
+type DeliveryState = "idle" | "sending" | "checking" | "pending" | "delivered" | "error";
 
 export function QrResultView({
   result,
@@ -30,6 +32,7 @@ export function QrResultView({
 }: QrResultViewProps) {
   const [deliveryState, setDeliveryState] = useState<DeliveryState>("idle");
   const [deliveryMessage, setDeliveryMessage] = useState("");
+  const deliveryBusy = useRef(false);
   if (!result.ok) {
     return (
       <section className="result-section" aria-live="polite">
@@ -50,15 +53,22 @@ export function QrResultView({
     window.open(result.href, "_blank", "noopener,noreferrer");
   };
 
-  const sendToPc = async () => {
-    if (!pairedPc || deliveryState === "sending") return;
-    setDeliveryState("sending");
-    setDeliveryMessage(`Sending securely to ${pairedPc.pcLabel}...`);
+  const sendToPc = async (checkOnly = false) => {
+    if (!pairedPc || deliveryBusy.current || deliveryState === "delivered") return;
+    deliveryBusy.current = true;
+    setDeliveryState(checkOnly ? "checking" : "sending");
+    setDeliveryMessage(checkOnly ? "Checking the existing delivery..." : `Sending securely to ${pairedPc.pcLabel}...`);
     try {
-      await sendUrlToPc(pairedPc, result.href);
+      if (checkOnly) await checkUrlDelivery(pairedPc, result.href);
+      else await sendUrlToPc(pairedPc, result.href);
       setDeliveryState("delivered");
       setDeliveryMessage(`${pairedPc.pcLabel} received and verified the link.`);
     } catch (error) {
+      if (error instanceof PendingDeliveryError) {
+        setDeliveryState("pending");
+        setDeliveryMessage(error.message);
+        return;
+      }
       if (isPairRevokedError(error)) {
         try {
           await removePairIfRevoked(error, pairedPc.pairId);
@@ -75,6 +85,8 @@ export function QrResultView({
       }
       setDeliveryState("error");
       setDeliveryMessage(error instanceof Error ? error.message : "The link was not delivered.");
+    } finally {
+      deliveryBusy.current = false;
     }
   };
 
@@ -106,10 +118,10 @@ export function QrResultView({
             <button
               type="button"
               className="result-secondary result-secondary-enabled"
-              disabled={deliveryState === "sending" || deliveryState === "delivered"}
-              onClick={sendToPc}
+              disabled={deliveryState === "sending" || deliveryState === "checking" || deliveryState === "pending" || deliveryState === "delivered"}
+              onClick={() => { void sendToPc(); }}
             >
-              <span>{deliveryState === "sending" ? "Sending..." : "Send to PC"}</span>
+              <span>{deliveryState === "sending" ? "Sending..." : deliveryState === "delivered" ? "Received by PC" : deliveryState === "pending" || deliveryState === "checking" ? "Awaiting receipt" : "Send to PC"}</span>
               <small>{pairedPc.pcLabel}</small>
             </button>
           ) : (
@@ -129,6 +141,17 @@ export function QrResultView({
           >
             {deliveryMessage}
           </p>
+        )}
+        {pairedPc && (deliveryState === "pending" || deliveryState === "checking") && (
+          <button
+            type="button"
+            className="result-secondary result-secondary-enabled"
+            disabled={deliveryState === "checking"}
+            onClick={() => { void sendToPc(true); }}
+          >
+            <span>{deliveryState === "checking" ? "Checking..." : "Check delivery status"}</span>
+            <small>No new link will be sent</small>
+          </button>
         )}
         <button type="button" className="result-text-button" onClick={onScanAgain}>
           Scan another QR
