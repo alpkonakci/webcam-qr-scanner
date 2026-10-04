@@ -111,7 +111,7 @@ export function PwaHome() {
             <p className="eyebrow">PHONE-TO-PC</p>
             <p className="brand-name">QR Scanner</p>
           </div>
-          <span className="dev-badge">v0.2 beta.3</span>
+          <span className="dev-badge">v0.2 beta.4</span>
         </header>
 
         {pairingUri ? (
