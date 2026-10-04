@@ -43,6 +43,7 @@ from ui import (
     show_instructions,
 )
 from window_icon import set_window_icon
+from window_cursor import set_window_arrow
 
 
 class ScreenScanStatus(Enum):
@@ -264,6 +265,7 @@ def run(
         )
         cv2.namedWindow(WINDOW_TITLE, cv2.WINDOW_NORMAL)
         set_window_icon(WINDOW_TITLE)
+        set_window_arrow(WINDOW_TITLE)
         cv2.resizeWindow(WINDOW_TITLE, *DISPLAY_SIZE)
 
         result_version = 0

@@ -5,6 +5,7 @@ import {
   checkUrlDelivery,
   isPairRevokedError,
   PendingDeliveryError,
+  prepareUrlRescan,
   RelayClientError,
   removePairIfRevoked,
   sendUrlToPc,
@@ -35,6 +36,7 @@ export function QrResultView({
   const [deliveryState, setDeliveryState] = useState<DeliveryState>("idle");
   const [deliveryMessage, setDeliveryMessage] = useState("");
   const deliveryBusy = useRef(false);
+  const scanAgainBusy = useRef(false);
   const activeRequest = useRef<AbortController | null>(null);
   useEffect(() => () => activeRequest.current?.abort(), []);
   const awaitingReceipt = deliveryState === "pending" || deliveryState === "checking";
@@ -75,6 +77,17 @@ export function QrResultView({
 
   const openInNewTab = () => {
     window.open(result.href, "_blank", "noopener,noreferrer");
+  };
+
+  const scanAgain = async () => {
+    if (scanAgainBusy.current || deliveryBusy.current) return;
+    scanAgainBusy.current = true;
+    try {
+      if (pairedPc) await prepareUrlRescan(pairedPc, result.href);
+      onScanAgain();
+    } finally {
+      scanAgainBusy.current = false;
+    }
   };
 
   const sendToPc = async (checkOnly = false) => {
@@ -188,9 +201,10 @@ export function QrResultView({
             <small>No new link will be sent</small>
           </button>
         )}
-        <button type="button" className="result-text-button" onClick={onScanAgain}>
+        <button type="button" className="result-text-button" disabled={deliveryState === "sending" || deliveryState === "checking"} onClick={() => { void scanAgain(); }}>
           Scan another QR
         </button>
+        {deliveryState === "delivered" && <p className="result-note">You can scan the same QR again to send it once more.</p>}
       </div>
     </section>
   );

@@ -16,6 +16,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from qr_reader import QRReader
 from window_icon import set_window_icon
+from window_cursor import set_window_arrow
 
 
 WINDOW_TITLE = "QR Scanner - Pair Phone"
@@ -179,6 +180,7 @@ def show_pairing_qr_window(
     qr_image = generate_pairing_qr_image(pairing_value)
     cv2.namedWindow(WINDOW_TITLE, cv2.WINDOW_AUTOSIZE)
     set_window_icon(WINDOW_TITLE)
+    set_window_arrow(WINDOW_TITLE)
     screen_width, screen_height = _primary_screen_size()
     cv2.moveWindow(
         WINDOW_TITLE,

@@ -26,6 +26,7 @@ from home_ui import (
 from native_dialogs import confirm_remove_phone_access
 from paired_phone_ipc import PairedPhoneView
 from window_icon import set_window_icon
+from window_cursor import set_window_arrow
 
 
 WINDOW_TITLE = "QR Scanner - Paired Phones"
@@ -279,6 +280,7 @@ def show_paired_phones_window(
 
     cv2.namedWindow(WINDOW_TITLE, cv2.WINDOW_AUTOSIZE)
     set_window_icon(WINDOW_TITLE)
+    set_window_arrow(WINDOW_TITLE)
     cv2.setMouseCallback(WINDOW_TITLE, handle_mouse)
     screen_width, screen_height = _primary_screen_size()
     cv2.moveWindow(

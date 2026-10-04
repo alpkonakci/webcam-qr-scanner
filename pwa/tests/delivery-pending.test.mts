@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test, { type TestContext } from "node:test";
-import { checkUrlDelivery, PendingDeliveryError, sendUrlToPc, watchUrlDelivery } from "../lib/relay-client.ts";
+import { checkUrlDelivery, PendingDeliveryError, prepareUrlRescan, sendUrlToPc, watchUrlDelivery } from "../lib/relay-client.ts";
 import { canonicalJson, decodeBase64Url, encodeBase64Url, type SenderCredentials } from "../lib/wqrs.ts";
 
 const vector = JSON.parse(await readFile(new URL("../../protocol/test-vectors/wqrs-1.json", import.meta.url), "utf8"));
@@ -84,9 +84,68 @@ test("a lost submission response remains uncertain and cannot create a duplicate
   let requests = 0;
   globalThis.fetch = async () => { requests += 1; throw new TypeError("connection lost"); };
   await assert.rejects(sendUrlToPc(f.credentials, f.url), PendingDeliveryError);
+  assert.equal(await prepareUrlRescan(f.credentials, f.url), false);
   await assert.rejects(sendUrlToPc(f.credentials, f.url), PendingDeliveryError);
   await assert.rejects(checkUrlDelivery(f.credentials, f.url), PendingDeliveryError);
   assert.equal(requests, 1);
+});
+
+test("an explicit scan after verified delivery sends the same URL with a fresh message ID", async (context) => {
+  const f = await fixture(context);
+  const messageIds: string[] = [];
+  globalThis.fetch = async (_url, options) => {
+    if (options?.method === "POST") {
+      messageIds.push(JSON.parse(String(options.body)).message_id);
+      return Response.json({ delivery_id: `rescan-${messageIds.length}` }, { status: 202 });
+    }
+    return Response.json({ envelope: await receipt(f.credentials, messageIds.at(-1)!) });
+  };
+  assert.equal(await prepareUrlRescan(f.credentials, f.url), false);
+  await sendUrlToPc(f.credentials, f.url);
+  await sendUrlToPc(f.credentials, f.url); // Same result / double tap remains cached.
+  assert.equal(messageIds.length, 1);
+  assert.equal(await prepareUrlRescan(f.credentials, f.url), true);
+  await Promise.all([sendUrlToPc(f.credentials, f.url), sendUrlToPc(f.credentials, f.url)]);
+  assert.equal(messageIds.length, 2);
+  assert.notEqual(messageIds[0], messageIds[1]);
+});
+
+test("a rescan never unlocks an unconfirmed delivery", async (context) => {
+  const f = await fixture(context);
+  let posts = 0;
+  globalThis.fetch = async (_url, options) => {
+    if (options?.method === "POST") {
+      posts += 1;
+      return Response.json({ delivery_id: "pending-rescan" }, { status: 202 });
+    }
+    f.advance(16_000);
+    return Response.json({ status: "pending" }, { status: 202 });
+  };
+  await assert.rejects(sendUrlToPc(f.credentials, f.url), PendingDeliveryError);
+  assert.equal(await prepareUrlRescan(f.credentials, f.url), false);
+  await assert.rejects(sendUrlToPc(f.credentials, f.url), PendingDeliveryError);
+  assert.equal(posts, 1);
+  globalThis.fetch = async () => Response.json({ error: { code: "delivery_receipt_expired" } }, { status: 410 });
+  await assert.rejects(checkUrlDelivery(f.credentials, f.url), { code: "delivery_receipt_expired" });
+  assert.equal(await prepareUrlRescan(f.credentials, f.url), false);
+});
+
+test("rescan reset is scoped to the exact PC and URL", async (context) => {
+  const f = await fixture(context);
+  let messageId = "";
+  globalThis.fetch = async (_url, options) => {
+    if (options?.method === "POST") {
+      messageId = JSON.parse(String(options.body)).message_id;
+      return Response.json({ delivery_id: "scoped-rescan" }, { status: 202 });
+    }
+    return Response.json({ envelope: await receipt(f.credentials, messageId) });
+  };
+  await sendUrlToPc(f.credentials, f.url);
+  assert.equal(await prepareUrlRescan({ ...f.credentials, pairId: "other-PC" }, f.url), false);
+  assert.equal(await prepareUrlRescan({ ...f.credentials, relayOrigin: "https://other.example" }, f.url), false);
+  assert.equal(await prepareUrlRescan(f.credentials, f.url + "/other"), false);
+  assert.equal(await prepareUrlRescan(f.credentials, f.url), true);
+  assert.equal(await prepareUrlRescan(f.credentials, f.url), false);
 });
 
 test("automatic receipt watching verifies a late ACK using GETs only and caches it", async (context) => {

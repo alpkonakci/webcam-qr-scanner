@@ -24,7 +24,8 @@ interface DeliveryAttempt {
 }
 
 // Page-memory only: no URL, token or delivery data is written to browser storage.
-// A rescan of the same link in this page reuses its attempt instead of POSTing twice.
+// The same link reuses its attempt unless an explicit new scan retires a verified
+// delivery. Uncertain attempts stay locked instead of POSTing twice.
 const deliveryAttempts = new Map<string, Promise<DeliveryAttempt>>();
 
 export class PendingDeliveryError extends Error {
@@ -192,6 +193,22 @@ export async function sendUrlToPc(
     throw error;
   }).finally(() => { attempt.inFlight = undefined; });
   return attempt.inFlight;
+}
+
+export async function prepareUrlRescan(
+  credentials: SenderCredentials,
+  url: string,
+): Promise<boolean> {
+  // Only an explicit new scan may retire a verified attempt. Pending or lost
+  // receipts must keep their original message ID, even when the QR is rescanned.
+  const key = deliveryAttemptKey(credentials, url);
+  const stored = deliveryAttempts.get(key);
+  if (!stored) return false;
+  let attempt: DeliveryAttempt;
+  try { attempt = await stored; } catch { return false; }
+  if (!attempt.verified || attempt.inFlight || deliveryAttempts.get(key) !== stored) return false;
+  deliveryAttempts.delete(key);
+  return true;
 }
 
 export async function checkUrlDelivery(

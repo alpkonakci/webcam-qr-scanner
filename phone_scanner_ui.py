@@ -13,6 +13,7 @@ from home_ui import (
 )
 from pairing_ui import generate_pairing_qr_image
 from window_icon import set_window_icon
+from window_cursor import set_window_arrow
 
 WINDOW_TITLE = "QR Scanner - Open Phone Scanner"
 WINDOW_WIDTH = 574
@@ -51,6 +52,7 @@ def show_phone_scanner_window(origin: str) -> None:
 
     cv2.namedWindow(WINDOW_TITLE, cv2.WINDOW_AUTOSIZE)
     set_window_icon(WINDOW_TITLE)
+    set_window_arrow(WINDOW_TITLE)
     cv2.setMouseCallback(WINDOW_TITLE, on_mouse)
     width, height = _primary_screen_size()
     cv2.moveWindow(WINDOW_TITLE, max(0, (width - WINDOW_WIDTH) // 2),

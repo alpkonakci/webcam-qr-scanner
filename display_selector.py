@@ -21,6 +21,7 @@ from home_ui import (
     _primary_screen_size,
 )
 from screen_capture import ConnectedDisplay
+from window_cursor import set_window_arrow
 
 
 WINDOW_TITLE = "QR Scanner - Choose Screen"
@@ -159,6 +160,7 @@ def select_display(
             state.selected = items[state.hover_index]
 
     cv2.namedWindow(WINDOW_TITLE, cv2.WINDOW_AUTOSIZE)
+    set_window_arrow(WINDOW_TITLE)
     cv2.setMouseCallback(WINDOW_TITLE, handle_mouse)
     screen_width, screen_height = _primary_screen_size()
     height = window_height(len(items))
