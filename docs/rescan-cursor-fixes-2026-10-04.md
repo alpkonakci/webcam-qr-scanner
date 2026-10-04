@@ -38,3 +38,15 @@ Physical acceptance: refresh the phone website, send a QR and wait for
 **Received by PC**, select **Scan another QR**, scan that same QR, send again and
 verify a second PC confirmation. Check arrow cursors in the desktop menus and
 the retained crosshair in screen-region selection.
+
+## Phone-site rollout
+
+With explicit user approval, source commit
+`a2201270acf1a7f7c372761ececb2439478c8d7b` was rebuilt using the existing
+Vercel Production environment. Deployment `FibzH8a6yukPiveRf3nxaGXaErPT`
+is **Ready** and assigned to `qrwebcam.vercel.app`.
+
+- Public root returns HTTP 200; CSP is present.
+- Public client assets contain the new explicit repeat-scan help text.
+- No Supabase migration, pairing removal, main merge or GitHub release update.
+- Physical same-QR twice acceptance awaits the user's refreshed phone test.
