@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/alpkonakci/webcam-qr-scanner/protocol/schemas/encrypted-envelope.schema.json",
+  "title": "WQRS/1 encrypted envelope",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/pairingEnvelope"
+    },
+    {
+      "$ref": "#/$defs/messageEnvelope"
+    }
+  ],
+  "$defs": {
+    "protocol": {
+      "const": "wqrs/1"
+    },
+    "id16": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{22}$"
+    },
+    "publicKey65": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{87}$"
+    },
+    "nonce12": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{16}$"
+    },
+    "ciphertext": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{22,}$"
+    },
+    "timestamp": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "keyEpoch": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "pairingEnvelope": {
+      "type": "object",
+      "required": [
+        "protocol",
+        "type",
+        "device_id",
+        "pairing_id",
+        "phone_public_key",
+        "created_at",
+        "expires_at",
+        "nonce",
+        "ciphertext"
+      ],
+      "properties": {
+        "protocol": {
+          "$ref": "#/$defs/protocol"
+        },
+        "type": {
+          "enum": [
+            "pair_request",
+            "pair_result"
+          ]
+        },
+        "device_id": {
+          "$ref": "#/$defs/id16"
+        },
+        "pairing_id": {
+          "$ref": "#/$defs/id16"
+        },
+        "phone_public_key": {
+          "$ref": "#/$defs/publicKey65"
+        },
+        "created_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "nonce": {
+          "$ref": "#/$defs/nonce12"
+        },
+        "ciphertext": {
+          "$ref": "#/$defs/ciphertext"
+        }
+      },
+      "additionalProperties": false
+    },
+    "messageEnvelope": {
+      "type": "object",
+      "required": [
+        "protocol",
+        "type",
+        "pair_id",
+        "key_epoch",
+        "message_id",
+        "created_at",
+        "expires_at",
+        "nonce",
+        "ciphertext"
+      ],
+      "properties": {
+        "protocol": {
+          "$ref": "#/$defs/protocol"
+        },
+        "type": {
+          "enum": [
+            "url_message",
+            "delivered_ack"
+          ]
+        },
+        "pair_id": {
+          "$ref": "#/$defs/id16"
+        },
+        "key_epoch": {
+          "$ref": "#/$defs/keyEpoch"
+        },
+        "message_id": {
+          "$ref": "#/$defs/id16"
+        },
+        "created_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "nonce": {
+          "$ref": "#/$defs/nonce12"
+        },
+        "ciphertext": {
+          "$ref": "#/$defs/ciphertext"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

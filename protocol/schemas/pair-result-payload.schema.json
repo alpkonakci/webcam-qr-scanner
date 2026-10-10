@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/alpkonakci/webcam-qr-scanner/protocol/schemas/pair-result-payload.schema.json",
+  "title": "WQRS/1 pair result payload",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "payload_version",
+        "kind",
+        "pair_id",
+        "sender_token",
+        "pc_label",
+        "key_epoch"
+      ],
+      "properties": {
+        "payload_version": {
+          "const": 1
+        },
+        "kind": {
+          "const": "pair_approved"
+        },
+        "pair_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{22}$"
+        },
+        "sender_token": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        },
+        "pc_label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "key_epoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "payload_version",
+        "kind"
+      ],
+      "properties": {
+        "payload_version": {
+          "const": 1
+        },
+        "kind": {
+          "const": "pair_rejected"
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}
+

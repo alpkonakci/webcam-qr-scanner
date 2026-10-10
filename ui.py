@@ -34,8 +34,14 @@ def readable_preview(value: str, limit: int = 70) -> str:
 
 
 def is_exit_key(key: int) -> bool:
-    """The application intentionally reserves only Escape for exit."""
+    """Escape closes only the camera view."""
     return key == 27
+
+
+def is_application_exit_key(key: int) -> bool:
+    """Ctrl+Q requests a complete application and Bridge exit."""
+
+    return key == 17
 
 
 def fps_color(fps: float) -> tuple[int, int, int]:
@@ -282,7 +288,7 @@ def _draw_status_panel(
     margin: int,
 ) -> None:
     status_text = "QR code detected" if detected else "Waiting for QR code"
-    control_text = "ESC   Exit"
+    control_text = "ESC   Close camera    CTRL+Q   Exit all"
     font_scale = 0.54 * scale
     thickness = max(1, int(2 * scale))
     (status_width, status_height), _ = cv2.getTextSize(
