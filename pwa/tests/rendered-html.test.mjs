@@ -12,7 +12,8 @@ test("keeps the QR Scanner mobile PWA shell in the Vercel build", async () => {
   assert.match(layout, /QR Scanner/);
   assert.match(home, /Scan here\. Continue on your PC\./);
   assert.match(home, /Camera scanner ready/);
-  assert.match(home, /Scan a web link or PC pairing code/);
+  assert.match(home, /Scan a link, text or PC pairing code/);
+  assert.match(home, /<TextResultView text=\{scanResult\.text\}/);
   assert.doesNotMatch(home, /Install app|Added to Home Screen/);
   assert.match(home, /No location access/);
   assert.doesNotMatch(`${layout}\n${home}`, /Coming next/);
@@ -37,6 +38,7 @@ test("applies privacy and embedding security headers", async () => {
   assert.match(csp, /frame-ancestors 'none'/);
   assert.match(csp, /connect-src 'self'/);
   assert.match(csp, /worker-src 'self' blob:/);
+  assert.match(csp, /img-src 'self' data: blob:/);
   assert.doesNotMatch(buildContentSecurityPolicy(false), /'unsafe-eval'/);
   assert.match(buildContentSecurityPolicy(true), /'unsafe-eval'/);
   assert.equal(

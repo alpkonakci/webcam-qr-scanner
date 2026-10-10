@@ -709,3 +709,39 @@ footer {
 }
 .camera-permission-help summary { cursor: pointer; min-height: 32px; color: var(--ink); }
 .camera-permission-help p { margin: 6px 0 0; }
+
+.qr-text-content {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding: 12px;
+  resize: vertical;
+  border: 1px solid rgba(45, 212, 191, 0.25);
+  border-radius: 12px;
+  background: #08111f;
+  color: var(--ink);
+  font: 1rem/1.6 ui-monospace, monospace;
+  overflow-wrap: anywhere;
+}
+.qr-text-content:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.image-action-icon { display: grid; place-items: center; color: var(--accent); font-size: 1.8rem; }
+.image-action-icon::before, .image-action-icon::after { display: none; }
+.image-reader { padding: 18px 2px; }
+.image-reader-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.image-reader h1 { margin-top: 10px; font-size: clamp(2rem, 8vw, 2.8rem); }
+.image-help, .image-privacy { color: var(--muted); font-size: 0.85rem; line-height: 1.6; }
+.image-privacy { margin-top: 20px; font-size: 0.75rem; }
+.image-file-input { display: none; }
+.image-source-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 18px; }
+.image-choose { flex: 1 1 150px; min-width: 0; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 4px; margin: 0; padding: 14px 10px; font-size: 0.9rem; }
+.image-choose small { font-size: 0.7rem; }
+.image-choose:disabled { opacity: 0.55; }
+.image-preview-frame { display: flex; justify-content: center; padding: 10px; border: 1px solid var(--line); border-radius: 16px; background: #02060b; }
+.image-crop-surface { position: relative; max-width: 100%; width: fit-content; touch-action: none; user-select: none; cursor: crosshair; }
+.image-crop-surface img { display: block; max-width: 100%; max-height: 52svh; width: auto; height: auto; pointer-events: none; }
+.image-crop-box { position: absolute; pointer-events: none; border: 2px solid var(--accent); background: rgba(50, 215, 204, 0.14); }
+.image-selection-actions { display: flex; justify-content: space-between; gap: 8px; }
+.image-selection-actions button { min-height: 48px; font-size: 0.78rem; }
+.image-read { width: 100%; }
+.image-feedback { margin-top: 14px; }

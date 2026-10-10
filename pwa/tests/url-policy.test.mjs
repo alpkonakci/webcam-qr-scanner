@@ -40,3 +40,10 @@ test("rejects malformed, credential-bearing and hostile text", () => {
     assert.equal(parseWebUrl(value).ok, false);
   }
 });
+
+test("brace-like QR text is URL data, never a file glob or module name", () => {
+  assert.equal(parseWebUrl("{".repeat(3500) + "x" + "}".repeat(3500)).ok, false);
+  const result = parseWebUrl("https://example.com/{a,b}/{1..3}?pattern=*.ts");
+  assert.equal(result.ok, true);
+  assert.equal(decodeURIComponent(new URL(result.href).pathname), "/{a,b}/{1..3}");
+});

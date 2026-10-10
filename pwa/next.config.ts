@@ -16,7 +16,7 @@ export function buildContentSecurityPolicy(isDevelopment: boolean): string {
     "font-src 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
-    "img-src 'self' data:",
+    "img-src 'self' data: blob:",
     "manifest-src 'self'",
     "object-src 'none'",
     `script-src ${scriptSources.join(" ")}`,

@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { isLikelyMobileBrowser } from "../lib/device-kind";
-import { parseWebUrl } from "../lib/url-policy.mjs";
-import type { WebUrlResult } from "../lib/url-policy.mjs";
+import { parseQrPayload } from "../lib/qr-payload.mjs";
+import type { QrPayloadResult } from "../lib/qr-payload.mjs";
 import { getMostRecentPair } from "../lib/pair-store";
 import {
   pairingUriFromLaunchFragment,
@@ -13,6 +13,8 @@ import {
 import { PairingView } from "./PairingView";
 import { QrResultView } from "./QrResultView";
 import { QrScannerView } from "./QrScannerView";
+import { QrImageView } from "./QrImageView";
+import { TextResultView } from "./TextResultView";
 
 const subscribeToStaticDeviceKind = () => () => {};
 const getServerDeviceKind = () => false;
@@ -20,7 +22,9 @@ const getServerDeviceKind = () => false;
 export function PwaHome() {
   const [serviceWorkerReady, setServiceWorkerReady] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [scanResult, setScanResult] = useState<WebUrlResult | null>(null);
+  const [imageOpen, setImageOpen] = useState(false);
+  const [scanSource, setScanSource] = useState<"camera" | "image">("camera");
+  const [scanResult, setScanResult] = useState<QrPayloadResult | null>(null);
   const [pairingUri, setPairingUri] = useState<string | null>(null);
   const [pairedPc, setPairedPc] = useState<SenderCredentials | null>(null);
   const [pairStoreReady, setPairStoreReady] = useState(false);
@@ -66,10 +70,12 @@ export function PwaHome() {
   }, []);
 
   const closeScanner = useCallback(() => setScannerOpen(false), []);
+  const closeImage = useCallback(() => setImageOpen(false), []);
   const closePairing = useCallback(() => setPairingUri(null), []);
 
   const handleDecoded = useCallback((value: string) => {
     setScannerOpen(false);
+    setImageOpen(false);
     const scannedPairingUri = pairingUriFromScannedValue(
       value,
       window.location.origin,
@@ -79,14 +85,25 @@ export function PwaHome() {
       return;
     }
     setPairingUri(null);
-    setScanResult(parseWebUrl(value));
+    setScanResult(parseQrPayload(value));
   }, []);
 
   const startScanner = () => {
+    setScanSource("camera");
+    setImageOpen(false);
     setScanResult(null);
     setPairingUri(null);
     setScannerOpen(true);
   };
+
+  const startImage = () => {
+    setScanSource("image");
+    setScanResult(null);
+    setPairingUri(null);
+    setScannerOpen(false);
+    setImageOpen(true);
+  };
+  const scanAgain = () => scanSource === "image" ? startImage() : startScanner();
 
   const startPairingScanner = () => {
     setPairingUri(null);
@@ -114,7 +131,9 @@ export function PwaHome() {
           <span className="dev-badge">v0.2 beta.4</span>
         </header>
 
-        {pairingUri ? (
+        {imageOpen ? (
+          <QrImageView onCancel={closeImage} onDecoded={handleDecoded} />
+        ) : pairingUri ? (
           <PairingView
             pairingUri={pairingUri}
             existingPair={pairedPc}
@@ -123,14 +142,16 @@ export function PwaHome() {
             onPairInvalid={clearRevokedPair}
             onCancel={closePairing}
           />
+        ) : scanResult?.kind === "text" ? (
+          <TextResultView text={scanResult.text} onScanAgain={scanAgain} />
         ) : scanResult ? (
           <QrResultView
-            result={scanResult}
+            result={scanResult.result}
             pairedPc={pairedPc}
             isMobileClient={isMobileClient}
             onPairPc={startPairingScanner}
             onPairRevoked={clearRevokedPair}
-            onScanAgain={startScanner}
+            onScanAgain={scanAgain}
           />
         ) : (
           <>
@@ -141,7 +162,7 @@ export function PwaHome() {
               </div>
               <h1 id="page-title">Scan here. Continue on your PC.</h1>
               <p>
-                Scan a QR web link with your phone, or scan the one-time pairing
+                Scan a QR link or text with your phone, or scan the one-time pairing
                 code shown by QR Scanner on your PC.
               </p>
             </div>
@@ -158,11 +179,15 @@ export function PwaHome() {
                 </span>
                 <span className="action-copy">
                   <strong>Scan QR</strong>
-                  <small id="scan-status">Scan a web link or PC pairing code</small>
+                  <small id="scan-status">Scan a link, text or PC pairing code</small>
                 </span>
                 <span className="action-arrow" aria-hidden="true">→</span>
               </button>
-
+              <button className="primary-action primary-action-ready image-action" type="button" onClick={startImage}>
+                <span className="action-icon image-action-icon" aria-hidden="true">▧</span>
+                <span className="action-copy"><strong>Read from image</strong><small>Choose a screenshot or saved QR</small></span>
+                <span className="action-arrow" aria-hidden="true">→</span>
+              </button>
             </section>
 
             {pairedPc && (
@@ -198,6 +223,7 @@ export function PwaHome() {
                 <li><span aria-hidden="true">✓</span>No account</li>
                 <li><span aria-hidden="true">✓</span>No location access</li>
                 <li><span aria-hidden="true">✓</span>Camera only while the scanner is open</li>
+                <li><span aria-hidden="true">✓</span>Selected images are never uploaded</li>
               </ul>
               <details className="camera-permission-help">
                 <summary>Camera permission after refreshing?</summary>

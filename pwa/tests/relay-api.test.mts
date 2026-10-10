@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { Miniflare } from "miniflare";
+import { convertV4MiniflareOptions, Miniflare } from "miniflare";
 import { cleanExpiredState, handleRelayRequest } from "../worker/relay-api.ts";
 
 const PROTOCOL = "wqrs/1";
@@ -10,11 +10,12 @@ const PROTOCOL = "wqrs/1";
 test("D1 relay routes only opaque envelopes and returns an authenticated receipt", async (context) => {
   let clock = Date.now();
   context.mock.method(Date, "now", () => clock);
-  const miniflare = new Miniflare({
+  // Use Miniflare's supported adapter for the unchanged isolated D1 fixture.
+  const miniflare = new Miniflare(convertV4MiniflareOptions({
     modules: true,
     script: "export default { fetch() { return new Response('unused') } }",
     d1Databases: ["DB"],
-  });
+  }));
   context.after(() => miniflare.dispose());
   const database = await miniflare.getD1Database("DB");
   const migration = await readFile(
