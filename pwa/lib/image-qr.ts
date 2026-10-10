@@ -55,6 +55,7 @@ export async function scanQrImage(image: HTMLImageElement, crop: ImageCrop, sign
   context.fillStyle = "white"; context.fillRect(0, 0, canvas.width, canvas.height);
   context.drawImage(image, region.x, region.y, region.width, region.height, 0, 0, canvas.width, canvas.height);
   let engine: Awaited<ReturnType<typeof import("qr-scanner").default.createQrEngine>> | undefined;
+  let invertedCanvas: HTMLCanvasElement | undefined;
   let disposed = false;
   const disposeEngine = () => { disposed = true; if (engine && "terminate" in engine) engine.terminate(); };
   const scan = async () => {
@@ -62,7 +63,32 @@ export async function scanQrImage(image: HTMLImageElement, crop: ImageCrop, sign
     if (signal.aborted || disposed) throw cancelled();
     engine = await QrScanner.createQrEngine();
     if (signal.aborted || disposed) { disposeEngine(); throw cancelled(); }
-    const decode = () => QrScanner.scanImage(canvas, { qrEngine: engine, returnDetailedScanResult: true });
+    const workerEngine = "postMessage" in engine;
+    // scanImage only enables both polarities when it owns the worker. We own
+    // this engine for cancellation, so configure it explicitly before decoding.
+    if ("postMessage" in engine) engine.postMessage({ type: "inversionMode", data: "both" });
+    const decode = async () => {
+      try { return await QrScanner.scanImage(canvas, { qrEngine: engine, returnDetailedScanResult: true }); }
+      catch (error) {
+        if (signal.aborted || disposed) throw cancelled();
+        if (workerEngine || !String(error).includes(NO_QR)) throw error;
+      }
+      // Native BarcodeDetector has no inversion setting. Retry an inverted
+      // local canvas, also during the second-code probe, without changing the
+      // preview or fetching/uploading anything.
+      invertedCanvas ??= document.createElement("canvas");
+      invertedCanvas.width = canvas.width; invertedCanvas.height = canvas.height;
+      const invertedContext = invertedCanvas.getContext("2d", { willReadFrequently: true });
+      if (!invertedContext) throw new Error("Image scanning is not available in this browser.");
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+      for (let i = 0; i < pixels.data.length; i += 4) {
+        pixels.data[i] = 255 - pixels.data[i];
+        pixels.data[i + 1] = 255 - pixels.data[i + 1];
+        pixels.data[i + 2] = 255 - pixels.data[i + 2];
+      }
+      invertedContext.putImageData(pixels, 0, 0);
+      return QrScanner.scanImage(invertedCanvas, { qrEngine: engine, returnDetailedScanResult: true });
+    };
     let first;
     try { first = await decode(); }
     catch (error) {
@@ -89,5 +115,8 @@ export async function scanQrImage(image: HTMLImageElement, crop: ImageCrop, sign
   };
   signal.addEventListener("abort", disposeEngine, { once: true });
   try { return await bounded(scan(), signal); }
-  finally { signal.removeEventListener("abort", disposeEngine); disposeEngine(); canvas.width = canvas.height = 0; }
+  finally {
+    signal.removeEventListener("abort", disposeEngine); disposeEngine(); canvas.width = canvas.height = 0;
+    if (invertedCanvas) invertedCanvas.width = invertedCanvas.height = 0;
+  }
 }

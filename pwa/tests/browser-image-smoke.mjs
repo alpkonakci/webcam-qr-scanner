@@ -1,5 +1,5 @@
 // Optional local browser QA; Playwright is supplied by the workspace runtime.
-// Usage: node tests/browser-image-smoke.mjs <playwright-module> <chromium-exe> <fixture-dir>
+// Usage: node tests/browser-image-smoke.mjs <playwright-module> <chromium-exe> <fixture-dir> [poster-file expected-url]
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -35,11 +35,12 @@ try {
   assert.equal(context.pages().length, 1);
   console.log("PASS: PNG automatically decoded without selecting an area, navigating or uploading");
 
-  for (const name of ["link.png", "link.jpg", "link.webp"]) {
+  for (const name of ["link.png", "link.jpg", "link.webp", "inverted.png"]) {
     await button("Scan another QR").click();
     await visible(page.getByRole("heading", { name: "Read from image" }));
     await select(name);
     await visible(page.getByRole("heading", { name: "Link ready." }));
+    assert.equal(await page.locator(".result-address").innerText(), "https://example.com/image-test");
     console.log("PASS: repeat/image-source preserved:", name);
   }
   await button("Scan another QR").click();
@@ -56,12 +57,14 @@ try {
   await visible(page.getByAltText("Selected image for local QR scanning"));
   assert.equal(await button("Read selected area").isEnabled(), false);
   console.log("PASS: no QR gives actionable guidance");
-  await select("multiple.png");
-  await visible(feedback);
-  assert.match(await feedback.innerText(), /More than one/);
-  await visible(page.getByAltText("Selected image for local QR scanning"));
-  assert.equal(await button("Read selected area").isEnabled(), false);
-  console.log("PASS: multiple QR codes blocked");
+  for (const name of ["mixed-polarity.png", "multiple-inverted.png", "multiple.png"]) {
+    await select(name);
+    await visible(feedback);
+    assert.match(await feedback.innerText(), /More than one/);
+    await visible(page.getByAltText("Selected image for local QR scanning"));
+    assert.equal(await button("Read selected area").isEnabled(), false);
+    console.log("PASS: multiple QR codes blocked:",name);
+  }
 
   // A pointer crop selects only the first QR from the same two-code image.
   const bounds = await page.locator(".image-crop-surface").boundingBox();
@@ -96,6 +99,16 @@ try {
   assert.equal(await page.locator(".result-address").innerText(),"https://example.com/image-test");
   console.log("PASS: clipboard button automatically reads an actual PNG locally without mobile overflow");
   await button("Scan another QR").click();
+  const invertedBase64 = (await readFile(path.join(fixtureDir,"inverted.png"))).toString("base64");
+  await page.evaluate(async value => {
+    const bytes = Uint8Array.from(atob(value), char => char.charCodeAt(0));
+    await navigator.clipboard.write([new ClipboardItem({"image/png":new Blob([bytes],{type:"image/png"})})]);
+  }, invertedBase64);
+  await page.getByRole("button",{name:/Paste image/}).click();
+  await visible(page.getByRole("heading",{name:"Link ready."}));
+  assert.equal(await page.locator(".result-address").innerText(),"https://example.com/image-test");
+  console.log("PASS: inverted QR paste automatically decodes");
+  await button("Scan another QR").click();
   await copyImage();
   await button("Back").focus();
   await page.keyboard.press("Control+v");
@@ -106,6 +119,15 @@ try {
   await page.getByRole("button",{name:/Paste image/}).click();
   await visible(feedback); assert.match(await feedback.innerText(), /image itself/);
   console.log("PASS: copied URL is not fetched or treated as an image");
+  if (process.argv[5]) {
+    await page.locator('input[type="file"]').setInputFiles(path.resolve(process.argv[5]));
+    await visible(page.getByRole("heading",{name:"Link ready."}));
+    assert.equal(await page.locator(".result-address").innerText(),process.argv[6]);
+    await page.screenshot({path:path.join(fixtureDir,"poster-result-390.png"),fullPage:true});
+    assert.equal(context.pages().length,1);
+    console.log("PASS: supplied poster decoded automatically, no URL opened or sent");
+    await button("Scan another QR").click();
+  }
   await button("Back").click();
   await visible(page.getByRole("heading", {name:"Scan here. Continue on your PC."}));
   assert.deepEqual(transmissions, []); assert.deepEqual(errors, []);

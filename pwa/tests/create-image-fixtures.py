@@ -4,7 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from PIL import Image
+from PIL import Image, ImageOps
 from qr_creator import create_qr
 
 out = ROOT / "dist" / "mobile-image-qa-20261010"
@@ -20,4 +20,9 @@ combined = Image.new("RGB", (first.width + second.width + 60, max(first.height, 
 combined.paste(first, (0, 0))
 combined.paste(second, (first.width + 60, 0))
 combined.save(out / "multiple.png")
+ImageOps.invert(first.convert("RGB")).save(out / "inverted.png")
+mixed = combined.copy()
+mixed.paste(ImageOps.invert(second.convert("RGB")), (first.width + 60, 0))
+mixed.save(out / "mixed-polarity.png")
+ImageOps.invert(combined.convert("RGB")).save(out / "multiple-inverted.png")
 print(out)
