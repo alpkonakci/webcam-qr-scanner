@@ -36,6 +36,7 @@ class HomeUiTests(unittest.TestCase):
         self.assertIs(action_at_point(100, 150), HomeAction.SCAN_CAMERA)
         self.assertIs(action_at_point(100, 250), HomeAction.SCAN_SCREEN)
         self.assertIs(action_at_point(100, 350), HomeAction.PAIR_PHONE)
+        self.assertIs(action_at_point(100, 400), HomeAction.CREATE_QR)
         self.assertIs(action_at_point(500, 490), HomeAction.EXIT)
         self.assertIsNone(action_at_point(20, 20))
 

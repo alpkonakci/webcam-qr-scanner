@@ -8,6 +8,8 @@ from exit_codes import (
     CONTROL_MANAGE_PHONES,
     CONTROL_REMOVE_PHONE,
     CONTROL_SCAN_SCREEN,
+    CONTROL_CREATE_QR,
+    CONTROL_BACK_HOME,
 )
 from paired_phone_ipc import RemovePhoneRequest
 from tray_app import (
@@ -19,6 +21,41 @@ from tray_app import (
 
 
 class TrayApplicationTests(unittest.TestCase):
+    @patch("tray_app.threading.Thread")
+    def test_creator_is_single_instance_and_blocks_home(self, thread_type) -> None:
+        process = Mock()
+        process.poll.return_value = None
+        spawner = Mock(return_value=process)
+        application = self._application(spawner)
+        application._handle_home_action(CONTROL_CREATE_QR)
+        application._launch_creator()
+        application._launch_home()
+        spawner.assert_called_once_with(["--create-qr-process"])
+        self.assertIs(application._creator_process, process)
+        thread_type.return_value.start.assert_called_once_with()
+
+    def test_creator_back_reopens_home_and_clears_child(self) -> None:
+        process = Mock()
+        process.wait.return_value = CONTROL_BACK_HOME
+        application = self._application()
+        application._children.add(process)
+        application._creator_process = process
+        with patch.object(application, "_launch_home") as home:
+            application._monitor_child(process, ChildRole.CREATOR)
+        home.assert_called_once_with()
+        self.assertIsNone(application._creator_process)
+        self.assertNotIn(process, application._children)
+
+    def test_creator_is_terminated_on_full_exit(self) -> None:
+        process = Mock()
+        process.poll.side_effect = [None, 0]
+        application = self._application()
+        application._children.add(process)
+        application._creator_process = process
+        application._terminate_children()
+        process.terminate.assert_called_once_with()
+        self.assertFalse(application._children)
+
     def setUp(self) -> None:
         self.icon = Mock()
         self.icon.HAS_NOTIFICATION = True

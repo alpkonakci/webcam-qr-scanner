@@ -1,4 +1,4 @@
-cryptography==49.0.0
+cryptography==50.0.2
 comtypes==1.4.17
 dxcam==0.3.0
 httpx==0.28.1

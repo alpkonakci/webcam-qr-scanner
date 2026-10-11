@@ -23,6 +23,7 @@ from links import open_web_url, payload_kind
 from native_dialogs import confirm_application_exit, show_dialog, show_error_dialog
 from performance import FPSCounter
 from qr_reader import QRReader, QRResult
+from qr_creator_ui import show_text_result
 from display_selector import select_display
 from screen_capture import (
     ConnectedDisplay,
@@ -184,14 +185,7 @@ def run_screen_scan(
 
     value = results[0].data
     if payload_kind(value) != "URL":
-        notify(
-            "Scan Screen - Text QR",
-            (
-                "The QR code does not contain a valid HTTP/HTTPS web address."
-                f"\n\nDecoded text:\n{_dialog_preview(value)}"
-            ),
-            0x40,
-        )
+        show_text_result(value)
         return ScreenScanStatus.TEXT_FOUND
 
     if not confirm(value):
@@ -213,7 +207,10 @@ def _report_scan(result: QRResult, auto_open: bool) -> None:
     timestamp = datetime.now().strftime("%H:%M:%S")
     kind = payload_kind(result.data)
     print(f"[{timestamp}] {kind} scanned: {result.data}")
-    if kind != "URL" or not auto_open:
+    if kind != "URL":
+        show_text_result(result.data)
+        return
+    if not auto_open:
         return
 
     if open_web_url(result.data):

@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "v0.2.0-beta.4",
+    [string]$Version = "v0.2.0-beta.5",
     [string]$ExecutablePath = "",
     [string]$OutputDirectory = "",
     [switch]$FailIfExists
@@ -72,6 +72,14 @@ Copy-Item -LiteralPath $pythonLicense `
     -Destination (New-Item -ItemType Directory -Path `
         (Join-Path $licenseDirectory "Python") -Force)
 
+$tkLicense = Join-Path $pythonBase "tcl\tk8.6\license.terms"
+if (-not (Test-Path -LiteralPath $tkLicense)) {
+    throw "Bundled Tcl/Tk license not found: $tkLicense"
+}
+Copy-Item -LiteralPath $tkLicense `
+    -Destination (New-Item -ItemType Directory -Path `
+        (Join-Path $licenseDirectory "Tcl-Tk") -Force)
+
 $sitePackages = Join-Path $projectDirectory ".venv\Lib\site-packages"
 
 function Copy-LicenseTree {
@@ -128,7 +136,7 @@ Copy-Item -LiteralPath `
     @("anyio-4.14.2.dist-info", "AnyIO"),
     @("certifi-2026.7.22.dist-info", "certifi"),
     @("cffi-2.1.0.dist-info", "cffi"),
-    @("cryptography-49.0.0.dist-info", "cryptography"),
+    @("cryptography-50.0.2.dist-info", "cryptography"),
     @("comtypes-1.4.17.dist-info", "comtypes"),
     @("dxcam-0.3.0.dist-info", "DXcam"),
     @("h11-0.16.0.dist-info", "h11"),

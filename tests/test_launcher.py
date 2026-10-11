@@ -8,6 +8,8 @@ from exit_codes import (
     CONTROL_MANAGE_PHONES,
     CONTROL_PAIR_PHONE,
     CONTROL_REMOVE_PHONE,
+    CONTROL_CREATE_QR,
+    CONTROL_BACK_HOME,
 )
 from home_ui import HomeAction
 from paired_phone_ipc import PairedPhoneView
@@ -15,6 +17,17 @@ from paired_phones_ui import PairedPhonesAction, PairedPhonesDecision
 
 
 class LauncherTests(unittest.TestCase):
+    def test_creator_runs_offline_child_and_returns_home(self) -> None:
+        with patch("qr_creator_ui.show_creator_window") as show_creator, patch("launcher.run_bridge") as bridge:
+            result = launcher.main(["--create-qr-process"])
+        self.assertEqual(result, CONTROL_BACK_HOME)
+        show_creator.assert_called_once_with()
+        bridge.assert_not_called()
+
+    def test_home_create_action_returns_creator_code(self) -> None:
+        with patch("home_ui.show_home_window", return_value=HomeAction.CREATE_QR):
+            self.assertEqual(launcher.main(["--home-process"]), CONTROL_CREATE_QR)
+
     def test_camera_options_start_tray_and_open_camera(self) -> None:
         with patch("launcher.run_bridge", return_value=0) as run_bridge:
             result = launcher.main(["--show-fps"])

@@ -37,6 +37,7 @@ class HomeAction(Enum):
     SCAN_SCREEN = "scan_screen"
     PAIR_PHONE = "pair_phone"
     MANAGE_PHONES = "manage_phones"
+    CREATE_QR = "create_qr"
     EXIT = "exit"
 
 
@@ -52,13 +53,13 @@ class ActionCard:
 BASE_ACTION_CARDS = (
     ActionCard(
         HomeAction.SCAN_CAMERA,
-        (32, 116, 588, 206),
+        (32, 116, 588, 190),
         "Scan with Camera",
         "Open the webcam and place a QR code inside the frame.",
     ),
     ActionCard(
         HomeAction.SCAN_SCREEN,
-        (32, 220, 588, 310),
+        (32, 202, 588, 276),
         "Select a Screen Area",
         "Take a screenshot, then drag around the QR code to scan it.",
     ),
@@ -78,7 +79,7 @@ def action_cards(pair_count: int = 0) -> tuple[ActionCard, ...]:
     if pair_count > 0:
         phone_card = ActionCard(
             HomeAction.MANAGE_PHONES,
-            (32, 324, 588, 414),
+            (32, 288, 588, 362),
             f"Paired Phones ({pair_count})",
             "View, remove, or add a phone.",
             WARNING,
@@ -86,12 +87,16 @@ def action_cards(pair_count: int = 0) -> tuple[ActionCard, ...]:
     else:
         phone_card = ActionCard(
             HomeAction.PAIR_PHONE,
-            (32, 324, 588, 414),
+            (32, 288, 588, 362),
             "Pair Phone",
             "Scan a code to connect your phone.",
             WARNING,
         )
-    return (*BASE_ACTION_CARDS, phone_card)
+    creator_card = ActionCard(
+        HomeAction.CREATE_QR, (32, 374, 588, 448),
+        "Create QR", "Turn a link or short text into a QR. Save or copy it.",
+    )
+    return (*BASE_ACTION_CARDS, phone_card, creator_card)
 
 
 def action_at_point(
@@ -154,7 +159,7 @@ def build_home_canvas(
         )
         left, top, _, _ = card.bounds
         draw.rounded_rectangle(
-            (left + 18, top + 18, left + 24, top + 72),
+            (left + 18, top + 16, left + 24, card.bounds[3] - 16),
             radius=3,
             fill=card.accent,
         )
@@ -165,7 +170,7 @@ def build_home_canvas(
             fill=PRIMARY_TEXT,
         )
         draw.text(
-            (left + 42, top + 53),
+            (left + 42, top + 46),
             card.description,
             font=card_body_font,
             fill=SECONDARY_TEXT,

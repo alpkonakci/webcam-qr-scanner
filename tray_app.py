@@ -35,6 +35,7 @@ from exit_codes import (
     CONTROL_REMOVE_PHONE,
     CONTROL_SCAN_CAMERA,
     CONTROL_SCAN_SCREEN,
+    CONTROL_CREATE_QR,
 )
 from native_dialogs import (
     MB_ICONWARNING,
@@ -63,6 +64,7 @@ class ChildRole(Enum):
     SCREEN = "screen"
     HOME = "home"
     PAIRED_PHONES = "paired_phones"
+    CREATOR = "creator"
 
 
 class PairManager(Protocol):
@@ -152,6 +154,7 @@ class TrayApplication:
         self._camera_process: subprocess.Popen[bytes] | None = None
         self._home_process: subprocess.Popen[bytes] | None = None
         self._paired_phones_process: subprocess.Popen[bytes] | None = None
+        self._creator_process: subprocess.Popen[bytes] | None = None
         self._pairing_thread: threading.Thread | None = None
         self._children_lock = threading.RLock()
         self._exit_prompt_lock = threading.Lock()
@@ -177,9 +180,10 @@ class TrayApplication:
             ),
             pystray.MenuItem("Scan with Camera", self._scan_with_camera),
             pystray.MenuItem("Select a Screen Area", self._scan_screen),
+            pystray.MenuItem("Create QR", lambda *_: self._launch_creator()),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
-                "Phone-to-PC: v0.2 beta.2",
+                "Phone-to-PC: v0.2 beta.5",
                 lambda *_: None,
                 enabled=False,
             ),
@@ -424,9 +428,21 @@ class TrayApplication:
                 role=ChildRole.SCREEN,
             )
 
+    def _launch_creator(self) -> None:
+        with self._children_lock:
+            if self._stop_event.is_set() or self._foreground_dialog_count > 0:
+                return
+            if self._creator_process is not None and self._creator_process.poll() is None:
+                self._notify("The QR creator is already open.", "QR Scanner")
+                return
+            self._dismiss_control_windows_locked()
+            self._launch_child(["--create-qr-process"], role=ChildRole.CREATOR)
+
     def _launch_home(self) -> None:
         with self._children_lock:
             if self._stop_event.is_set() or self._foreground_dialog_count > 0:
+                return
+            if self._creator_process is not None and self._creator_process.poll() is None:
                 return
             if (
                 self._paired_phones_process is not None
@@ -512,6 +528,8 @@ class TrayApplication:
                 self._home_process = process
             elif role is ChildRole.PAIRED_PHONES:
                 self._paired_phones_process = process
+            elif role is ChildRole.CREATOR:
+                self._creator_process = process
         threading.Thread(
             target=self._monitor_child,
             args=(process, role),
@@ -534,6 +552,8 @@ class TrayApplication:
                 self._home_process = None
             if process is self._paired_phones_process:
                 self._paired_phones_process = None
+            if process is self._creator_process:
+                self._creator_process = None
         if return_code == APPLICATION_EXIT_REQUESTED:
             self._stop()
             return
@@ -545,6 +565,8 @@ class TrayApplication:
             self._handle_paired_phones_action(return_code)
         elif role in {ChildRole.CAMERA, ChildRole.SCREEN}:
             self._launch_home()
+        elif role is ChildRole.CREATOR and return_code == CONTROL_BACK_HOME:
+            self._launch_home()
 
     def _handle_home_action(self, return_code: int) -> None:
         if return_code == CONTROL_SCAN_CAMERA:
@@ -552,6 +574,9 @@ class TrayApplication:
             return
         if return_code == CONTROL_SCAN_SCREEN:
             self._launch_screen()
+            return
+        if return_code == CONTROL_CREATE_QR:
+            self._launch_creator()
             return
         if return_code == CONTROL_PAIR_PHONE:
             self._start_pairing()

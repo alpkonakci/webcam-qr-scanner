@@ -362,14 +362,16 @@ class AppHelpersTests(unittest.TestCase):
         notify.assert_not_called()
 
     def test_screen_scan_never_opens_non_web_payload(self) -> None:
-        status, confirm, opener, notify = self._run_mock_screen_scan(
-            [self._screen_result("file:///C:/secret.txt")]
-        )
+        with patch("app.show_text_result") as show_text:
+            status, confirm, opener, notify = self._run_mock_screen_scan(
+                [self._screen_result("file:///C:/secret.txt")]
+            )
 
         self.assertIs(status, ScreenScanStatus.TEXT_FOUND)
         confirm.assert_not_called()
         opener.assert_not_called()
-        notify.assert_called_once()
+        notify.assert_not_called()
+        show_text.assert_called_once_with("file:///C:/secret.txt")
 
     def test_screen_scan_respects_cancelled_confirmation(self) -> None:
         status, confirm, opener, notify = self._run_mock_screen_scan(

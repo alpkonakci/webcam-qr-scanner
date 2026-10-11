@@ -15,19 +15,21 @@ default browser, and closes the scanner automatically.
 ![Webcam QR Scanner usage demo](docs/assets/webcam-qr-scanner-demo.gif)
 
 > **Development status:** The latest stable GitHub release is `v0.1.1`. The
-> current branch targets `v0.2.0-beta.4`, a limited Phone-to-PC pre-release,
+> current branch targets `v0.2.0-beta.5`, a limited Phone-to-PC pre-release,
 > not a stable release. Normal use runs through the public
 > [qrwebcam.vercel.app](https://qrwebcam.vercel.app/) service without a Vercel
 > login, bypass secret or PowerShell setup. iPhone and Android core flows,
 > separate-Windows-account pairing/sending and cross-network delivery have
 > user-confirmed evidence; the full acceptance/security matrix remains open.
-> Beta.4 adds intentional same-QR rescanning and native arrow cursors in menus,
-> retaining beta.3 replay protection and automatic receipt-status checks.
-> See the [beta.4 release notes](docs/v0.2.0-beta.4-release-notes.md) and
+> Beta.5 adds offline QR creation and mobile image/clipboard reading, including
+> light-on-dark codes. Existing pairing and delivery protections remain.
+> See the [beta.5 release notes](docs/v0.2.0-beta.5-release-notes.md) and
 > [beta release checklist](docs/v0.2-beta-release-checklist.md).
 
 ## Features
 
+- Create QR codes from links or short text, then save PNG or copy the image (beta.5)
+- Read saved or pasted QR images on the phone without uploading them (beta.5)
 - Live camera preview with a modern turquoise interface
 - A visible guide that is also the real QR analysis area
 - Multi-monitor selection followed by drag-to-select, one-shot screen scanning
@@ -94,7 +96,7 @@ executables downloaded from the internet.
 
 ### v0.2 beta: background behavior
 
-The current source and locally generated `v0.2.0-beta.4` package still distribute
+The current source and locally generated `v0.2.0-beta.5` package still distribute
 one `QR-Scanner.exe`, but the executable starts separate internal modes:
 
 - A lightweight controller stays visible in the Windows system tray.
@@ -102,7 +104,7 @@ one `QR-Scanner.exe`, but the executable starts separate internal modes:
 - `Esc`, the camera window's close button, or a successful scan closes only the
   camera and brings a calm control center to the foreground. The controller
   stays available without using the camera.
-- The control center offers **Scan with Camera**, **Select a Screen Area**, and
+- The control center offers **Scan with Camera**, **Select a Screen Area**, **Create QR**, and
   either **Pair Phone** or **Paired Phones (N)** without requiring the
   user to find a hidden tray icon.
 - Closing the control center offers background or full-exit options. Its explicit
@@ -292,7 +294,7 @@ The self-test verifies OpenCV imports and QR decoding without opening a camera.
 The build produces the terminal-free executable and a distributable ZIP:
 
 ```text
-dist\Webcam-QR-Scanner-v0.2.0-beta.4-windows-x64.zip
+dist\Webcam-QR-Scanner-v0.2.0-beta.5-windows-x64.zip
 ```
 
 The ZIP contains `QR-Scanner.exe`, the `Scan Screen.vbs` launcher, the project

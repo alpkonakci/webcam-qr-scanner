@@ -7,6 +7,8 @@ remain subject to their own licenses and are not relicensed under MIT.
 ## Components included in the Windows package
 
 - **CPython 3.12.14** — Python Software Foundation License
+- **Tcl/Tk 8.6.12** — Tcl/Tk permissive license; offline QR creator and
+  read-only text result windows via Python's standard-library tkinter
 - **SQLite 3.53.1** — public domain; bundled with CPython for the encrypted
   replay ledger. [Upstream copyright statement](https://sqlite.org/copyright.html).
 - **NumPy 2.5.1** — BSD 3-Clause License and licenses of bundled components
@@ -15,7 +17,7 @@ remain subject to their own licenses and are not relicensed under MIT.
 - **Pillow 12.3.0** — HPND License (MIT-CMU)
 - **pystray 0.19.5** — GNU Lesser General Public License v3.0
 - **six 1.17.0** — MIT License
-- **cryptography 49.0.0** — Apache License 2.0 or BSD 3-Clause License
+- **cryptography 50.0.2** — Apache License 2.0 or BSD 3-Clause License
 - **comtypes 1.4.17** — MIT License
 - **DXcam 0.3.0** — MIT License; DXGI desktop capture
 - **cffi 2.1.0** — MIT No Attribution License
@@ -53,6 +55,7 @@ THIRD_PARTY_LICENSES/
 |-- Python/
 |-- pystray/
 |-- six/
+|-- Tcl-Tk/
 |-- typing_extensions/
 `-- websockets/
 ```
@@ -63,9 +66,9 @@ does not change the license of the application source code.
 
 ## Components included in the PWA
 
-- **Next.js 16.2.12** — MIT License; PWA rendering and Vercel API routes
-- **React 19.2.6** — MIT License; browser user interface
-- **React DOM 19.2.6** — MIT License; browser rendering
+- **Next.js 16.4.0** — MIT License; PWA rendering and Vercel API routes
+- **React 19.2.8** — MIT License; browser user interface
+- **React DOM 19.2.8** — MIT License; browser rendering
 - **Drizzle ORM 0.45.2** — Apache License 2.0; versioned relay schema tooling
 - **qr-scanner 1.4.2** — MIT License; camera lifecycle and on-device QR decoding
 - **@types/offscreencanvas 2019.7.3** — MIT License; type declarations used by
