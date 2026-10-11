@@ -22,6 +22,7 @@ test("the source gate detects static, re-exported, dynamic and CJS tool imports"
     'import x = require("vite-plugin-commonjs");',
     'require.resolve("@next/eslint-plugin-next");',
     'import x from "bra\\u0063es";', 'import x from "vinext";',
+    'import x from "@wqrs/build-glob";', 'import x from "tinyglobby";',
   ]) assert.throws(() => assertRuntimeSource(source, filename), /Build-only|build entry/);
 });
 
@@ -43,6 +44,8 @@ test("normal QR imports, local runtime modules and Worker server entry points st
 test("artifact gate detects Windows, nested and external module IDs without blocking the Worker runtime", () => {
   for (const id of [
     "fast-glob", "braces/lib/parse.js",
+    "/project/node_modules/@wqrs/build-glob/index.cjs", "tinyglobby",
+    "/project/vendor/build-glob/index.cjs",
     "C:\\project\\node_modules\\braces\\index.js",
     "/project/node_modules/x/node_modules/micromatch/index.js",
     "/project/node_modules/vinext/dist/index.js?commonjs-proxy",

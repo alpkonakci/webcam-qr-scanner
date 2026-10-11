@@ -183,7 +183,7 @@ class TrayApplication:
             pystray.MenuItem("Create QR", lambda *_: self._launch_creator()),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
-                "Phone-to-PC: v0.2 beta.5",
+                "Phone-to-PC: v0.2 beta.6",
                 lambda *_: None,
                 enabled=False,
             ),

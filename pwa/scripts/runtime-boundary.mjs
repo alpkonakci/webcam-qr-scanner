@@ -5,11 +5,11 @@ import ts from "typescript";
 
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 const sourceRoots = ["app", "lib", "server", "worker"];
-// Installed packages flagged by the current braces advisory, not every glob
-// implementation or every possible future dependency vulnerability.
+// Keep build tooling out of runtime, including the private glob replacement.
 const toolPackages = [
   "braces", "micromatch", "fast-glob", "@next/eslint-plugin-next",
   "eslint-config-next", "vite-plugin-dynamic-import", "vite-plugin-commonjs",
+  "@wqrs/build-glob", "tinyglobby", "fdir",
 ];
 
 export function assertRuntimeSpecifier(specifier, filename, root = projectRoot) {
@@ -86,6 +86,7 @@ export async function checkRuntimeSources(root = projectRoot) {
 export function assertRuntimeModuleId(id) {
   const normalized = id.replaceAll("\\", "/");
   if (toolPackages.some((name) => normalized === name || normalized.startsWith(`${name}/`) || normalized.includes(`/node_modules/${name}/`)) ||
+      normalized.includes("/vendor/build-glob/") ||
       normalized === "vinext" ||
       /\/node_modules\/vinext\/dist\/index\.[cm]?js(?:$|\?)/.test(normalized)) {
     throw new Error(`Build-only dependency in runtime artifact: ${id}`);

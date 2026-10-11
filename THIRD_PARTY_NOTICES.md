@@ -80,6 +80,12 @@ in `pwa/package-lock.json`; npm package license metadata remains part of the
 Vercel build input. The decoder is bundled with the first-party application
 assets and is not loaded from a CDN at runtime.
 
+Development-only glob calls use **tinyglobby 0.2.17** (MIT) via the private
+`pwa/vendor/build-glob` compatibility adapter (project MIT license). Its
+dependencies are fdir (MIT) and picomatch (MIT). These build tools are excluded
+from the browser/relay runtime by the runtime boundary checks. Upstream:
+https://github.com/SuperchupuDev/tinyglobby.
+
 Vercel and Supabase are managed infrastructure services, not components
 bundled into the Windows executable or browser JavaScript. Their service terms
 and privacy policies apply to the deployment operator separately from this

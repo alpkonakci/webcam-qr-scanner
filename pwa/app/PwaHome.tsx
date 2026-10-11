@@ -128,7 +128,7 @@ export function PwaHome() {
             <p className="eyebrow">PHONE-TO-PC</p>
             <p className="brand-name">QR Scanner</p>
           </div>
-          <span className="dev-badge">v0.2 beta.5</span>
+          <span className="dev-badge">v0.2 beta.6</span>
         </header>
 
         {imageOpen ? (
