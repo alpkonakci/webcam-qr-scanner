@@ -91,3 +91,27 @@ These checks resolve the concrete source/rebuild and notice omissions
 identified here. They are not an independent legal opinion, nor a fresh
 full physical-device acceptance test. The original beta.6 tag, public assets
 and Production website are not modified by this local preparation.
+
+### Completed candidate package check
+
+Local source revision: `14bc6ad4ca5788c33fc00522429a00336d0ad4cb`.
+Candidate ZIP (not a new public release):
+`dist/license-review-20261011/Webcam-QR-Scanner-v0.2.0-beta.6-license-review-windows-x64.zip`.
+ZIP SHA-256:
+`54217D99C0E998A38B1A1D429F99BED4A8B173D520AE0A725A19DE5DAB6028C2`.
+
+The ZIP was extracted. All three upstream digests pass both in the packaged
+source folder and inside the extracted APPLICATION_SOURCE.zip. Its EXE hash
+matches the normal candidate and its QR self-test passes. Inventory license
+material is present for all 21 observed distributions.
+
+The application was then rebuilt from the extracted APPLICATION_SOURCE.zip
+with the modified pystray source override. Analysis confirms app.py, camera.py
+and tray_app.py were taken from that extracted source directory. Frozen-code
+inspection and the startup marker assertion pass, followed by QR self-test
+exit code 0. Full and production-only npm audits still report zero findings.
+
+No GitHub assets were replaced, no new tag was published, no Production
+deployment or database was changed, and the user's installed beta.6 remains
+untouched. A fresh end-to-end device check is still appropriate before
+promoting a new stable release; it is separate from this licensing repair.
