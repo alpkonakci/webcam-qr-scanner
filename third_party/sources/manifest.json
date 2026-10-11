@@ -1,0 +1,27 @@
+[
+  {
+    "name": "pystray",
+    "version": "0.19.5",
+    "license": "LGPL-3.0-or-later",
+    "filename": "pystray-0.19.5.tar.gz",
+    "url": "https://api.github.com/repos/moses-palmer/pystray/tarball/1907f8681d6d421517c63d94f425f9cdd74d0034",
+    "upstream_commit": "1907f8681d6d421517c63d94f425f9cdd74d0034",
+    "sha256": "8f6522c492ad9c128f0bda5da9c0061f86a680ef9ad6fcaf90e4111d76e2dc73"
+  },
+  {
+    "name": "certifi",
+    "version": "2026.7.22",
+    "license": "MPL-2.0",
+    "filename": "certifi-2026.7.22.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/a3/c2/24167ea9858356b47a87a50d39908bfdb72ceeefe0041586e704e5376b3a/certifi-2026.7.22.tar.gz",
+    "sha256": "741e2c3b351ddf169a738da9f2c048608ff7f2c5cc02f1ebc6b118bb090d5d55"
+  },
+  {
+    "name": "MPL license text",
+    "version": "2.0",
+    "license": "MPL-2.0",
+    "filename": "MPL-2.0.txt",
+    "url": "https://www.mozilla.org/media/MPL/2.0/index.815ca599c9df.txt",
+    "sha256": "fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85"
+  }
+]

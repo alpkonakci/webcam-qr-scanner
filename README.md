@@ -467,3 +467,11 @@ Copyright © 2026 [alpkonakci](https://github.com/alpkonakci).
 This project is licensed under the [MIT License](LICENSE).
 Bundled dependency licenses are documented in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+The updated distribution recipe includes exact application and LGPL/MPL
+dependency sources, an inventory of frozen dependencies and instructions for
+rebuilding with a modified library. See
+[source access and rebuilding](docs/distribution-sources-and-rebuild.md).
+Browser license notices are collected at build time and available through the
+home page's Licenses link. These packaging changes do not retroactively alter
+previously published release assets.

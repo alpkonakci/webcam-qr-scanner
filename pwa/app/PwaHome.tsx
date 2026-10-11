@@ -241,7 +241,7 @@ export function PwaHome() {
                 <i aria-hidden="true" />
                 {serviceWorkerReady ? "Scanner ready" : "Preparing scanner"}
               </span>
-              <span>Open source · MIT</span>
+              <a href="/licenses/THIRD_PARTY_NOTICES.txt">Open source · Licenses</a>
             </footer>
           </>
         )}

@@ -2,6 +2,8 @@ param(
     [string]$Version = "v0.2.0-beta.6",
     [string]$ExecutablePath = "",
     [string]$OutputDirectory = "",
+    [Parameter(Mandatory)]
+    [string]$AnalysisPath,
     [switch]$FailIfExists
 )
 
@@ -29,6 +31,16 @@ $packageDirectory = Join-Path $outputDirectory $packageName
 $archivePath = Join-Path $outputDirectory "$packageName.zip"
 $checksumsPath = Join-Path $outputDirectory "SHA256SUMS.txt"
 $pythonPath = Join-Path $projectDirectory ".venv\Scripts\python.exe"
+
+# Ship application source from an immutable local revision, not a moving branch.
+# Untracked unrelated notes are not included; tracked edits must be committed.
+$trackedChanges = & git -C $projectDirectory status --porcelain --untracked-files=no
+if ($LASTEXITCODE -ne 0 -or $trackedChanges) {
+    throw "Commit tracked release inputs before packaging source material."
+}
+$sourceRevision = & git -C $projectDirectory rev-parse HEAD
+if ($LASTEXITCODE -ne 0) { throw "Cannot identify source revision." }
+if (-not (Test-Path -LiteralPath $AnalysisPath)) { throw "PyInstaller analysis inventory is required." }
 
 if (-not (Test-Path -LiteralPath $executablePath)) {
     throw "Build the executable first: $executablePath"
@@ -65,6 +77,12 @@ Copy-Item -LiteralPath (Join-Path $projectDirectory "LICENSE") `
     -Destination (Join-Path $packageDirectory "LICENSE.txt")
 Copy-Item -LiteralPath (Join-Path $projectDirectory "THIRD_PARTY_NOTICES.md") `
     -Destination $packageDirectory
+Copy-Item -LiteralPath (Join-Path $projectDirectory "docs\distribution-sources-and-rebuild.md") `
+    -Destination (Join-Path $packageDirectory "REBUILDING.md")
+& git -C $projectDirectory archive --format=zip "--output=$packageDirectory\APPLICATION_SOURCE.zip" HEAD
+if ($LASTEXITCODE -ne 0) { throw "Application source archive failed." }
+@("Application source revision: $sourceRevision", "Application license: MIT", "See REBUILDING.md and THIRD_PARTY_LICENSES/SOURCES/manifest.json") |
+    Set-Content -LiteralPath (Join-Path $packageDirectory "SOURCE_REVISION.txt") -Encoding utf8
 
 $pythonBase = & $pythonPath -c "import sys; print(sys.base_prefix)"
 $pythonLicense = Join-Path $pythonBase "LICENSE.txt"
@@ -154,6 +172,14 @@ $pyInstallerLicenseDirectory = New-Item -ItemType Directory -Path `
 Copy-Item -LiteralPath `
     (Join-Path $sitePackages "pyinstaller-6.21.0.dist-info\licenses\COPYING.txt") `
     -Destination $pyInstallerLicenseDirectory
+
+# Audit what was actually frozen, not just our direct requirements list.
+& $pythonPath (Join-Path $projectDirectory "scripts\release_licenses.py") `
+    --analysis $AnalysisPath --destination $licenseDirectory `
+    --sources (Join-Path $projectDirectory "third_party\sources")
+if ($LASTEXITCODE -ne 0) { throw "Dependency inventory/license/source verification failed." }
+& $pythonPath (Join-Path $projectDirectory "scripts\verify_distribution.py") --exe $executablePath
+if ($LASTEXITCODE -ne 0) { throw "Frozen distribution contents failed verification." }
 
 Compress-Archive -LiteralPath $packageDirectory -DestinationPath $archivePath `
     -CompressionLevel Optimal

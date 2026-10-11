@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node scripts/runtime-boundary.mjs",
+    "prebuild": "node scripts/browser-license-notices.mjs && node scripts/runtime-boundary.mjs",
     "build": "next build",
     "postbuild": "node scripts/runtime-boundary.mjs --next-traces",
     "start": "next start",

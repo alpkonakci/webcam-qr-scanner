@@ -28,17 +28,7 @@ echo Building terminal-free QR-Scanner.exe for v0.2.0-beta.6...
 ".venv\Scripts\python.exe" -m PyInstaller ^
     --noconfirm ^
     --clean ^
-    --onefile ^
-    --windowed ^
-    --icon "assets\QR-Scanner.ico" ^
-    --version-file "assets\windows-version-info.txt" ^
-    --add-data "assets\QR-Scanner.ico;assets" ^
-    --hidden-import bridge.pairing_controller ^
-    --hidden-import bridge.realtime ^
-    --hidden-import pystray._win32 ^
-    --collect-all dxcam ^
-    --name QR-Scanner ^
-    launcher.py
+    packaging\QR-Scanner.spec
 
 if errorlevel 1 (
     echo.
@@ -63,7 +53,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "package_release.ps1" -Version "v0.2.0-beta.6"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "package_release.ps1" -Version "v0.2.0-beta.6" -AnalysisPath "build\QR-Scanner\Analysis-00.toc"
 if errorlevel 1 (
     echo.
     echo Release package creation failed.

@@ -467,3 +467,11 @@ Telif hakkı © 2026 [alpkonakci](https://github.com/alpkonakci).
 Bu proje [MIT Lisansı](LICENSE) ile lisanslanmıştır.
 Paketlenen bağımlılıkların lisansları
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) dosyasında açıklanmıştır.
+
+Güncellenen paketleme yöntemi uygulamanın tam kaynak kodunu, LGPL/MPL bileşen
+kaynaklarını, gerçek derleme bağımlılık envanterini ve değiştirilmiş kütüphane
+ile yeniden derleme yönergesini ekler. Ayrıntılar:
+[kaynak erişimi ve yeniden derleme](docs/distribution-sources-and-rebuild.md).
+Telefon sitesinin lisans bildirimleri derleme sırasında oluşturulur ve ana
+sayfanın Licenses bağlantısından açılır. Bu değişiklikler eski yayın
+dosyalarını geriye dönük olarak değiştirmez.

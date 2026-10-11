@@ -15,7 +15,7 @@ remain subject to their own licenses and are not relicensed under MIT.
 - **opencv-python 5.0.0.93** — Apache License 2.0 and licenses of bundled
   third-party components
 - **Pillow 12.3.0** — HPND License (MIT-CMU)
-- **pystray 0.19.5** — GNU Lesser General Public License v3.0
+- **pystray 0.19.5** — GNU Lesser General Public License v3.0 or later
 - **six 1.17.0** — MIT License
 - **cryptography 50.0.2** — Apache License 2.0 or BSD 3-Clause License
 - **comtypes 1.4.17** — MIT License
@@ -32,6 +32,34 @@ remain subject to their own licenses and are not relicensed under MIT.
   the PyInstaller Bootloader Exception, plus Apache-2.0-licensed run-time hooks
 
 - **websockets 16.1.1** — BSD 3-Clause License
+- **Click 8.4.2** — BSD 3-Clause License; indirect runtime import
+- **Colorama 0.4.6** — BSD 3-Clause License; indirect Windows console helper
+- **pyinstaller-hooks-contrib 2026.6 run-time hooks** — Apache License 2.0;
+  build-time hooks retain their separate GPL license and are not runtime code
+
+The packaging inventory is generated from PyInstaller's actual analysis and
+fails if a site-packages input cannot be attributed to a licensed distribution.
+`THIRD_PARTY_LICENSES/INVENTORY_LICENSES` contains each included distribution's
+complete license tree (including the above indirect components), alongside
+`DEPENDENCY_INVENTORY.json`. The earlier named license directories are retained.
+
+## Source access and rebuilding the single-file executable
+
+The updated packaging recipe supplies `APPLICATION_SOURCE.zip` and
+`SOURCE_REVISION.txt`, plus complete pystray and certifi source archives under
+`THIRD_PARTY_LICENSES/SOURCES`. Their immutable upstream identities and SHA-256
+checksums are in that directory's `manifest.json`. Sources are provided under
+their own LGPL/MPL terms, not relicensed as MIT. The full MPL 2.0 text is included.
+See the accompanying `REBUILDING.md` for modifying the library and rebuilding
+an interface-compatible Windows executable. Such modifications and reverse
+engineering to debug them are not restricted by this project.
+
+The updated Windows recipe excludes the separate OpenCV FFmpeg video plugin,
+which this local-camera/image QR application does not use. MSMF/DirectShow,
+OpenCV image decoding and the native OpenCV module remain. Upstream OpenCV
+notices are retained in full even where they describe components not shipped.
+NumPy's upstream notice includes OpenBLAS/LAPACK and the GCC runtime library
+exception; those complete texts are retained, not replaced with a MIT label.
 
 The distributable ZIP contains the complete license material copied from the
 exact Python environment used to build the executable:
