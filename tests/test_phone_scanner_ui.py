@@ -1,9 +1,10 @@
 import unittest
+import threading
 from unittest.mock import patch
 
 from paired_phone_ipc import PairedPhoneView
 from paired_phones_ui import PairedPhonesAction, PairedPhonesDecision
-from phone_scanner_ui import build_phone_scanner_canvas, show_phone_scanner_window
+from phone_scanner_ui import build_phone_scanner_canvas, _show_phone_scanner_window
 from qr_reader import QRReader
 
 
@@ -31,16 +32,29 @@ class PhoneScannerUiTests(unittest.TestCase):
         show.assert_called_once_with("https://qrwebcam.vercel.app")
         remove.assert_not_called()
 
-    def test_escape_closes_recovery_window(self):
+    def run_window(self, *, wait_key=27, **kwargs):
         with (
             patch("phone_scanner_ui.cv2.namedWindow"),
             patch("phone_scanner_ui.set_window_icon"),
+            patch("phone_scanner_ui.set_window_arrow"),
             patch("phone_scanner_ui.cv2.setMouseCallback"),
             patch("phone_scanner_ui.cv2.moveWindow"),
             patch("phone_scanner_ui.cv2.imshow"),
             patch("phone_scanner_ui._bring_window_to_front"),
-            patch("phone_scanner_ui.cv2.waitKey", return_value=27),
+            patch("phone_scanner_ui.cv2.waitKey", return_value=wait_key),
+            patch("phone_scanner_ui.cv2.getWindowProperty", side_effect=AssertionError("expected automatic close")),
             patch("phone_scanner_ui.cv2.destroyWindow") as destroy,
         ):
-            show_phone_scanner_window("https://qrwebcam.vercel.app")
+            _show_phone_scanner_window("https://qrwebcam.vercel.app", **kwargs)
         destroy.assert_called_once()
+
+    def test_escape_closes_recovery_window(self):
+        self.run_window()
+
+    def test_phone_opened_closes_recovery_window(self):
+        opened = threading.Event()
+        opened.set()
+        self.run_window(phone_opened=opened, wait_key=-1)
+
+    def test_expired_open_session_closes_recovery_window(self):
+        self.run_window(expires_at=1, wait_key=-1)

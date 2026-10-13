@@ -5,6 +5,7 @@ import { isLikelyMobileBrowser } from "../lib/device-kind";
 import { parseQrPayload } from "../lib/qr-payload.mjs";
 import type { QrPayloadResult } from "../lib/qr-payload.mjs";
 import { getMostRecentPair } from "../lib/pair-store";
+import { acknowledgeScannerReturn, parseScannerReturn } from "../lib/scanner-return";
 import {
   pairingUriFromLaunchFragment,
   pairingUriFromScannedValue,
@@ -28,6 +29,7 @@ export function PwaHome() {
   const [pairingUri, setPairingUri] = useState<string | null>(null);
   const [pairedPc, setPairedPc] = useState<SenderCredentials | null>(null);
   const [pairStoreReady, setPairStoreReady] = useState(false);
+  const [scannerReturn, setScannerReturn] = useState<ReturnType<typeof parseScannerReturn>>(null);
   const isMobileClient = useSyncExternalStore(
     subscribeToStaticDeviceKind,
     isLikelyMobileBrowser,
@@ -49,18 +51,20 @@ export function PwaHome() {
       .catch(() => { if (active) setPairedPc(null); })
       .finally(() => { if (active) setPairStoreReady(true); });
 
+    const returnRequest = parseScannerReturn(window.location.hash);
+    if (returnRequest) queueMicrotask(() => { if (active) setScannerReturn(returnRequest); });
     const launchPairingUri = pairingUriFromLaunchFragment(
       window.location.hash,
       window.location.origin,
     );
-    if (launchPairingUri) {
+    if (launchPairingUri || window.location.hash.startsWith("#open=")) {
       window.history.replaceState(
         window.history.state,
         "",
         `${window.location.pathname}${window.location.search}`,
       );
       queueMicrotask(() => {
-        if (active) setPairingUri(launchPairingUri);
+        if (active && launchPairingUri) setPairingUri(launchPairingUri);
       });
     }
 
@@ -69,6 +73,13 @@ export function PwaHome() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!scannerReturn) return;
+    const controller = new AbortController();
+    void acknowledgeScannerReturn(scannerReturn, controller.signal);
+    return () => controller.abort();
+  }, [scannerReturn]);
+
   const closeScanner = useCallback(() => setScannerOpen(false), []);
   const closeImage = useCallback(() => setImageOpen(false), []);
   const closePairing = useCallback(() => setPairingUri(null), []);
@@ -76,6 +87,17 @@ export function PwaHome() {
   const handleDecoded = useCallback((value: string) => {
     setScannerOpen(false);
     setImageOpen(false);
+    try {
+      const url = new URL(value);
+      const request = url.origin === window.location.origin && url.pathname === "/"
+        ? parseScannerReturn(url.hash) : null;
+      if (request) {
+        setPairingUri(null);
+        setScanResult(null);
+        setScannerReturn(request);
+        return;
+      }
+    } catch { /* Ordinary text QR; continue with payload parsing. */ }
     const scannedPairingUri = pairingUriFromScannedValue(
       value,
       window.location.origin,
@@ -128,7 +150,7 @@ export function PwaHome() {
             <p className="eyebrow">PHONE-TO-PC</p>
             <p className="brand-name">QR Scanner</p>
           </div>
-          <span className="dev-badge">v0.2 beta.6</span>
+          <span className="dev-badge">v0.2 beta.7</span>
         </header>
 
         {imageOpen ? (

@@ -15,7 +15,7 @@ default browser, and closes the scanner automatically.
 ![Webcam QR Scanner usage demo](docs/assets/webcam-qr-scanner-demo.gif)
 
 > **Development status:** The latest stable GitHub release is `v0.1.1`. The
-> current branch targets `v0.2.0-beta.6`, a limited Phone-to-PC pre-release,
+> current branch targets `v0.2.0-beta.7`, a limited Phone-to-PC pre-release,
 > not a stable release. Normal use runs through the public
 > [qrwebcam.vercel.app](https://qrwebcam.vercel.app/) service without a Vercel
 > login, bypass secret or PowerShell setup. iPhone and Android core flows,
@@ -24,7 +24,9 @@ default browser, and closes the scanner automatically.
 > Beta.6 removes the reported braces dependency chain from development tools
 > through a tested, project-scoped tinyglobby adapter. Full npm audit reports
 > zero findings. QR creation and mobile image reading from beta.5 remain.
-> See the [beta.6 release notes](docs/v0.2.0-beta.6-release-notes.md) and
+> Beta.7 closes the return-to-phone QR automatically when the site opens and
+> includes dependency sources, full license notices and rebuilding instructions.
+> See the [beta.7 release notes](docs/v0.2.0-beta.7-release-notes.md) and
 > [beta release checklist](docs/v0.2-beta-release-checklist.md).
 
 ## Features
@@ -97,7 +99,7 @@ executables downloaded from the internet.
 
 ### v0.2 beta: background behavior
 
-The current source and locally generated `v0.2.0-beta.6` package still distribute
+The current source and locally generated `v0.2.0-beta.7` package still distribute
 one `QR-Scanner.exe`, but the executable starts separate internal modes:
 
 - A lightweight controller stays visible in the Windows system tray.
@@ -295,7 +297,7 @@ The self-test verifies OpenCV imports and QR decoding without opening a camera.
 The build produces the terminal-free executable and a distributable ZIP:
 
 ```text
-dist\Webcam-QR-Scanner-v0.2.0-beta.6-windows-x64.zip
+dist\Webcam-QR-Scanner-v0.2.0-beta.7-windows-x64.zip
 ```
 
 The ZIP contains `QR-Scanner.exe`, the `Scan Screen.vbs` launcher, the project

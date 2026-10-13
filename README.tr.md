@@ -15,7 +15,7 @@ varsayılan tarayıcıda açılır ve QR Scanner otomatik olarak kapanır.
 ![Webcam QR Scanner kullanım videosu](docs/assets/webcam-qr-scanner-demo.gif)
 
 > **Geliştirme durumu:** Güncel kararlı GitHub sürümü `v0.1.1`'dir. Mevcut dal
-> kararlı sürüm değil, `v0.2.0-beta.6` sınırlı Telefon-PC ön sürümünü hedefler.
+> kararlı sürüm değil, `v0.2.0-beta.7` sınırlı Telefon-PC ön sürümünü hedefler.
 > Normal kullanım açık [qrwebcam.vercel.app](https://qrwebcam.vercel.app/)
 > hizmetinde çalışır; Vercel girişi, bypass secret veya PowerShell kurulumu
 > gerekmez. iPhone/Android temel akışları, ayrı Windows hesabında eşleştirme ve
@@ -23,7 +23,9 @@ varsayılan tarayıcıda açılır ve QR Scanner otomatik olarak kapanır.
 > Tam kabul ve güvenlik matrisi henüz tamamlanmadı. Beta.6, test edilmiş yerel
 > tinyglobby adaptörüyle geliştirme araçlarındaki braces zincirini kaldırır;
 > tam npm taraması sıfır bulgu bildirir. Beta.5'in QR özellikleri korunur.
-> Ayrıntılar için [beta.6 sürüm notlarına](docs/v0.2.0-beta.6-release-notes.md)
+> Beta.7, telefonda site açılınca geri dönüş QR penceresini otomatik kapatır;
+> bağımlılık kaynaklarını, tam lisans metinlerini ve derleme yönergesini içerir.
+> Ayrıntılar için [beta.7 sürüm notlarına](docs/v0.2.0-beta.7-release-notes.md)
 > ve [beta yayın kontrol listesine](docs/v0.2-beta-release-checklist.tr.md) bakın.
 
 ## Özellikler
@@ -95,7 +97,7 @@ SmartScreen uyarı gösterebilir.
 
 ### v0.2 beta: arka plan davranışı
 
-Mevcut kaynak kod ve yerel olarak oluşturulan `v0.2.0-beta.6` paketi yine tek bir
+Mevcut kaynak kod ve yerel olarak oluşturulan `v0.2.0-beta.7` paketi yine tek bir
 `QR-Scanner.exe` dağıtır; EXE kendi içinde ayrı çalışma kipleri başlatır:
 
 - Hafif masaüstü denetleyicisi Windows sistem tepsisinde görünür kalır.
@@ -298,7 +300,7 @@ Self-test, kamera açmadan OpenCV yüklemesini ve QR çözümlemeyi doğrular.
 Build sonunda terminal göstermeyen EXE ile dağıtıma hazır arşiv oluşturulur:
 
 ```text
-dist\Webcam-QR-Scanner-v0.2.0-beta.6-windows-x64.zip
+dist\Webcam-QR-Scanner-v0.2.0-beta.7-windows-x64.zip
 ```
 
 ZIP içinde `QR-Scanner.exe`, `Scan Screen.vbs` başlatıcısı, proje MIT lisansı,

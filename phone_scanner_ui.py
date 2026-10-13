@@ -1,8 +1,11 @@
-"""Public, reusable homepage QR for returning to the phone scanner."""
+"""Homepage QR with a temporary, access-free scanner-open acknowledgement."""
 
 from __future__ import annotations
 
 import cv2
+import asyncio
+import threading
+import time
 import numpy as np
 from PIL import Image, ImageDraw
 
@@ -21,7 +24,7 @@ WINDOW_HEIGHT = 600
 BACK_BOUNDS = (28, 544, 546, 584)
 
 
-def build_phone_scanner_canvas(origin: str) -> np.ndarray:
+def build_phone_scanner_canvas(origin: str, *, launch_url: str | None = None) -> np.ndarray:
     """Show only the public origin, never a credential or private pairing QR."""
     origin = normalize_relay_origin(origin)
     canvas = Image.new("RGB", (WINDOW_WIDTH, WINDOW_HEIGHT), WINDOW_BACKGROUND)
@@ -30,7 +33,7 @@ def build_phone_scanner_canvas(origin: str) -> np.ndarray:
               fill=PRIMARY_TEXT)
     draw.text((28, 61), "Scan to reopen. No new pairing needed.",
               font=_load_font(15), fill=SECONDARY_TEXT)
-    canvas.paste(generate_pairing_qr_image(origin + "/", size=350), (112, 98))
+    canvas.paste(generate_pairing_qr_image(launch_url or origin + "/", size=350), (112, 98))
     draw.text((28, 466), "Use the same phone browser you paired with.",
               font=_load_font(15), fill=PRIMARY_TEXT)
     draw.text((28, 495), "Then tap Scan QR to send a link to this PC.",
@@ -41,7 +44,25 @@ def build_phone_scanner_canvas(origin: str) -> np.ndarray:
 
 
 def show_phone_scanner_window(origin: str) -> None:
-    canvas = build_phone_scanner_canvas(origin)
+    from bridge.scanner_return import open_phone_scanner
+    from native_dialogs import show_dialog, MB_ICONWARNING
+    try:
+        asyncio.run(open_phone_scanner(origin, _show_phone_scanner_window))
+    except Exception:
+        show_dialog(
+            "QR Scanner - Open phone scanner",
+            "Automatic closing is unavailable while the relay cannot be reached. "
+            "You can still open the phone scanner and close this QR with Back.",
+            MB_ICONWARNING,
+        )
+        _show_phone_scanner_window(origin)
+
+
+def _show_phone_scanner_window(
+    origin: str, *, launch_url: str | None = None,
+    phone_opened: threading.Event | None = None, expires_at: int | None = None,
+) -> None:
+    canvas = build_phone_scanner_canvas(origin, launch_url=launch_url)
     closed = False
 
     def on_mouse(event: int, x: int, y: int, _flags: int, _param: object) -> None:
@@ -61,6 +82,10 @@ def show_phone_scanner_window(origin: str) -> None:
         cv2.imshow(WINDOW_TITLE, canvas)
         _bring_window_to_front(WINDOW_TITLE)
         while not closed:
+            if phone_opened is not None and phone_opened.is_set():
+                break
+            if expires_at is not None and time.time() >= expires_at:
+                break
             if cv2.waitKey(16) & 0xFF == 27:
                 break
             if cv2.getWindowProperty(WINDOW_TITLE, cv2.WND_PROP_VISIBLE) < 1:
@@ -68,5 +93,6 @@ def show_phone_scanner_window(origin: str) -> None:
     finally:
         try:
             cv2.destroyWindow(WINDOW_TITLE)
+            cv2.waitKey(1)
         except cv2.error:
             pass

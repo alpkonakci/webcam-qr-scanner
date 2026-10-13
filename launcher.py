@@ -136,8 +136,8 @@ def run_paired_phones() -> int:
             break
         from phone_scanner_ui import show_phone_scanner_window
 
-        # This public homepage QR contains no pairing material and cannot grant
-        # access. The phone must still possess its own saved browser credentials.
+        # The temporary open acknowledgement cannot grant access. The phone
+        # must still possess its own saved browser credentials.
         if phones:
             show_phone_scanner_window(phones[0].relay_origin)
     if decision.action is PairedPhonesAction.REMOVE:
