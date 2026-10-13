@@ -13,6 +13,9 @@ import cv2
 import numpy as np
 
 
+MAX_SCREEN_QR_CODES = 12
+
+
 @dataclass(frozen=True)
 class QRResult:
     data: str
@@ -33,7 +36,9 @@ class QRReader:
         results: list[QRResult] = []
 
         try:
-            detected, decoded_values, points, _ = self._detector.detectAndDecodeMulti(image)
+            detected, decoded_values, points, _ = (
+                self._detector.detectAndDecodeMulti(image)
+            )
             if detected and points is not None:
                 for value, qr_points in zip(decoded_values, points):
                     if value:
@@ -60,6 +65,131 @@ class QRReader:
             )
             for result in results
         ]
+
+    @staticmethod
+    def _unique(results: list[QRResult]) -> list[QRResult]:
+        unique: list[QRResult] = []
+        seen: set[str] = set()
+        for result in results:
+            if result.data not in seen:
+                seen.add(result.data)
+                unique.append(result)
+        return unique
+
+    @staticmethod
+    def _mask_results(image: np.ndarray, results: list[QRResult]) -> None:
+        """Hide decoded codes so another pass can find overlooked neighbours."""
+
+        fill_value: int | tuple[int, int, int]
+        fill_value = 255 if image.ndim == 2 else (255, 255, 255)
+        for result in results:
+            corners = result.corners.astype(np.float32)
+            center = corners.mean(axis=0)
+            expanded = np.rint(center + (corners - center) * 1.18).astype(
+                np.int32
+            )
+            cv2.fillConvexPoly(image, expanded, fill_value, cv2.LINE_AA)
+
+    def _scan_repeated(
+        self,
+        image: np.ndarray,
+        *,
+        limit: int = MAX_SCREEN_QR_CODES,
+    ) -> list[QRResult]:
+        """Repeat detection after masking hits to improve multi-QR coverage."""
+
+        working = image.copy()
+        collected: list[QRResult] = []
+        while len(collected) < limit:
+            detected = self._scan_once(working)
+            if not detected:
+                break
+            new_results = [
+                result
+                for result in detected
+                if all(existing.data != result.data for existing in collected)
+            ]
+            self._mask_results(working, detected)
+            if not new_results:
+                break
+            collected.extend(new_results)
+        return collected[:limit]
+
+    def scan_all(
+        self,
+        frame: np.ndarray,
+        *,
+        limit: int = MAX_SCREEN_QR_CODES,
+    ) -> list[QRResult]:
+        """Decode distinct QR payloads across a one-shot screen capture."""
+
+        if frame is None or frame.size == 0:
+            return []
+
+        height, width = frame.shape[:2]
+        collected: list[QRResult] = []
+        if width > 960:
+            scale = 960.0 / width
+            reduced = cv2.resize(
+                frame,
+                (960, max(1, int(height * scale))),
+                interpolation=cv2.INTER_AREA,
+            )
+            collected.extend(
+                self._restore_scale(
+                    self._scan_repeated(reduced, limit=limit),
+                    scale,
+                )
+            )
+
+        collected.extend(self._scan_repeated(frame, limit=limit))
+        collected = self._unique(collected)
+        if len(collected) >= limit:
+            return collected[:limit]
+
+        gray = (
+            cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            if frame.ndim == 3
+            else frame
+        )
+        enhanced = cv2.equalizeHist(cv2.GaussianBlur(gray, (3, 3), 0))
+        collected.extend(
+            self._scan_repeated(
+                enhanced,
+                limit=limit - len(collected),
+            )
+        )
+        # Selected screen areas can contain sharp but very small QR modules.
+        # Blur destroys those modules, so retry the unblurred crop at a bounded
+        # larger scale with a quiet border. Never synthesize/guess a payload.
+        if max(height, width) <= 512:
+            for interpolation in (cv2.INTER_NEAREST, cv2.INTER_CUBIC):
+                for scale in (2, 4):
+                    enlarged = cv2.resize(
+                        gray, None, fx=scale, fy=scale,
+                        interpolation=interpolation,
+                    )
+                    border = 16 * scale
+                    padded = cv2.copyMakeBorder(
+                        enlarged, border, border, border, border,
+                        cv2.BORDER_CONSTANT, value=255,
+                    )
+                    variants = (padded, cv2.threshold(
+                        padded, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU,
+                    )[1])
+                    for variant in variants:
+                        for result in self._scan_repeated(variant, limit=limit):
+                            corners = np.rint(
+                                (result.corners.astype(np.float32) - border)
+                                / scale
+                            ).astype(np.int32)
+                            corners[:, 0] = np.clip(corners[:, 0], 0, width - 1)
+                            corners[:, 1] = np.clip(corners[:, 1], 0, height - 1)
+                            collected.append(QRResult(result.data, corners))
+                        collected = self._unique(collected)
+                        if len(collected) >= limit:
+                            return collected[:limit]
+        return self._unique(collected)[:limit]
 
     def scan(self, frame: np.ndarray, thorough: bool = True) -> list[QRResult]:
         if frame is None or frame.size == 0:

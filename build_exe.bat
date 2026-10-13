@@ -17,14 +17,18 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo Building terminal-free QR-Scanner.exe...
+if not exist "assets\QR-Scanner.ico" (
+    echo Windows application icon not found.
+    echo Run: .venv\Scripts\python.exe pwa\scripts\generate_icons.py
+    pause
+    exit /b 1
+)
+
+echo Building terminal-free QR-Scanner.exe for v0.2.0-beta.7...
 ".venv\Scripts\python.exe" -m PyInstaller ^
     --noconfirm ^
     --clean ^
-    --onefile ^
-    --windowed ^
-    --name QR-Scanner ^
-    app.py
+    packaging\QR-Scanner.spec
 
 if errorlevel 1 (
     echo.
@@ -33,7 +37,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-"dist\QR-Scanner.exe" --self-test
+powershell.exe -NoProfile -Command "$p = Start-Process -FilePath 'dist\QR-Scanner.exe' -ArgumentList '--self-test' -WindowStyle Hidden -Wait -PassThru; exit $p.ExitCode"
 if errorlevel 1 (
     echo.
     echo EXE self-test failed.
@@ -49,7 +53,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "package_release.ps1" -Version "v0.1.1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "package_release.ps1" -Version "v0.2.0-beta.7" -AnalysisPath "build\QR-Scanner\Analysis-00.toc"
 if errorlevel 1 (
     echo.
     echo Release package creation failed.
