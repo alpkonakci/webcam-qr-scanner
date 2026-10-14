@@ -134,7 +134,7 @@ export function PairingView({
     return (
       <section className="result-section" aria-live="polite">
         <div className="result-pill result-pill-warning">{tr("Pairing rejected")}</div>
-        <h1>{tr("This pairing code is not valid.")}</h1>
+        <h1 id="pairing-title" tabIndex={-1}>{tr("This pairing code is not valid.")}</h1>
         <div className="result-card result-card-warning" role="alert">
           <p>{tr(preview.reason)}</p>
           <p className="result-note">{tr("No credential was created or stored.")}</p>
@@ -148,7 +148,7 @@ export function PairingView({
     return (
       <section className="result-section pairing-section" aria-live="polite">
         <div className="result-pill pairing-pill">{tr("Checking pairing")}</div>
-        <h1>Preparing secure storage.</h1>
+        <h1 id="pairing-title" tabIndex={-1}>{tr("Preparing secure storage.")}</h1>
         <p className="pairing-status">{tr("Checking this browser for an existing PC pairing…")}</p>
       </section>
     );
@@ -158,7 +158,7 @@ export function PairingView({
     return (
       <section className="result-section pairing-section" aria-live="polite">
         <div className="result-pill result-pill-success">{tr("Saved connection")}</div>
-        <h1>{state === "check_error" ? tr("Connection check stopped.") : tr("Checking your PC connection.")}</h1>
+        <h1 id="pairing-title" tabIndex={-1}>{state === "check_error" ? tr("Connection check stopped.") : tr("Checking your PC connection.")}</h1>
         <p className="pairing-status" role={state === "check_error" ? "alert" : "status"}>
           {state === "check_error" ? tr(message) : tr("Checking whether this phone still has access…")}
         </p>
@@ -182,7 +182,7 @@ export function PairingView({
     return (
       <section className="result-section pairing-section" aria-live="polite">
         <div className="result-pill result-pill-success">{tr("Already paired")}</div>
-        <h1>{tr("This browser is already connected.")}</h1>
+        <h1 id="pairing-title" tabIndex={-1}>{tr("This browser is already connected.")}</h1>
         <div className="result-card pairing-card">
           <p className="result-label">{tr("PAIRED PC")}</p>
           <p className="result-hostname">{existingPair.pcLabel}</p>
@@ -207,7 +207,7 @@ export function PairingView({
   return (
     <section className="result-section pairing-section" aria-live="polite">
       <div className="result-pill pairing-pill">{tr("PC pairing code")}</div>
-      <h1>
+      <h1 id="pairing-title" tabIndex={-1}>
         {state === "error"
             ? tr("Pairing stopped.")
             : tr("Connecting your phone.")}

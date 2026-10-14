@@ -23,6 +23,9 @@ from paired_phones_ui import (
 
 class PairedPhonesUiTests(unittest.TestCase):
     def setUp(self) -> None:
+        platform = patch("paired_phones_ui.native_controls_available", return_value=False)
+        platform.start()
+        self.addCleanup(platform.stop)
         self.phone = PairedPhoneView(
             relay_origin="https://relay.example",
             pair_id="abcDEF0123456789-_xyZA",

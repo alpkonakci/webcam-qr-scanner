@@ -22,6 +22,12 @@ from home_ui import (
 
 
 class HomeUiTests(unittest.TestCase):
+    def setUp(self):
+        # These existing tests cover the non-Windows OpenCV fallback.
+        platform = patch("home_ui.native_controls_available", return_value=False)
+        platform.start()
+        self.addCleanup(platform.stop)
+
     def test_screen_action_explains_region_selection(self) -> None:
         screen_card = next(
             card

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { isLikelyMobileBrowser } from "../lib/device-kind";
 import { parseQrPayload } from "../lib/qr-payload.mjs";
 import type { QrPayloadResult } from "../lib/qr-payload.mjs";
@@ -20,6 +20,8 @@ import { LocaleProvider, useLocale } from "../lib/i18n";
 import { APP_VERSION } from "../lib/app-info";
 import { PcConnectionBadge } from "./PcConnectionBadge";
 import { SettingsView } from "./SettingsView";
+import { HomeScreenGuide } from "./HomeScreenGuide";
+import { homeScreenContext, type HomeScreenContext } from "../lib/home-screen";
 
 const subscribeToStaticDeviceKind = () => () => {};
 const getServerDeviceKind = () => false;
@@ -30,6 +32,7 @@ export function PwaHome() {
 function Home() {
   const { tr } = useLocale();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [installContext, setInstallContext] = useState<HomeScreenContext>({ platform: "other", installed: false });
   const [serviceWorkerReady, setServiceWorkerReady] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
@@ -38,7 +41,16 @@ function Home() {
   const [pairingUri, setPairingUri] = useState<string | null>(null);
   const [pairedPc, setPairedPc] = useState<SenderCredentials | null>(null);
   const [pairStoreReady, setPairStoreReady] = useState(false);
+  const [pairStoreError, setPairStoreError] = useState(false);
   const [scannerReturn, setScannerReturn] = useState<ReturnType<typeof parseScannerReturn>>(null);
+  const surface = useRef<HTMLElement>(null);
+  const currentView = scannerOpen ? "camera" : settingsOpen ? "settings" : imageOpen ? "image" : pairingUri ? "pairing" : scanResult ? "result" : "home";
+  const titleId = settingsOpen ? "settings-title" : imageOpen ? "image-reader-title" : pairingUri ? "pairing-title" : scanResult?.kind === "text" ? "text-result-title" : scanResult ? "link-result-title" : "page-title";
+  useEffect(() => {
+    if (currentView === "camera") return;
+    const frame = requestAnimationFrame(() => surface.current?.querySelector<HTMLElement>("h1")?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [currentView]);
   const isMobileClient = useSyncExternalStore(
     subscribeToStaticDeviceKind,
     isLikelyMobileBrowser,
@@ -47,6 +59,13 @@ function Home() {
 
   useEffect(() => {
     let active = true;
+    const standalone = window.matchMedia("(display-mode: standalone)");
+    const readMode = () => setInstallContext(homeScreenContext({
+      userAgent: navigator.userAgent, platform: navigator.platform, maxTouchPoints: navigator.maxTouchPoints,
+      standalone: standalone.matches || (navigator as Navigator & { standalone?: boolean }).standalone === true,
+    }));
+    queueMicrotask(() => { if (active) readMode(); });
+    standalone.addEventListener("change", readMode);
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
@@ -57,7 +76,7 @@ function Home() {
 
     getMostRecentPair()
       .then((pair) => { if (active) setPairedPc(pair); })
-      .catch(() => { if (active) setPairedPc(null); })
+      .catch(() => { if (active) { setPairedPc(null); setPairStoreError(true); } })
       .finally(() => { if (active) setPairStoreReady(true); });
 
     const returnRequest = parseScannerReturn(window.location.hash);
@@ -79,6 +98,7 @@ function Home() {
 
     return () => {
       active = false;
+      standalone.removeEventListener("change", readMode);
     };
   }, []);
 
@@ -147,7 +167,7 @@ function Home() {
 
   return (
     <main className="app-shell">
-      <section className="phone-surface" aria-labelledby={settingsOpen ? "settings-title" : "page-title"}>
+      <section ref={surface} className="phone-surface" aria-labelledby={titleId} inert={scannerOpen}>
         <header className="brand-row">
           <div className="brand-mark" aria-hidden="true">
             <span />
@@ -192,7 +212,7 @@ function Home() {
                 <span className="ready-dot" aria-hidden="true" />
                 {pairedPc ? `${tr("Pairing saved")}: ${pairedPc.pcLabel}` : tr("Camera scanner ready")}
               </div>
-              <h1 id="page-title">{tr("Scan here. Continue on your PC.")}</h1>
+              <h1 id="page-title" tabIndex={-1}>{tr("Scan here. Continue on your PC.")}</h1>
               <p>
                 {tr("Scan a QR link or text with your phone, or scan the one-time pairing code shown by QR Scanner on your PC.")}</p>
             </div>
@@ -221,6 +241,7 @@ function Home() {
             </section>
 
             {pairedPc && <PcConnectionBadge pair={pairedPc} onRevoked={clearRevokedPair} />}
+            <HomeScreenGuide context={installContext} pairing={!pairStoreReady ? "checking" : pairStoreError ? "unavailable" : pairedPc ? "available" : "missing"} tr={tr} />
 
             {pairedPc && (
               <aside className="return-panel" aria-label={tr("Return to your scanner")}>

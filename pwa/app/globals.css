@@ -758,3 +758,16 @@ footer {
 .pc-connection button { justify-self: start; border: 1px solid #2dd4bf; border-radius: 10px; background: transparent; color: #f8fafc; padding: .6rem .9rem; cursor: pointer; }
 .pc-connection button:disabled { opacity: .55; }
 button:focus-visible, a:focus-visible, select:focus-visible { outline: 3px solid #2dd4bf; outline-offset: 4px; }
+summary:focus-visible, input:focus-visible, textarea:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+.home-screen-guide { border: 1px solid var(--line); border-radius: 18px; padding: 18px; margin-top: 24px; color: var(--muted); line-height: 1.6; }
+.home-screen-guide summary { color: var(--ink); cursor: pointer; font-weight: 650; }
+.home-screen-guide h3 { font-size: 1rem; color: var(--ink); margin-top: 1rem; }
+.home-screen-guide ol { padding-left: 1.2rem; }
+.home-screen-guide li { margin-block: .65rem; }
+.home-screen-guide a { color: var(--accent); }
+.home-screen-warning { border-left: 3px solid var(--warning); padding-left: 12px; }
+.keyboard-area-controls { margin-block: 1rem; color: var(--ink); }
+.keyboard-area-controls summary { cursor: pointer; }
+.keyboard-area-controls fieldset { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; border: 1px solid var(--line); padding: 16px; margin-top: 12px; border-radius: 12px; }
+.keyboard-area-controls label { display: grid; gap: 6px; font-size: .85rem; }
+.keyboard-area-controls input { width: 100%; padding: 10px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; font: inherit; }

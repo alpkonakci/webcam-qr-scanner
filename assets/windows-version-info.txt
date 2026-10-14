@@ -7,11 +7,11 @@ VSVersionInfo(
         StringFileInfo([
             StringTable('040904B0', [
                 StringStruct('FileDescription', 'Webcam QR Scanner'),
-                StringStruct('FileVersion', '0.2.0-beta.8-preview'),
+                StringStruct('FileVersion', '0.2.0-beta.8-preview.2'),
                 StringStruct('InternalName', 'QR-Scanner'),
                 StringStruct('OriginalFilename', 'QR-Scanner.exe'),
                 StringStruct('ProductName', 'Webcam QR Scanner'),
-                StringStruct('ProductVersion', '0.2.0-beta.8-preview'),
+                StringStruct('ProductVersion', '0.2.0-beta.8-preview.2'),
                 StringStruct('Comments', 'Limited beta; not a stable release'),
             ])
         ]),

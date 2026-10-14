@@ -21,7 +21,7 @@ export function TextResultView({ text, onScanAgain }: { text: string; onScanAgai
   return (
     <section className="result-section" aria-live="polite">
       <div className="result-pill result-pill-success">{tr("Text QR decoded")}</div>
-      <h1>{tr("Text ready.")}</h1>
+      <h1 id="text-result-title" tabIndex={-1}>{tr("Text ready.")}</h1>
       <div className="result-card">
         <label className="result-label" htmlFor="qr-text">{tr("QR CONTENT")}</label>
         <textarea id="qr-text" className="qr-text-content" ref={field} value={text} readOnly rows={7} />

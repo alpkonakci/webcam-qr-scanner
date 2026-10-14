@@ -65,7 +65,7 @@ export function QrResultView({
     return (
       <section className="result-section" aria-live="polite">
         <div className="result-pill result-pill-warning">{tr("QR rejected")}</div>
-        <h1>{tr("That code is not a safe web link.")}</h1>
+        <h1 id="link-result-title" tabIndex={-1}>{tr("That code is not a safe web link.")}</h1>
         <div className="result-card result-card-warning" role="alert">
           <p>{tr(result.reason)}</p>
           <p className="result-note">{tr("Nothing was opened or sent.")}</p>
@@ -141,7 +141,7 @@ export function QrResultView({
   return (
     <section className="result-section" aria-live="polite">
       <div className="result-pill result-pill-success">{tr("QR decoded")}</div>
-      <h1>{tr("Link ready.")}</h1>
+      <h1 id="link-result-title" tabIndex={-1}>{tr("Link ready.")}</h1>
 
       <div className="result-card">
         <p className="result-label">{tr("WEBSITE")}</p>

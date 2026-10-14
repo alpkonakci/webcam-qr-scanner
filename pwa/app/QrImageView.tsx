@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent } from "rea
 import { loadQrImage, scanQrImage, type LocalQrImage } from "../lib/image-qr";
 import { pastedImage, readClipboardImage } from "../lib/image-clipboard.mjs";
 import type { ImageCrop } from "../lib/image-policy.mjs";
+import { adjustSelection } from "../lib/keyboard-crop";
 
 interface Props { onCancel(): void; onDecoded(value: string): void }
 
@@ -117,7 +118,7 @@ export function QrImageView({ onCancel, onDecoded }: Props) {
   return (
     <section className="image-reader" aria-labelledby="image-reader-title" aria-busy={busy}>
       <div className="image-reader-heading">
-        <div><p className="eyebrow">{tr("ON-DEVICE SCANNING")}</p><h1 id="image-reader-title">{tr("Read from image")}</h1></div>
+        <div><p className="eyebrow">{tr("ON-DEVICE SCANNING")}</p><h1 id="image-reader-title" tabIndex={-1}>{tr("Read from image")}</h1></div>
         <button type="button" className="scanner-close" onClick={onCancel}>{tr("Back")}</button>
       </div>
       <p className="image-help">{url && !busy
@@ -163,6 +164,18 @@ export function QrImageView({ onCancel, onDecoded }: Props) {
             <button type="button" className="result-text-button" disabled={busy || !crop}
               onClick={() => { setCrop(null); setMessage(null); }}>{tr("Reset selection")}</button>
           </div>
+          <details className="keyboard-area-controls">
+            <summary>{tr("Select an area with the keyboard")}</summary>
+            <fieldset>
+              <legend>{tr("Area as a percentage of the image")}</legend>
+              {([ ["x", "Left (%)"], ["y", "Top (%)"], ["width", "Width (%)"], ["height", "Height (%)"] ] as const).map(([field, label]) =>
+                <label key={field}>{tr(label)}
+                  <input type="number" min={field === "x" || field === "y" ? 0 : 1} max={field === "x" || field === "y" ? 99 : 100} step={1}
+                    value={Math.round((crop ?? { x: 0, y: 0, width: 1, height: 1 })[field] * 100)}
+                    onChange={(event) => { setCrop(adjustSelection(crop, field, event.target.valueAsNumber)); setMessage(null); }} />
+                </label>)}
+            </fieldset>
+          </details>
           <button type="button" className="result-primary image-read" disabled={busy || !crop || crop.width === 0 || crop.height === 0}
             onClick={() => void read()}>{busy ? tr("Reading…") : tr("Read selected area")}</button>
         </>

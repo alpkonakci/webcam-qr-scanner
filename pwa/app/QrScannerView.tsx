@@ -34,6 +34,7 @@ export function QrScannerView({ onCancel, onDecoded }: QrScannerViewProps) {
   const { tr } = useLocale();
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<QrScanner | null>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
   const decodedRef = useRef(false);
   const [status, setStatus] = useState<CameraStatus>("starting");
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +43,7 @@ export function QrScannerView({ onCancel, onDecoded }: QrScannerViewProps) {
 
   useEffect(() => {
     let cancelled = false;
+    closeButton.current?.focus();
 
     const closeWhenHidden = () => {
       if (document.visibilityState === "hidden") onCancel();
@@ -120,16 +122,24 @@ export function QrScannerView({ onCancel, onDecoded }: QrScannerViewProps) {
   };
 
   return (
-    <section className="scanner-screen" aria-label={tr("QR camera scanner")}>
-      <video ref={videoRef} className="scanner-video" muted playsInline />
+    <section className="scanner-screen" role="dialog" aria-modal="true" aria-labelledby="scanner-title"
+      onKeyDown={(event) => {
+        if (event.key !== "Tab") return;
+        const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"));
+        const first = buttons[0], last = buttons.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }}>
+      <video ref={videoRef} className="scanner-video" muted playsInline aria-hidden="true" />
       <div className="scanner-shade" aria-hidden="true" />
 
       <header className="scanner-header">
         <div>
           <p className="eyebrow">{tr("ON-DEVICE SCANNING")}</p>
-          <h2>{tr("Point at a QR code")}</h2>
+          <h2 id="scanner-title">{tr("Point at a QR code")}</h2>
         </div>
         <button
+          ref={closeButton}
           type="button"
           className="scanner-close"
           onClick={onCancel}

@@ -4,7 +4,7 @@ import { APP_VERSION, RELEASES_URL } from "../lib/app-info";
 export function SettingsView({ onBack }: { onBack(): void }) {
   const { language, setLanguage, tr } = useLocale();
   return <section className="settings-panel" aria-labelledby="settings-title">
-    <h1 id="settings-title">{tr("Settings and about")}</h1>
+    <h1 id="settings-title" tabIndex={-1}>{tr("Settings and about")}</h1>
     <label htmlFor="ui-language">{tr("Language")}</label>
     <select id="ui-language" value={language} onChange={(e) => setLanguage(e.target.value === "tr" ? "tr" : "en")}>
       <option value="tr">Türkçe</option><option value="en">English</option>

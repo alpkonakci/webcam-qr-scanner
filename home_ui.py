@@ -18,6 +18,7 @@ from window_icon import set_window_icon
 from window_cursor import set_window_arrow
 from desktop_i18n import t
 from receiver_status import connection_confirmed
+from accessible_controls import available as native_controls_available
 
 
 WINDOW_TITLE = "QR Scanner"
@@ -229,6 +230,11 @@ def show_home_window(
     pair_count: int = 0,
 ) -> HomeAction:
     """Show the control center; title-bar close asks how to leave it."""
+
+    if native_controls_available():
+        from accessible_desktop import home_controls
+        window = home_controls(pair_count=pair_count, confirm_exit=confirm_exit, choose_close=choose_close)
+        return window.run()
 
     state = HomeWindowState()
     from bridge.pairing_controller import configured_relay_origin

@@ -29,6 +29,7 @@ from native_dialogs import confirm_remove_phone_access
 from paired_phone_ipc import PairedPhoneView
 from window_icon import set_window_icon
 from window_cursor import set_window_arrow
+from accessible_controls import available as native_controls_available
 
 
 WINDOW_TITLE = t("QR Scanner - Paired Phones")
@@ -228,6 +229,9 @@ def show_paired_phones_window(
     items = tuple(phones)
     if not items:
         return PairedPhonesDecision(PairedPhonesAction.BACK)
+    if native_controls_available():
+        from accessible_desktop import phone_controls
+        return phone_controls(items, confirm_remove=confirm_remove).run()
     state = PairedPhonesWindowState()
 
     def handle_mouse(

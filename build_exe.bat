@@ -24,7 +24,7 @@ if not exist "assets\QR-Scanner.ico" (
     exit /b 1
 )
 
-echo Building terminal-free QR-Scanner.exe for v0.2.0-beta.8-preview...
+echo Building terminal-free QR-Scanner.exe for v0.2.0-beta.8-preview.2...
 ".venv\Scripts\python.exe" -m PyInstaller ^
     --noconfirm ^
     --clean ^
@@ -53,7 +53,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "package_release.ps1" -Version "v0.2.0-beta.8-preview" -AnalysisPath "build\QR-Scanner\Analysis-00.toc"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "package_release.ps1" -Version "v0.2.0-beta.8-preview.2" -AnalysisPath "build\QR-Scanner\Analysis-00.toc"
 if errorlevel 1 (
     echo.
     echo Release package creation failed.

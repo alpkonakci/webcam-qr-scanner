@@ -58,6 +58,11 @@ class SettingsWindow:
 
 
 def show_settings_window() -> None:
+    from accessible_controls import available
+    if available():
+        from accessible_desktop import settings_controls
+        settings_controls().run()
+        return
     root = _window("Settings and about", "620x490")
     SettingsWindow(root)
     root.mainloop()
