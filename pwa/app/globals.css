@@ -745,3 +745,16 @@ footer {
 .image-selection-actions button { min-height: 48px; font-size: 0.78rem; }
 .image-read { width: 100%; }
 .image-feedback { margin-top: 14px; }
+.settings-toggle { display: grid; place-items: center; min-width: 44px; min-height: 44px; border: 1px solid var(--line); border-radius: 50%; background: var(--panel); cursor: pointer; font-size: 1.2rem; color: var(--accent); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+.settings-panel { display: grid; gap: 1.15rem; padding-top: 2rem; }
+.settings-panel h1 { font-size: clamp(1.6rem, 5vw, 2.7rem); }
+.settings-panel select { background: #111c2e; color: #f8fafc; border: 1px solid #2dd4bf; border-radius: 12px; padding: 1rem; font: inherit; }
+.pc-connection { border: 1px solid #263a4c; border-radius: 18px; padding: 1rem; margin: 1.5rem 0; display: grid; gap: .65rem; color: #a7b2c4; }
+.pc-connection-label { color: #f8fafc; font-weight: 600; }
+.pc-connection p { margin: 0; }
+.pc-connection-reachable p { color: #2dd4bf; }
+.pc-connection-unreachable p { color: #fbbf24; }
+.pc-connection button { justify-self: start; border: 1px solid #2dd4bf; border-radius: 10px; background: transparent; color: #f8fafc; padding: .6rem .9rem; cursor: pointer; }
+.pc-connection button:disabled { opacity: .55; }
+button:focus-visible, a:focus-visible, select:focus-visible { outline: 3px solid #2dd4bf; outline-offset: 4px; }

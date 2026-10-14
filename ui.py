@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from desktop_i18n import t
+
 import os
 import time
+from functools import lru_cache
+from pathlib import Path
+from PIL import Image, ImageDraw, ImageFont
 
 os.environ.setdefault("OPENCV_LOG_LEVEL", "ERROR")
 
@@ -24,6 +29,30 @@ COLOR_WARNING = (11, 158, 245)  # Amber #F59E0B
 COLOR_PANEL = (32, 18, 11)  # Graphite #0B1220
 COLOR_TEXT = (252, 250, 248)  # Off-white #F8FAFC
 COLOR_MUTED = (225, 213, 203)  # Light blue-gray #CBD5E1
+
+
+@lru_cache(maxsize=24)
+def _unicode_font(size: int):
+    try:
+        return ImageFont.truetype(str(Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts/segoeui.ttf"), size)
+    except OSError:
+        return ImageFont.load_default()
+
+
+def put_text(frame, text, origin, face, scale, color, thickness=1, line_type=cv2.LINE_AA):
+    """Preserve the fast ASCII renderer; draw only a tiny Unicode ROI with PIL."""
+    if text.isascii():
+        return cv2.putText(frame, text, origin, face, scale, color, thickness, line_type)
+    font = _unicode_font(max(12, round(30 * scale)))
+    x, y = origin
+    left, top, right, bottom = font.getbbox(text, anchor="ls")
+    left, top = max(0, x + left - 2), max(0, y + top - 2)
+    right, bottom = min(frame.shape[1], x + right + 2), min(frame.shape[0], y + bottom + 2)
+    if right <= left or bottom <= top: return frame
+    roi = Image.fromarray(cv2.cvtColor(frame[top:bottom, left:right], cv2.COLOR_BGR2RGB))
+    ImageDraw.Draw(roi).text((x - left, y - top), text, font=font, fill=tuple(reversed(color)), anchor="ls")
+    frame[top:bottom, left:right] = cv2.cvtColor(np.asarray(roi), cv2.COLOR_RGB2BGR)
+    return frame
 
 
 def readable_preview(value: str, limit: int = 70) -> str:
@@ -149,7 +178,7 @@ def draw_result(frame: np.ndarray, result: QRResult) -> None:
         alpha=0.76,
         radius=max(8, int(12 * scale)),
     )
-    cv2.putText(
+    put_text(
         frame,
         label,
         (box_x + 14, box_y + text_height + 8),
@@ -211,7 +240,7 @@ def show_instructions(
         )
 
     text_left = icon_left + icon_size + int(22 * scale)
-    cv2.putText(
+    put_text(
         frame,
         "QR SCANNER",
         (text_left, panel_top + int(45 * scale)),
@@ -221,9 +250,9 @@ def show_instructions(
         max(2, int(2 * scale)),
         cv2.LINE_AA,
     )
-    cv2.putText(
+    put_text(
         frame,
-        "Place the QR code inside the frame",
+        t("Place the QR code inside the frame"),
         (text_left, panel_top + int(78 * scale)),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.56 * scale,
@@ -266,7 +295,7 @@ def _draw_fps_badge(
         alpha=0.68,
         radius=int(17 * scale),
     )
-    cv2.putText(
+    put_text(
         frame,
         fps_text,
         (
@@ -287,8 +316,8 @@ def _draw_status_panel(
     scale: float,
     margin: int,
 ) -> None:
-    status_text = "QR code detected" if detected else "Waiting for QR code"
-    control_text = "ESC   Close camera    CTRL+Q   Exit all"
+    status_text = t("QR code detected") if detected else t("Waiting for QR code")
+    control_text = t("ESC   Close camera    CTRL+Q   Exit all")
     font_scale = 0.54 * scale
     thickness = max(1, int(2 * scale))
     (status_width, status_height), _ = cv2.getTextSize(
@@ -321,7 +350,7 @@ def _draw_status_panel(
         cv2.LINE_AA,
     )
     baseline_y = dot_y + status_height // 2
-    cv2.putText(
+    put_text(
         frame,
         status_text,
         (dot_x + int(18 * scale), baseline_y),
@@ -340,7 +369,7 @@ def _draw_status_panel(
         max(1, int(scale)),
         cv2.LINE_AA,
     )
-    cv2.putText(
+    put_text(
         frame,
         control_text,
         (separator_x + int(24 * scale), baseline_y),

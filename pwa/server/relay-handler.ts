@@ -493,8 +493,10 @@ async function getPairStatus(
   admin: SupabaseAdmin,
   pairId: string,
 ): Promise<Response> {
-  await senderPair(request, admin, pairId);
-  return json({ status: "active", pair_id: pairId });
+  const pair = await senderPair(request, admin, pairId);
+  const now = unixTime();
+  const remaining = pair.last_seen_at == null ? 0 : Math.max(0, Math.min(RECEIVER_ONLINE_SECONDS, pair.last_seen_at + RECEIVER_ONLINE_SECONDS - now));
+  return json({ status: "active", pair_id: pairId, reachable: remaining > 0, checked_at: now, valid_for_seconds: remaining });
 }
 
 async function submitMessage(

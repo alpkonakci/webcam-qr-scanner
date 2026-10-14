@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from desktop_i18n import t
+
 import cv2
 import asyncio
 import threading
@@ -18,7 +20,7 @@ from pairing_ui import generate_pairing_qr_image
 from window_icon import set_window_icon
 from window_cursor import set_window_arrow
 
-WINDOW_TITLE = "QR Scanner - Open Phone Scanner"
+WINDOW_TITLE = t("QR Scanner - Open Phone Scanner")
 WINDOW_WIDTH = 574
 WINDOW_HEIGHT = 600
 BACK_BOUNDS = (28, 544, 546, 584)
@@ -29,17 +31,17 @@ def build_phone_scanner_canvas(origin: str, *, launch_url: str | None = None) ->
     origin = normalize_relay_origin(origin)
     canvas = Image.new("RGB", (WINDOW_WIDTH, WINDOW_HEIGHT), WINDOW_BACKGROUND)
     draw = ImageDraw.Draw(canvas)
-    draw.text((28, 22), "OPEN PHONE SCANNER", font=_load_font(25, semibold=True),
+    draw.text((28, 22), t("OPEN PHONE SCANNER"), font=_load_font(25, semibold=True),
               fill=PRIMARY_TEXT)
-    draw.text((28, 61), "Scan to reopen. No new pairing needed.",
+    draw.text((28, 61), t("Scan to reopen. No new pairing needed."),
               font=_load_font(15), fill=SECONDARY_TEXT)
     canvas.paste(generate_pairing_qr_image(launch_url or origin + "/", size=350), (112, 98))
-    draw.text((28, 466), "Use the same phone browser you paired with.",
+    draw.text((28, 466), t("Use the same phone browser you paired with."),
               font=_load_font(15), fill=PRIMARY_TEXT)
-    draw.text((28, 495), "Then tap Scan QR to send a link to this PC.",
+    draw.text((28, 495), t("Then tap Scan QR to send a link to this PC."),
               font=_load_font(15), fill=SECONDARY_TEXT)
     draw.rounded_rectangle(BACK_BOUNDS, radius=10, fill="#111C2E")
-    draw.text((264, 553), "Back", font=_load_font(15, semibold=True), fill=ACCENT)
+    draw.text((264, 553), t("Back"), font=_load_font(15, semibold=True), fill=ACCENT)
     return cv2.cvtColor(np.asarray(canvas), cv2.COLOR_RGB2BGR)
 
 
@@ -51,8 +53,8 @@ def show_phone_scanner_window(origin: str) -> None:
     except Exception:
         show_dialog(
             "QR Scanner - Open phone scanner",
-            "Automatic closing is unavailable while the relay cannot be reached. "
-            "You can still open the phone scanner and close this QR with Back.",
+            t("Automatic closing is unavailable while the relay cannot be reached. "
+            "You can still open the phone scanner and close this QR with Back."),
             MB_ICONWARNING,
         )
         _show_phone_scanner_window(origin)

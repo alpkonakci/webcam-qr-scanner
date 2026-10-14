@@ -16,11 +16,20 @@ import { QrResultView } from "./QrResultView";
 import { QrScannerView } from "./QrScannerView";
 import { QrImageView } from "./QrImageView";
 import { TextResultView } from "./TextResultView";
+import { LocaleProvider, useLocale } from "../lib/i18n";
+import { APP_VERSION } from "../lib/app-info";
+import { PcConnectionBadge } from "./PcConnectionBadge";
+import { SettingsView } from "./SettingsView";
 
 const subscribeToStaticDeviceKind = () => () => {};
 const getServerDeviceKind = () => false;
 
 export function PwaHome() {
+  return <LocaleProvider><Home /></LocaleProvider>;
+}
+function Home() {
+  const { tr } = useLocale();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [serviceWorkerReady, setServiceWorkerReady] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
@@ -138,7 +147,7 @@ export function PwaHome() {
 
   return (
     <main className="app-shell">
-      <section className="phone-surface" aria-labelledby="page-title">
+      <section className="phone-surface" aria-labelledby={settingsOpen ? "settings-title" : "page-title"}>
         <header className="brand-row">
           <div className="brand-mark" aria-hidden="true">
             <span />
@@ -147,13 +156,14 @@ export function PwaHome() {
             <span />
           </div>
           <div>
-            <p className="eyebrow">PHONE-TO-PC</p>
+            <p className="eyebrow">{tr("PHONE-TO-PC")}</p>
             <p className="brand-name">QR Scanner</p>
           </div>
-          <span className="dev-badge">v0.2 beta.7</span>
+          <button type="button" className="settings-toggle" onClick={() => setSettingsOpen(true)} aria-label={tr("Settings and about")}>⚙</button>
+          <span className="sr-only">{APP_VERSION}</span>
         </header>
 
-        {imageOpen ? (
+        {settingsOpen ? <SettingsView onBack={() => setSettingsOpen(false)} /> : imageOpen ? (
           <QrImageView onCancel={closeImage} onDecoded={handleDecoded} />
         ) : pairingUri ? (
           <PairingView
@@ -180,16 +190,14 @@ export function PwaHome() {
             <div className="hero-copy">
               <div className="ready-pill">
                 <span className="ready-dot" aria-hidden="true" />
-                {pairedPc ? `Paired with ${pairedPc.pcLabel}` : "Camera scanner ready"}
+                {pairedPc ? `${tr("Pairing saved")}: ${pairedPc.pcLabel}` : tr("Camera scanner ready")}
               </div>
-              <h1 id="page-title">Scan here. Continue on your PC.</h1>
+              <h1 id="page-title">{tr("Scan here. Continue on your PC.")}</h1>
               <p>
-                Scan a QR link or text with your phone, or scan the one-time pairing
-                code shown by QR Scanner on your PC.
-              </p>
+                {tr("Scan a QR link or text with your phone, or scan the one-time pairing code shown by QR Scanner on your PC.")}</p>
             </div>
 
-            <section className="action-panel" aria-label="Available actions">
+            <section className="action-panel" aria-label={tr("Available actions")}>
               <button
                 className="primary-action primary-action-ready"
                 type="button"
@@ -200,70 +208,60 @@ export function PwaHome() {
                   <i />
                 </span>
                 <span className="action-copy">
-                  <strong>Scan QR</strong>
-                  <small id="scan-status">Scan a link, text or PC pairing code</small>
+                  <strong>{tr("Scan QR")}</strong>
+                  <small id="scan-status">{tr("Scan a link, text or PC pairing code")}</small>
                 </span>
                 <span className="action-arrow" aria-hidden="true">→</span>
               </button>
               <button className="primary-action primary-action-ready image-action" type="button" onClick={startImage}>
                 <span className="action-icon image-action-icon" aria-hidden="true">▧</span>
-                <span className="action-copy"><strong>Read from image</strong><small>Choose a screenshot or saved QR</small></span>
+                <span className="action-copy"><strong>{tr("Read from image")}</strong><small>{tr("Choose a screenshot or saved QR")}</small></span>
                 <span className="action-arrow" aria-hidden="true">→</span>
               </button>
             </section>
 
+            {pairedPc && <PcConnectionBadge pair={pairedPc} onRevoked={clearRevokedPair} />}
+
             {pairedPc && (
-              <aside className="return-panel" aria-label="Return to your scanner">
-                <strong>Your connection is saved in this browser.</strong>
+              <aside className="return-panel" aria-label={tr("Return to your scanner")}>
+                <strong>{tr("Your connection is saved in this browser.")}</strong>
                 <p>
-                  Bookmark this page to return later. Closing the tab does not
-                  remove your pairing.
-                </p>
+                  {tr("Bookmark this page to return later. Closing the tab does not remove your pairing.")}</p>
                 <p className="return-address">{pairedPc.relayOrigin}</p>
                 <details>
-                  <summary>How do I send another QR?</summary>
+                  <summary>{tr("How do I send another QR?")}</summary>
                   <p>
-                    Open this page in the same browser and tap Scan QR. Your
-                    phone&apos;s normal camera opens websites directly; it does
-                    not send them to your PC.
-                  </p>
+                    {tr("Open this page in the same browser and tap Scan QR. Your phone's normal camera opens websites directly; it does not send them to your PC.")}</p>
                   <p>
-                    Lost the tab? On your PC, open Paired Phones → Open scanner
-                    on phone and scan that code. If you use another browser,
-                    private browsing or clear site data, you may need to pair again.
-                  </p>
+                    {tr("Lost the tab? On your PC, open Paired Phones → Open scanner on phone and scan that code. If you use another browser, private browsing or clear site data, you may need to pair again.")}</p>
                 </details>
               </aside>
             )}
 
             <section className="privacy-panel" aria-labelledby="privacy-title">
               <div>
-                <p className="section-kicker">PRIVATE BY DEFAULT</p>
-                <h2 id="privacy-title">Only the permissions you choose</h2>
+                <p className="section-kicker">{tr("PRIVATE BY DEFAULT")}</p>
+                <h2 id="privacy-title">{tr("Only the permissions you choose")}</h2>
               </div>
               <ul>
-                <li><span aria-hidden="true">✓</span>No account</li>
-                <li><span aria-hidden="true">✓</span>No location access</li>
-                <li><span aria-hidden="true">✓</span>Camera only while the scanner is open</li>
-                <li><span aria-hidden="true">✓</span>Selected images are never uploaded</li>
+                <li><span aria-hidden="true">✓</span>{tr("No account")}</li>
+                <li><span aria-hidden="true">✓</span>{tr("No location access")}</li>
+                <li><span aria-hidden="true">✓</span>{tr("Camera only while the scanner is open")}</li>
+                <li><span aria-hidden="true">✓</span>{tr("Selected images are never uploaded")}</li>
               </ul>
               <details className="camera-permission-help">
-                <summary>Camera permission after refreshing?</summary>
+                <summary>{tr("Camera permission after refreshing?")}</summary>
                 <p>
-                  Your browser controls this permission. If it asks each time,
-                  you can choose Camera → Allow for this site in the browser&apos;s
-                  website settings. You do not need to allow all websites.
-                  Camera permission is separate from your saved PC pairing.
-                </p>
+                  {tr("Your browser controls this permission. If it asks each time, you can choose Camera → Allow for this site in the browser's website settings. You do not need to allow all websites. Camera permission is separate from your saved PC pairing.")}</p>
               </details>
             </section>
 
             <footer>
               <span className={serviceWorkerReady ? "status-online" : "status-idle"}>
                 <i aria-hidden="true" />
-                {serviceWorkerReady ? "Scanner ready" : "Preparing scanner"}
+                {serviceWorkerReady ? tr("Scanner ready") : tr("Preparing scanner")}
               </span>
-              <a href="/licenses/THIRD_PARTY_NOTICES.txt">Open source · Licenses</a>
+              <a href="/licenses/THIRD_PARTY_NOTICES.txt">{tr("Open source · Licenses")}</a>
             </footer>
           </>
         )}

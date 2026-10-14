@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from desktop_i18n import t
+
 import ctypes
 import math
 import os
@@ -19,7 +21,7 @@ from window_icon import set_window_icon
 from window_cursor import set_window_arrow
 
 
-WINDOW_TITLE = "QR Scanner - Pair Phone"
+WINDOW_TITLE = t("QR Scanner - Pair Phone")
 WINDOW_WIDTH = 574
 WINDOW_HEIGHT = 624
 WINDOW_BACKGROUND = "#0B1220"
@@ -115,13 +117,13 @@ def build_pairing_canvas(
 
     draw.text(
         (28, 22),
-        "PAIR A PHONE",
+        t("PAIR A PHONE"),
         font=title_font,
         fill=PRIMARY_TEXT,
     )
     draw.text(
         (28, 58),
-        "Scan with your camera or Google Lens.",
+        t("Scan with your camera or Google Lens."),
         font=body_font,
         fill=SECONDARY_TEXT,
     )
@@ -136,7 +138,7 @@ def build_pairing_canvas(
         qr = qr.resize((QR_SIZE, QR_SIZE), Image.Resampling.NEAREST)
     canvas.paste(qr, ((WINDOW_WIDTH - QR_SIZE) // 2, 108))
 
-    countdown = f"{max(0, remaining_seconds)} seconds remaining"
+    countdown = t("{seconds} seconds remaining", seconds=max(0, remaining_seconds))
     countdown_width = draw.textlength(countdown, font=countdown_font)
     draw.text(
         ((WINDOW_WIDTH - countdown_width) / 2, 532),
@@ -147,7 +149,7 @@ def build_pairing_canvas(
 
     draw.text(
         (28, 580),
-        "Keep this window open until your phone connects.",
+        t("Keep this window open until your phone connects."),
         font=body_font,
         fill=SECONDARY_TEXT,
     )

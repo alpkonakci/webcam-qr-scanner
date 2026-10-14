@@ -20,6 +20,7 @@ class AppSettings:
 
     version: int = SETTINGS_VERSION
     camera_closed_notice_shown: bool = False
+    language: str = "en"
 
 
 def settings_directory(environment: dict[str, str] | None = None) -> Path:
@@ -63,7 +64,7 @@ class SettingsStore:
         temporary_path.write_text(serialized, encoding="utf-8", newline="\n")
         os.replace(temporary_path, self.path)
 
-    def update(self, **changes: bool | int) -> AppSettings:
+    def update(self, **changes: bool | int | str) -> AppSettings:
         current = self.load()
         updated = replace(current, **changes)
         self.save(updated)
@@ -80,6 +81,9 @@ def _settings_from_mapping(value: dict[str, Any]) -> AppSettings:
     boolean_fields = ("camera_closed_notice_shown",)
     if any(type(value.get(field, False)) is not bool for field in boolean_fields):
         return AppSettings()
+    language = value.get("language", "en")
+    if not isinstance(language, str) or language not in {"en", "tr"}:
+        language = "en"
 
     return AppSettings(
         version=version,
@@ -87,4 +91,5 @@ def _settings_from_mapping(value: dict[str, Any]) -> AppSettings:
             "camera_closed_notice_shown",
             False,
         ),
+        language=language,
     )

@@ -1,4 +1,5 @@
 "use client";
+import { useLocale } from "../lib/i18n";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { defaultPhoneLabel, removePair } from "../lib/pair-store";
@@ -29,6 +30,7 @@ export function PairingView({
   onPairInvalid,
   onCancel,
 }: PairingViewProps) {
+  const { tr } = useLocale();
   const [phoneLabel] = useState(defaultPhoneLabel);
   const [state, setState] = useState<PairingState>("ready");
   const [message, setMessage] = useState("");
@@ -131,13 +133,13 @@ export function PairingView({
   if (!preview.ok) {
     return (
       <section className="result-section" aria-live="polite">
-        <div className="result-pill result-pill-warning">Pairing rejected</div>
-        <h1>This pairing code is not valid.</h1>
+        <div className="result-pill result-pill-warning">{tr("Pairing rejected")}</div>
+        <h1>{tr("This pairing code is not valid.")}</h1>
         <div className="result-card result-card-warning" role="alert">
-          <p>{preview.reason}</p>
-          <p className="result-note">No credential was created or stored.</p>
+          <p>{tr(preview.reason)}</p>
+          <p className="result-note">{tr("No credential was created or stored.")}</p>
         </div>
-        <button type="button" className="result-primary" onClick={onCancel}>Scan again</button>
+        <button type="button" className="result-primary" onClick={onCancel}>{tr("Scan again")}</button>
       </section>
     );
   }
@@ -145,9 +147,9 @@ export function PairingView({
   if (!pairStoreReady) {
     return (
       <section className="result-section pairing-section" aria-live="polite">
-        <div className="result-pill pairing-pill">Checking pairing</div>
+        <div className="result-pill pairing-pill">{tr("Checking pairing")}</div>
         <h1>Preparing secure storage.</h1>
-        <p className="pairing-status">Checking this browser for an existing PC pairing…</p>
+        <p className="pairing-status">{tr("Checking this browser for an existing PC pairing…")}</p>
       </section>
     );
   }
@@ -155,22 +157,22 @@ export function PairingView({
   if (samePcAlreadyPaired && state !== "waiting") {
     return (
       <section className="result-section pairing-section" aria-live="polite">
-        <div className="result-pill result-pill-success">Saved connection</div>
-        <h1>{state === "check_error" ? "Connection check stopped." : "Checking your PC connection."}</h1>
+        <div className="result-pill result-pill-success">{tr("Saved connection")}</div>
+        <h1>{state === "check_error" ? tr("Connection check stopped.") : tr("Checking your PC connection.")}</h1>
         <p className="pairing-status" role={state === "check_error" ? "alert" : "status"}>
-          {state === "check_error" ? message : "Checking whether this phone still has access…"}
+          {state === "check_error" ? tr(message) : tr("Checking whether this phone still has access…")}
         </p>
         {state === "check_error" && (
           <div className="result-actions">
             <button type="button" className="result-primary" onClick={() => {
               setState("ready");
               setCheckAttempt((attempt) => attempt + 1);
-            }}>Try again</button>
-            <button type="button" className="result-text-button" onClick={cancelUnusedPairing}>Cancel</button>
+            }}>{tr("Try again")}</button>
+            <button type="button" className="result-text-button" onClick={cancelUnusedPairing}>{tr("Cancel")}</button>
           </div>
         )}
         {state === "ready" && (
-          <button type="button" className="result-text-button" onClick={cancelUnusedPairing}>Cancel</button>
+          <button type="button" className="result-text-button" onClick={cancelUnusedPairing}>{tr("Cancel")}</button>
         )}
       </section>
     );
@@ -179,28 +181,24 @@ export function PairingView({
   if (existingPair && !replaceExisting) {
     return (
       <section className="result-section pairing-section" aria-live="polite">
-        <div className="result-pill result-pill-success">Already paired</div>
-        <h1>This browser is already connected.</h1>
+        <div className="result-pill result-pill-success">{tr("Already paired")}</div>
+        <h1>{tr("This browser is already connected.")}</h1>
         <div className="result-card pairing-card">
-          <p className="result-label">PAIRED PC</p>
+          <p className="result-label">{tr("PAIRED PC")}</p>
           <p className="result-hostname">{existingPair.pcLabel}</p>
           <p className="result-note">
-            Continue using the existing secure pairing. Replace it only if the
-            old connection no longer works or you intend to connect this
-            browser to another PC.
-          </p>
+            {tr("Continue using the existing secure pairing. Replace it only if the old connection no longer works or you intend to connect this browser to another PC.")}</p>
         </div>
         <div className="result-actions">
           <button type="button" className="result-primary" onClick={cancelUnusedPairing}>
-            Continue with {existingPair.pcLabel}
+            {tr("Continue with")} {existingPair.pcLabel}
           </button>
           <button
             type="button"
             className="result-text-button"
             onClick={() => setReplaceExisting(true)}
           >
-            Replace pairing
-          </button>
+            {tr("Replace pairing")}</button>
         </div>
       </section>
     );
@@ -208,30 +206,27 @@ export function PairingView({
 
   return (
     <section className="result-section pairing-section" aria-live="polite">
-      <div className="result-pill pairing-pill">PC pairing code</div>
+      <div className="result-pill pairing-pill">{tr("PC pairing code")}</div>
       <h1>
         {state === "error"
-            ? "Pairing stopped."
-            : "Connecting your phone."}
+            ? tr("Pairing stopped.")
+            : tr("Connecting your phone.")}
       </h1>
 
       <div className="result-card pairing-card">
-        <p className="result-label">SECURE CONNECTION</p>
+        <p className="result-label">{tr("SECURE CONNECTION")}</p>
         <p className="result-hostname">{preview.hostname}</p>
         <p className="result-note">
-          {phoneLabel} will use this encrypted connection. Your PC still asks
-          before opening every link.
-        </p>
+          {phoneLabel} {tr("will use this encrypted connection. Your PC still asks before opening every link.")}</p>
         {replaceExisting && existingPair && (
           <p className="pairing-status pairing-status-error">
-            Replacing {existingPair.pcLabel} creates a new secure pairing.
-          </p>
+            {tr("Replacing")} {existingPair.pcLabel} {tr("creates a new secure pairing.")}</p>
         )}
       </div>
 
       {message && (
         <p className={`pairing-status pairing-status-${state}`} role={state === "error" ? "alert" : "status"}>
-          {message}
+          {tr(message)}
         </p>
       )}
 
@@ -245,12 +240,10 @@ export function PairingView({
               void beginPairing();
             }}
           >
-            Try again
-          </button>
+            {tr("Try again")}</button>
         ) : null}
         <button type="button" className="result-text-button" disabled={state === "waiting"} onClick={cancelUnusedPairing}>
-          Cancel
-        </button>
+          {tr("Cancel")}</button>
       </div>
     </section>
   );

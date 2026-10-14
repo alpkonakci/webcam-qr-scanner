@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from desktop_i18n import t
+
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import Enum
@@ -29,7 +31,7 @@ from window_icon import set_window_icon
 from window_cursor import set_window_arrow
 
 
-WINDOW_TITLE = "QR Scanner - Paired Phones"
+WINDOW_TITLE = t("QR Scanner - Paired Phones")
 WINDOW_WIDTH = 620
 WINDOW_HEIGHT = 540
 LIST_LEFT = 32
@@ -131,10 +133,10 @@ def build_paired_phones_canvas(
     small_font = _load_font(12)
     button_font = _load_font(14, semibold=True)
 
-    draw.text((32, 24), "PAIRED PHONES", font=title_font, fill=PRIMARY_TEXT)
+    draw.text((32, 24), t("PAIRED PHONES"), font=title_font, fill=PRIMARY_TEXT)
     draw.text(
         (32, 66),
-        "Select a phone to manage its access.",
+        t("Select a phone to manage its access."),
         font=subtitle_font,
         fill=SECONDARY_TEXT,
     )
@@ -176,7 +178,7 @@ def build_paired_phones_canvas(
         last = min(len(phones), scroll_offset + VISIBLE_ROWS)
         draw.text(
             (32, 412),
-            f"{first}-{last} of {len(phones)}  \u00b7  Scroll for more",
+            t("{first}-{last} of {count} · Scroll for more", first=first, last=last, count=len(phones)),
             font=small_font,
             fill=SECONDARY_TEXT,
         )
@@ -184,7 +186,7 @@ def build_paired_phones_canvas(
     _draw_button(
         draw,
         PAIR_ANOTHER_BOUNDS,
-        "Add phone",
+        t("Add phone"),
         button_font,
         hovered=hover_action is PairedPhonesAction.PAIR_ANOTHER,
         accent=ACCENT,
@@ -192,7 +194,7 @@ def build_paired_phones_canvas(
     _draw_button(
         draw,
         BACK_BOUNDS,
-        "Back",
+        t("Back"),
         button_font,
         hovered=hover_action is PairedPhonesAction.BACK,
         accent=ACCENT,
@@ -200,14 +202,14 @@ def build_paired_phones_canvas(
     _draw_button(
         draw,
         REMOVE_BOUNDS,
-        "Remove",
+        t("Remove"),
         button_font,
         hovered=hover_action is PairedPhonesAction.REMOVE,
         accent=WARNING,
         enabled=selected_index is not None,
     )
     _draw_button(
-        draw, OPEN_SCANNER_BOUNDS, "Open scanner on phone", button_font,
+        draw, OPEN_SCANNER_BOUNDS, t("Open scanner on phone"), button_font,
         hovered=hover_action is PairedPhonesAction.OPEN_SCANNER,
         accent=ACCENT,
     )

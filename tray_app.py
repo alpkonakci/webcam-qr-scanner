@@ -36,6 +36,8 @@ from exit_codes import (
     CONTROL_SCAN_CAMERA,
     CONTROL_SCAN_SCREEN,
     CONTROL_CREATE_QR,
+    CONTROL_SETTINGS,
+    CONTROL_SETTINGS_CHANGED,
 )
 from native_dialogs import (
     MB_ICONWARNING,
@@ -51,6 +53,8 @@ from paired_phone_ipc import (
 )
 from process_launcher import spawn_application
 from windows_startup import is_startup_enabled, set_startup_enabled
+from app_info import APP_VERSION
+from desktop_i18n import t, reload_language
 
 
 APPLICATION_NAME = "QR Scanner"
@@ -65,6 +69,7 @@ class ChildRole(Enum):
     HOME = "home"
     PAIRED_PHONES = "paired_phones"
     CREATOR = "creator"
+    SETTINGS = "settings"
 
 
 class PairManager(Protocol):
@@ -155,6 +160,7 @@ class TrayApplication:
         self._home_process: subprocess.Popen[bytes] | None = None
         self._paired_phones_process: subprocess.Popen[bytes] | None = None
         self._creator_process: subprocess.Popen[bytes] | None = None
+        self._settings_process: subprocess.Popen[bytes] | None = None
         self._pairing_thread: threading.Thread | None = None
         self._children_lock = threading.RLock()
         self._exit_prompt_lock = threading.Lock()
@@ -174,16 +180,16 @@ class TrayApplication:
     def _build_menu(self) -> pystray.Menu:
         return pystray.Menu(
             pystray.MenuItem(
-                "Open QR Scanner",
+                t("Open QR Scanner"),
                 self._open_home,
                 default=True,
             ),
-            pystray.MenuItem("Scan with Camera", self._scan_with_camera),
-            pystray.MenuItem("Select a Screen Area", self._scan_screen),
-            pystray.MenuItem("Create QR", lambda *_: self._launch_creator()),
+            pystray.MenuItem(t("Scan with Camera"), self._scan_with_camera),
+            pystray.MenuItem(t("Select a Screen Area"), self._scan_screen),
+            pystray.MenuItem(t("Create QR"), lambda *_: self._launch_creator()),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
-                "Phone-to-PC: v0.2 beta.7",
+                f"Phone-to-PC: {APP_VERSION}",
                 lambda *_: None,
                 enabled=False,
             ),
@@ -192,19 +198,20 @@ class TrayApplication:
                 self._phone_action,
             ),
             pystray.MenuItem(
-                "Start with Windows",
+                t("Start with Windows"),
                 self._toggle_startup,
                 checked=lambda _: is_startup_enabled(),
             ),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Exit QR Scanner", self._exit_from_menu),
+            pystray.MenuItem(t("Settings and about"), lambda *_: self._launch_settings()),
+            pystray.MenuItem(t("Exit QR Scanner"), self._exit_from_menu),
         )
 
     def _phone_menu_text(self, _: pystray.MenuItem) -> str:
         count = len(self._list_pairs_safely())
         if count:
-            return f"Paired Phones ({count})..."
-        return "Pair Phone..."
+            return t("Paired Phones ({count})...", count=count)
+        return t("Pair Phone...")
 
     def _phone_action(
         self,
@@ -274,7 +281,7 @@ class TrayApplication:
                 and self._pairing_thread.is_alive()
             ):
                 self._notify(
-                    "A phone pairing window is already open.",
+                    t("A phone pairing window is already open."),
                     "QR Scanner",
                 )
                 return
@@ -296,18 +303,18 @@ class TrayApplication:
             if status == "approved":
                 self.receiver_service.request_refresh()
                 self._notify(
-                    f"{phone_label or 'Phone'} was paired securely.",
+                    t("{phone} was paired securely.", phone=phone_label or t("Phone")),
                     "QR Scanner",
                 )
                 self._refresh_pairing_status()
             elif status == "rejected":
                 self._notify(
-                    "The phone pairing request was rejected.",
+                    t("The phone pairing request was rejected."),
                     "QR Scanner",
                 )
             elif status == "expired":
                 self._notify(
-                    "The pairing code expired. Open Pair Phone to try again.",
+                    t("The pairing code expired. Open Pair Phone to try again."),
                     "QR Scanner",
                 )
         except Exception as error:
@@ -402,7 +409,7 @@ class TrayApplication:
                 and self._camera_process.poll() is None
             ):
                 self._notify(
-                    "The camera scanner is already open.",
+                    t("The camera scanner is already open."),
                     "QR Scanner",
                 )
                 return
@@ -433,7 +440,7 @@ class TrayApplication:
             if self._stop_event.is_set() or self._foreground_dialog_count > 0:
                 return
             if self._creator_process is not None and self._creator_process.poll() is None:
-                self._notify("The QR creator is already open.", "QR Scanner")
+                self._notify(t("The QR creator is already open."), "QR Scanner")
                 return
             self._dismiss_control_windows_locked()
             self._launch_child(["--create-qr-process"], role=ChildRole.CREATOR)
@@ -443,6 +450,8 @@ class TrayApplication:
             if self._stop_event.is_set() or self._foreground_dialog_count > 0:
                 return
             if self._creator_process is not None and self._creator_process.poll() is None:
+                return
+            if self._settings_process is not None and self._settings_process.poll() is None:
                 return
             if (
                 self._paired_phones_process is not None
@@ -530,6 +539,8 @@ class TrayApplication:
                 self._paired_phones_process = process
             elif role is ChildRole.CREATOR:
                 self._creator_process = process
+            elif role is ChildRole.SETTINGS:
+                self._settings_process = process
         threading.Thread(
             target=self._monitor_child,
             args=(process, role),
@@ -554,6 +565,8 @@ class TrayApplication:
                 self._paired_phones_process = None
             if process is self._creator_process:
                 self._creator_process = None
+            if process is self._settings_process:
+                self._settings_process = None
         if return_code == APPLICATION_EXIT_REQUESTED:
             self._stop()
             return
@@ -567,8 +580,17 @@ class TrayApplication:
             self._launch_home()
         elif role is ChildRole.CREATOR and return_code == CONTROL_BACK_HOME:
             self._launch_home()
+        elif role is ChildRole.SETTINGS:
+            reload_language()
+            self.icon.menu = self._build_menu()
+            self.icon.update_menu()
+            if return_code == CONTROL_SETTINGS_CHANGED:
+                self._launch_home()
 
     def _handle_home_action(self, return_code: int) -> None:
+        if return_code == CONTROL_SETTINGS:
+            self._launch_settings()
+            return
         if return_code == CONTROL_SCAN_CAMERA:
             self._launch_camera()
             return
@@ -586,6 +608,15 @@ class TrayApplication:
             return
         if return_code == CONTROL_EXIT_REQUESTED:
             self._request_full_exit()
+
+    def _launch_settings(self) -> None:
+        with self._children_lock:
+            if self._stop_event.is_set() or self._foreground_dialog_count > 0:
+                return
+            if self._settings_process is not None and self._settings_process.poll() is None:
+                return
+            self._dismiss_control_windows_locked()
+            self._launch_child(["--settings-process"], role=ChildRole.SETTINGS)
 
     def _handle_paired_phones_action(self, return_code: int) -> None:
         if return_code == CONTROL_PAIR_PHONE:
@@ -619,7 +650,7 @@ class TrayApplication:
             self.receiver_service.request_refresh()
             self._refresh_pairing_status()
             self._notify(
-                f"{request.phone_label} no longer has stored access.",
+                t("{phone} no longer has stored access.", phone=request.phone_label),
                 "QR Scanner",
             )
         except PairRevocationError:
@@ -662,7 +693,7 @@ class TrayApplication:
                 request.phone_label,
             )
             self._notify(
-                f"Access for {phone_label} was removed.",
+                t("Access for {phone} was removed.", phone=phone_label),
                 "QR Scanner",
             )
 
@@ -704,6 +735,7 @@ class TrayApplication:
             for process in (
                 self._dismiss_home_locked(),
                 self._dismiss_paired_phones_locked(),
+                self._dismiss_settings_locked(),
             )
             if process is not None
         )
@@ -734,6 +766,13 @@ class TrayApplication:
         except Exception:
             return ()
 
+    def _dismiss_settings_locked(self) -> subprocess.Popen[bytes] | None:
+        process = self._settings_process
+        self._settings_process = None
+        if process is not None and process.poll() is None:
+            process.terminate()
+        return process
+
     def _refresh_pairing_status(self) -> None:
         count = len(self._list_pairs_safely())
         status = f"{count} saved pairings" if count else "not paired"
@@ -762,7 +801,7 @@ class TrayApplication:
         if not self.icon.HAS_NOTIFICATION:
             return False
         try:
-            self.icon.notify(message, title)
+            self.icon.notify(t(message), t(title))
             return True
         except (NotImplementedError, OSError):
             return False

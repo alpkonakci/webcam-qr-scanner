@@ -16,6 +16,8 @@ from PIL import Image, ImageDraw, ImageFont
 from native_dialogs import WindowCloseChoice, choose_home_window_close
 from window_icon import set_window_icon
 from window_cursor import set_window_arrow
+from desktop_i18n import t
+from receiver_status import connection_confirmed
 
 
 WINDOW_TITLE = "QR Scanner"
@@ -38,6 +40,7 @@ class HomeAction(Enum):
     PAIR_PHONE = "pair_phone"
     MANAGE_PHONES = "manage_phones"
     CREATE_QR = "create_qr"
+    SETTINGS = "settings"
     EXIT = "exit"
 
 
@@ -65,6 +68,7 @@ BASE_ACTION_CARDS = (
     ),
 )
 EXIT_BOUNDS = (456, 470, 588, 510)
+SETTINGS_BOUNDS = (424, 25, 588, 63)
 
 
 @dataclass(slots=True)
@@ -80,21 +84,21 @@ def action_cards(pair_count: int = 0) -> tuple[ActionCard, ...]:
         phone_card = ActionCard(
             HomeAction.MANAGE_PHONES,
             (32, 288, 588, 362),
-            f"Paired Phones ({pair_count})",
-            "View, remove, or add a phone.",
+            t("Paired Phones ({count})", count=pair_count),
+            t("View, remove, or add a phone."),
             WARNING,
         )
     else:
         phone_card = ActionCard(
             HomeAction.PAIR_PHONE,
             (32, 288, 588, 362),
-            "Pair Phone",
-            "Scan a code to connect your phone.",
+            t("Pair Phone"),
+            t("Scan a code to connect your phone."),
             WARNING,
         )
     creator_card = ActionCard(
         HomeAction.CREATE_QR, (32, 374, 588, 448),
-        "Create QR", "Turn a link or short text into a QR. Save or copy it.",
+        t("Create QR"), t("Turn a link or short text into a QR. Save or copy it."),
     )
     return (*BASE_ACTION_CARDS, phone_card, creator_card)
 
@@ -112,6 +116,8 @@ def action_at_point(
             return card.action
     if _contains(EXIT_BOUNDS, x, y):
         return HomeAction.EXIT
+    if _contains(SETTINGS_BOUNDS, x, y):
+        return HomeAction.SETTINGS
     return None
 
 
@@ -119,6 +125,7 @@ def build_home_canvas(
     *,
     hover_action: HomeAction | None = None,
     pair_count: int = 0,
+    receiver_ready: bool = False,
 ) -> np.ndarray:
     """Render the complete control center with sharp system-font text."""
 
@@ -143,10 +150,18 @@ def build_home_canvas(
     )
     draw.text(
         (32, 70),
-        "Choose what you want to do.",
+        t("Choose what you want to do."),
         font=subtitle_font,
         fill=SECONDARY_TEXT,
     )
+
+    draw.rounded_rectangle(SETTINGS_BOUNDS, radius=9, fill=PANEL_BACKGROUND,
+                           outline=ACCENT if hover_action is HomeAction.SETTINGS else None)
+    draw.text((438, 35), t("Settings and about"), font=_load_font(12), fill=PRIMARY_TEXT)
+    status = t("No saved phone pairing") if pair_count == 0 else (
+        t("{count} saved phone pairing(s)", count=pair_count) + " · " +
+        t("Receiver connection confirmed" if receiver_ready else "Receiver connection not confirmed"))
+    draw.text((32, 94), status, font=_load_font(11), fill=ACCENT if receiver_ready else SECONDARY_TEXT)
 
     for card in action_cards(pair_count):
         hovered = card.action is hover_action
@@ -165,20 +180,20 @@ def build_home_canvas(
         )
         draw.text(
             (left + 42, top + 17),
-            card.title,
+            t(card.title),
             font=card_title_font,
             fill=PRIMARY_TEXT,
         )
         draw.text(
             (left + 42, top + 46),
-            card.description,
+            t(card.description),
             font=card_body_font,
             fill=SECONDARY_TEXT,
         )
 
     draw.text(
         (32, 478),
-        "ESC hides to tray  ·  X shows close options",
+        t("ESC hides to tray  ·  X shows close options"),
         font=small_font,
         fill=SECONDARY_TEXT,
     )
@@ -190,7 +205,7 @@ def build_home_canvas(
         outline=WARNING if exit_hovered else None,
         width=2 if exit_hovered else 1,
     )
-    exit_text = "Exit"
+    exit_text = t("Exit")
     exit_width = draw.textlength(exit_text, font=button_font)
     left, top, right, bottom = EXIT_BOUNDS
     draw.text(
@@ -216,6 +231,10 @@ def show_home_window(
     """Show the control center; title-bar close asks how to leave it."""
 
     state = HomeWindowState()
+    from bridge.pairing_controller import configured_relay_origin
+    origin = configured_relay_origin()
+    next_status_check = 0.0
+    receiver_ready = False
 
     def handle_mouse(
         event: int,
@@ -233,11 +252,16 @@ def show_home_window(
     try:
         first_frame = True
         while True:
+            import time
+            if time.monotonic() >= next_status_check:
+                receiver_ready = connection_confirmed(origin)
+                next_status_check = time.monotonic() + 1
             cv2.imshow(
                 WINDOW_TITLE,
                 build_home_canvas(
                     hover_action=state.hover_action,
                     pair_count=pair_count,
+                    receiver_ready=receiver_ready,
                 ),
             )
             if first_frame:

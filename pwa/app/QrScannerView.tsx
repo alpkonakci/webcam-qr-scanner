@@ -1,4 +1,5 @@
 "use client";
+import { useLocale } from "../lib/i18n";
 
 import { useEffect, useRef, useState } from "react";
 import type QrScanner from "qr-scanner";
@@ -30,6 +31,7 @@ function cameraErrorMessage(error: unknown): string {
 }
 
 export function QrScannerView({ onCancel, onDecoded }: QrScannerViewProps) {
+  const { tr } = useLocale();
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<QrScanner | null>(null);
   const decodedRef = useRef(false);
@@ -118,24 +120,23 @@ export function QrScannerView({ onCancel, onDecoded }: QrScannerViewProps) {
   };
 
   return (
-    <section className="scanner-screen" aria-label="QR camera scanner">
+    <section className="scanner-screen" aria-label={tr("QR camera scanner")}>
       <video ref={videoRef} className="scanner-video" muted playsInline />
       <div className="scanner-shade" aria-hidden="true" />
 
       <header className="scanner-header">
         <div>
-          <p className="eyebrow">ON-DEVICE SCANNING</p>
-          <h2>Point at a QR code</h2>
+          <p className="eyebrow">{tr("ON-DEVICE SCANNING")}</p>
+          <h2>{tr("Point at a QR code")}</h2>
         </div>
         <button
           type="button"
           className="scanner-close"
           onClick={onCancel}
           aria-keyshortcuts="Escape"
-          title="Close scanner (Esc)"
+          title={tr("Close scanner (Esc)")}
         >
-          Close
-        </button>
+          {tr("Close")}</button>
       </header>
 
       <div className="scanner-target" aria-hidden="true">
@@ -148,24 +149,24 @@ export function QrScannerView({ onCancel, onDecoded }: QrScannerViewProps) {
 
       <div className="scanner-controls" aria-live="polite">
         {status === "starting" && (
-          <p className="scanner-status">Starting camera…</p>
+          <p className="scanner-status">{tr("Starting camera…")}</p>
         )}
         {status === "scanning" && (
-          <p className="scanner-status">Keep the QR code inside the frame</p>
+          <p className="scanner-status">{tr("Keep the QR code inside the frame")}</p>
         )}
         {status === "error" && (
           <div className="camera-error" role="alert">
-            <strong>Camera unavailable</strong>
-            <p>{error}</p>
-            <button type="button" onClick={onCancel}>Back</button>
+            <strong>{tr("Camera unavailable")}</strong>
+            <p>{error && tr(error)}</p>
+            <button type="button" onClick={onCancel}>{tr("Back")}</button>
           </div>
         )}
         {status === "scanning" && hasFlash && (
           <button type="button" className="flash-button" onClick={toggleFlash}>
-            {flashOn ? "Turn flash off" : "Turn flash on"}
+            {flashOn ? tr("Turn flash off") : tr("Turn flash on")}
           </button>
         )}
-        <p className="camera-privacy">Frames stay on this device and are never uploaded.</p>
+        <p className="camera-privacy">{tr("Frames stay on this device and are never uploaded.")}</p>
       </div>
     </section>
   );

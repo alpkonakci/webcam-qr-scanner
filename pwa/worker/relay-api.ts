@@ -161,6 +161,12 @@ async function routeRelayRequest(
     return registerPair(request, db);
   }
   const pairMatch = path.match(/^\/v1\/pairs\/([A-Za-z0-9_-]{22})$/);
+  if (pairMatch && method === "GET") {
+    const pair = await senderPair(request, db, pairMatch[1]);
+    const now = unixTime();
+    const remaining = pair.last_seen_at == null ? 0 : Math.max(0, Math.min(RECEIVER_ONLINE_SECONDS, pair.last_seen_at + RECEIVER_ONLINE_SECONDS - now));
+    return json({ status: "active", pair_id: pair.pair_id, reachable: remaining > 0, checked_at: now, valid_for_seconds: remaining });
+  }
   if (pairMatch && method === "DELETE") {
     return revokePair(request, db, pairMatch[1]);
   }

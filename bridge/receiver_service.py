@@ -18,6 +18,7 @@ from bridge.secure_storage import (
 )
 from links import open_web_url
 from native_dialogs import confirm_phone_url
+from receiver_status import record_connection
 
 
 RECONNECT_DELAYS_SECONDS = (1.0, 2.0, 5.0, 10.0)
@@ -95,6 +96,9 @@ class ReceiverService:
                 await self._interruptible_delay(5.0)
                 continue
             groups = receiver_groups(snapshot)
+            for group in groups:
+                try: record_connection(group.relay_origin, False)
+                except OSError: pass  # Cosmetic UI state must not stop the receiver.
             with self._labels_lock:
                 self._phone_labels = {
                     pair_id: label
@@ -130,6 +134,7 @@ class ReceiverService:
                 realtime_session=current_realtime_session,
                 on_realtime_session=persist_realtime_session,
                 replay_guards=self.replay_guards_for(group),
+                on_connection=lambda ready: record_connection(group.relay_origin, ready),
             )
             try:
                 await receiver.run()

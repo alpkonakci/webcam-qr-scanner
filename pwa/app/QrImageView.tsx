@@ -1,4 +1,5 @@
 "use client";
+import { useLocale } from "../lib/i18n";
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 import { loadQrImage, scanQrImage, type LocalQrImage } from "../lib/image-qr";
@@ -8,6 +9,7 @@ import type { ImageCrop } from "../lib/image-policy.mjs";
 interface Props { onCancel(): void; onDecoded(value: string): void }
 
 export function QrImageView({ onCancel, onDecoded }: Props) {
+  const { tr } = useLocale();
   const picker = useRef<HTMLInputElement>(null);
   const localImage = useRef<LocalQrImage | null>(null);
   const job = useRef<AbortController | null>(null);
@@ -115,29 +117,29 @@ export function QrImageView({ onCancel, onDecoded }: Props) {
   return (
     <section className="image-reader" aria-labelledby="image-reader-title" aria-busy={busy}>
       <div className="image-reader-heading">
-        <div><p className="eyebrow">ON-DEVICE SCANNING</p><h1 id="image-reader-title">Read from image</h1></div>
-        <button type="button" className="scanner-close" onClick={onCancel}>Back</button>
+        <div><p className="eyebrow">{tr("ON-DEVICE SCANNING")}</p><h1 id="image-reader-title">{tr("Read from image")}</h1></div>
+        <button type="button" className="scanner-close" onClick={onCancel}>{tr("Back")}</button>
       </div>
       <p className="image-help">{url && !busy
-        ? "Drag around the QR you want to read, including its white border. Or choose another image."
-        : "Choose or paste an image. We'll find the QR automatically."}</p>
+        ? tr("Drag around the QR you want to read, including its white border. Or choose another image.")
+        : tr("Choose or paste an image. We'll find the QR automatically.")}</p>
       <input ref={picker} type="file" accept="image/png,image/jpeg,image/webp" className="image-file-input"
-        aria-label="Choose a QR image" tabIndex={-1}
+        aria-label={tr("Choose a QR image")} tabIndex={-1}
         onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; void choose(file); }} />
       <div className="image-source-actions">
       <button type="button" className="result-secondary result-secondary-enabled image-choose"
         disabled={busy} onClick={() => picker.current?.click()}>
-        {url ? "Choose another image" : "Choose image"}<small>PNG · JPEG · WebP</small>
+        {url ? tr("Choose another image") : tr("Choose image")}<small>PNG · JPEG · WebP</small>
       </button>
       <button type="button" className="result-secondary result-secondary-enabled image-choose"
         disabled={busy} onClick={() => void pasteFromClipboard()}>
-        Paste image<small>Clipboard · Ctrl+V / ⌘V</small>
+        {tr("Paste image")}<small>{tr("Clipboard · Ctrl+V / ⌘V")}</small>
       </button>
       </div>
       {url && !busy && (
         <>
           <div className="image-preview-frame">
-            <div className="image-crop-surface" aria-label="Drag to select one QR code"
+            <div className="image-crop-surface" aria-label={tr("Drag to select one QR code")}
               onPointerDown={(event) => {
                 if (busy || (event.pointerType === "mouse" && event.button !== 0)) return;
                 event.currentTarget.setPointerCapture(event.pointerId);
@@ -148,7 +150,7 @@ export function QrImageView({ onCancel, onDecoded }: Props) {
               onPointerCancel={() => { start.current = null; setCrop(null); }}>
               {/* Local, validated blob: deliberately not sent to an image optimizer. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="Selected image for local QR scanning" draggable={false} />
+              <img src={url} alt={tr("Selected image for local QR scanning")} draggable={false} />
               {crop && <div className="image-crop-box" aria-hidden="true" style={{
                 left: `${crop.x * 100}%`, top: `${crop.y * 100}%`,
                 width: `${crop.width * 100}%`, height: `${crop.height * 100}%`,
@@ -157,17 +159,17 @@ export function QrImageView({ onCancel, onDecoded }: Props) {
           </div>
           <div className="image-selection-actions">
             <button type="button" className="result-text-button" disabled={busy}
-              onClick={() => { setCrop({ x: 0, y: 0, width: 1, height: 1 }); setMessage(null); }}>Use whole image</button>
+              onClick={() => { setCrop({ x: 0, y: 0, width: 1, height: 1 }); setMessage(null); }}>{tr("Use whole image")}</button>
             <button type="button" className="result-text-button" disabled={busy || !crop}
-              onClick={() => { setCrop(null); setMessage(null); }}>Reset selection</button>
+              onClick={() => { setCrop(null); setMessage(null); }}>{tr("Reset selection")}</button>
           </div>
           <button type="button" className="result-primary image-read" disabled={busy || !crop || crop.width === 0 || crop.height === 0}
-            onClick={() => void read()}>{busy ? "Reading…" : "Read selected area"}</button>
+            onClick={() => void read()}>{busy ? tr("Reading…") : tr("Read selected area")}</button>
         </>
       )}
-      {busy && <p role="status" className="image-help">{url ? "Searching for a QR…" : "Preparing image…"}</p>}
-      {message && <p role="alert" className="delivery-status delivery-status-error image-feedback">{message}</p>}
-      <p className="image-privacy">Images stay on this device. No upload or camera permission. Clipboard access only when you paste. Up to 10 MB.</p>
+      {busy && <p role="status" className="image-help">{url ? tr("Searching for a QR…") : tr("Preparing image…")}</p>}
+      {message && <p role="alert" className="delivery-status delivery-status-error image-feedback">{tr(message)}</p>}
+      <p className="image-privacy">{tr("Images stay on this device. No upload or camera permission. Clipboard access only when you paste. Up to 10 MB.")}</p>
     </section>
   );
 }

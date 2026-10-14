@@ -66,6 +66,18 @@ export async function checkStoredPair(
     removeStoredPair?: (pairId: string) => Promise<void>;
   } = {},
 ): Promise<"active" | "revoked"> {
+  return (await getPcConnection(credentials, options)).pairStatus;
+}
+
+export interface PcConnection {
+  pairStatus: "active" | "revoked";
+  state: "reachable" | "unreachable" | "unknown";
+  validForSeconds: number;
+}
+export async function getPcConnection(
+  credentials: SenderCredentials,
+  options: { signal?: AbortSignal; removeStoredPair?: (pairId: string) => Promise<void> } = {},
+): Promise<PcConnection> {
   try {
     const response = await relayFetch(
       `${credentials.relayOrigin}/v1/pairs/${credentials.pairId}`,
@@ -75,14 +87,23 @@ export async function checkStoredPair(
     if (response.body.status !== "active" || response.body.pair_id !== credentials.pairId) {
       throw new RelayClientError("invalid_relay_response", "The relay returned an invalid response.");
     }
-    return "active";
+    const seconds = response.body.valid_for_seconds;
+    if (typeof response.body.reachable !== "boolean" || !Number.isInteger(seconds) ||
+        typeof seconds !== "number" || seconds < 0 || seconds > 75 ||
+        !Number.isInteger(response.body.checked_at) || typeof response.body.checked_at !== "number" ||
+        response.body.checked_at <= 0 || (response.body.reachable && seconds === 0) ||
+        (!response.body.reachable && seconds !== 0)) {
+      // Older relays can validate a pairing without proving reachability.
+      return { pairStatus: "active", state: "unknown", validForSeconds: 0 };
+    }
+    return { pairStatus: "active", state: response.body.reachable ? "reachable" : "unreachable", validForSeconds: seconds };
   } catch (error) {
     if (
       error instanceof RelayClientError &&
       (error.code === "pair_revoked" || error.code === "unauthorized")
     ) {
       await (options.removeStoredPair ?? removePair)(credentials.pairId);
-      return "revoked";
+      return { pairStatus: "revoked", state: "unknown", validForSeconds: 0 };
     }
     throw error;
   }

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from desktop_i18n import t
+
 import ctypes
 import math
 import os
@@ -10,6 +12,7 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
+from ui import put_text
 from ui import COLOR_ACCENT, COLOR_MUTED, COLOR_PANEL, COLOR_TEXT
 from window_icon import set_window_icon
 
@@ -165,9 +168,9 @@ def build_region_selector_canvas(
     )
     canvas[HEADER_HEIGHT:, :] = preview
 
-    cv2.putText(
+    put_text(
         canvas,
-        "SELECT QR AREA",
+        t("SELECT QR AREA"),
         (24, 34),
         cv2.FONT_HERSHEY_DUPLEX,
         0.72,
@@ -175,9 +178,9 @@ def build_region_selector_canvas(
         1,
         cv2.LINE_AA,
     )
-    cv2.putText(
+    put_text(
         canvas,
-        "Drag around one QR code and release to scan",
+        t("Drag around one QR code and release to scan"),
         (24, 65),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.57,
@@ -185,9 +188,9 @@ def build_region_selector_canvas(
         1,
         cv2.LINE_AA,
     )
-    cv2.putText(
+    put_text(
         canvas,
-        "ESC  Cancel",
+        t("ESC  Cancel"),
         (max(24, preview_size[0] - 132), 65),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.48,

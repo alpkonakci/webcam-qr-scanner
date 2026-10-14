@@ -6,9 +6,10 @@ import { runInNewContext } from "node:vm";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
+import { translate } from "../lib/i18n-core.ts";
 
 const require = createRequire(import.meta.url);
-async function fixture(text, clipboard) {
+async function fixture(text, clipboard, language = "en") {
   const source = await readFile(new URL("../app/TextResultView.tsx", import.meta.url), "utf8");
   const compiled = ts.transpileModule(source, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS } }).outputText;
   const buttons = [], messages = [];
@@ -26,7 +27,8 @@ async function fixture(text, clipboard) {
     require: (name) => name === "react" ? { ...React,
       useState: (initial) => [initial, (value) => messages.push(value)],
       useRef: () => ({ current: { focus() {}, select() { selected = true; } } }),
-    } : name === "react/jsx-runtime" ? captureRuntime : require(name),
+    } : name === "../lib/i18n" ? { useLocale: () => ({ tr: (text) => translate(text, language) }) }
+      : name === "react/jsx-runtime" ? captureRuntime : require(name),
   });
   const element = exports.TextResultView({ text, onScanAgain() {} });
   return { html: renderToStaticMarkup(element), buttons, messages, selected: () => selected };
@@ -57,4 +59,15 @@ test("unavailable clipboard selects text and explains manual copying", async () 
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(view.selected(), true);
   assert.match(view.messages[0], /Press and hold/);
+});
+
+test("Turkish UI preserves exact QR content and copied text", async () => {
+  const text = "Back\nSend to PC\nhttps://example.com/?token=secret";
+  const writes = [];
+  const view = await fixture(text, { writeText: async (value) => writes.push(value) }, "tr");
+  assert.match(view.html, /Metni kopyala/);
+  assert.match(view.html, /Back\nSend to PC/);
+  view.buttons[0].onClick();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(writes, [text]);
 });

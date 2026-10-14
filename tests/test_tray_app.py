@@ -10,6 +10,8 @@ from exit_codes import (
     CONTROL_SCAN_SCREEN,
     CONTROL_CREATE_QR,
     CONTROL_BACK_HOME,
+    CONTROL_SETTINGS,
+    CONTROL_SETTINGS_CHANGED,
 )
 from paired_phone_ipc import RemovePhoneRequest
 from tray_app import (
@@ -21,6 +23,40 @@ from tray_app import (
 
 
 class TrayApplicationTests(unittest.TestCase):
+    @patch("tray_app.threading.Thread")
+    def test_settings_is_single_instance_and_blocks_home(self, thread_type):
+        process = Mock()
+        process.poll.return_value = None
+        spawner = Mock(return_value=process)
+        application = self._application(spawner)
+        application._handle_home_action(CONTROL_SETTINGS)
+        application._launch_settings()
+        application._launch_home()
+        spawner.assert_called_once_with(["--settings-process"])
+        self.assertIs(application._settings_process, process)
+
+    def test_settings_back_refreshes_tray_and_reopens_home(self):
+        process = Mock()
+        process.wait.return_value = CONTROL_SETTINGS_CHANGED
+        application = self._application()
+        application._children.add(process)
+        application._settings_process = process
+        with patch.object(application, "_launch_home") as home, patch("tray_app.reload_language") as reload:
+            application._monitor_child(process, ChildRole.SETTINGS)
+        reload.assert_called_once_with()
+        self.icon.update_menu.assert_called_once_with()
+        home.assert_called_once_with()
+        self.assertIsNone(application._settings_process)
+        self.assertNotIn(process, application._children)
+
+    def test_forced_settings_close_does_not_reopen_home(self):
+        process = Mock()
+        process.wait.return_value = -1
+        application = self._application()
+        with patch.object(application, "_launch_home") as home:
+            application._monitor_child(process, ChildRole.SETTINGS)
+        home.assert_not_called()
+
     @patch("tray_app.threading.Thread")
     def test_creator_is_single_instance_and_blocks_home(self, thread_type) -> None:
         process = Mock()

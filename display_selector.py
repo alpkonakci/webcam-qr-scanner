@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from desktop_i18n import t
+
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -78,10 +80,10 @@ def build_display_selector_canvas(
     label_font = _load_font(16, semibold=True)
     detail_font = _load_font(12)
 
-    draw.text((24, 18), "CHOOSE A SCREEN", font=title_font, fill=PRIMARY_TEXT)
+    draw.text((24, 18), t("CHOOSE A SCREEN"), font=title_font, fill=PRIMARY_TEXT)
     draw.text(
         (24, 56),
-        "Select the screen that contains the QR code.",
+        t("Select the screen that contains the QR code."),
         font=subtitle_font,
         fill=SECONDARY_TEXT,
     )
@@ -100,11 +102,11 @@ def build_display_selector_canvas(
         )
         draw.text(
             (44, top + 10),
-            f"Screen {display.number}",
+            t("Screen {number}", number=display.number),
             font=label_font,
             fill=PRIMARY_TEXT,
         )
-        primary_note = "  ·  Primary" if display.primary else ""
+        primary_note = "  ·  " + t("Primary") if display.primary else ""
         draw.text(
             (44, top + 36),
             f"{display.bounds.width} × {display.bounds.height}{primary_note}",
@@ -113,9 +115,9 @@ def build_display_selector_canvas(
         )
 
     footer_y = height - 28
-    footer = "Click a screen  ·  ESC Cancel"
+    footer = t("Click a screen  ·  ESC Cancel")
     if len(displays) > VISIBLE_ROWS:
-        footer = "Scroll for more  ·  Click to select  ·  ESC Cancel"
+        footer = t("Scroll for more  ·  Click to select  ·  ESC Cancel")
     draw.text((24, footer_y), footer, font=detail_font, fill=SECONDARY_TEXT)
 
     return cv2.cvtColor(np.asarray(canvas, dtype=np.uint8), cv2.COLOR_RGB2BGR)

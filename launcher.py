@@ -23,6 +23,8 @@ from exit_codes import (
     CONTROL_SCAN_CAMERA,
     CONTROL_SCAN_SCREEN,
     CONTROL_CREATE_QR,
+    CONTROL_SETTINGS,
+    CONTROL_SETTINGS_CHANGED,
 )
 from single_instance import BridgeInstanceGuard
 
@@ -38,6 +40,7 @@ def parse_launcher_args(
     parser.add_argument("--home-process", action="store_true")
     parser.add_argument("--create-qr-process", action="store_true")
     parser.add_argument("--paired-phones-process", action="store_true")
+    parser.add_argument("--settings-process", action="store_true")
     parser.add_argument("--paired-phone-count", type=int, default=0)
     return parser.parse_known_args(argv)
 
@@ -116,6 +119,7 @@ def run_home(*, pair_count: int = 0) -> int:
         HomeAction.PAIR_PHONE: CONTROL_PAIR_PHONE,
         HomeAction.MANAGE_PHONES: CONTROL_MANAGE_PHONES,
         HomeAction.CREATE_QR: CONTROL_CREATE_QR,
+        HomeAction.SETTINGS: CONTROL_SETTINGS,
         HomeAction.EXIT: APPLICATION_EXIT_REQUESTED,
     }[action]
 
@@ -159,6 +163,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_screen(remaining)
     if args.paired_phones_process:
         return run_paired_phones()
+    if args.settings_process:
+        from settings_ui import show_settings_window
+        show_settings_window()
+        return CONTROL_SETTINGS_CHANGED
     if args.create_qr_process:
         from qr_creator_ui import show_creator_window
 

@@ -49,6 +49,7 @@ class PcReceiver:
         replay_guards: Mapping[str, PersistentReplayGuard] | None = None,
         realtime_session: RealtimeSession | None = None,
         on_realtime_session: SessionCallback | None = None,
+        on_connection: Callable[[bool], None] | None = None,
     ) -> None:
         self.relay_origin = normalize_relay_origin(relay_origin)
         credential_items = (
@@ -88,8 +89,23 @@ class PcReceiver:
         self.realtime_session = realtime_session
         self.on_realtime_session = on_realtime_session
         self.connected = asyncio.Event()
+        self.on_connection = on_connection
+
+    def _report_connection(self, reachable: bool) -> None:
+        # Existing callers use this as an "ever connected" readiness latch.
+        # Live health is reported separately and expires in the UI.
+        if reachable: self.connected.set()
+        if self.on_connection:
+            try: self.on_connection(reachable)
+            except Exception: pass  # Cosmetic status must not block encrypted receipt.
 
     async def run(self, *, stop_after: int | None = None) -> None:
+        try:
+            await self._run(stop_after=stop_after)
+        finally:
+            self._report_connection(False)
+
+    async def _run(self, *, stop_after: int | None = None) -> None:
         """Receive until cancelled or until ``stop_after`` valid URLs."""
 
         hostname = (urlsplit(self.relay_origin).hostname or "").lower()
@@ -127,7 +143,7 @@ class PcReceiver:
             open_timeout=5,
             close_timeout=2,
         ) as websocket:
-            self.connected.set()
+            self._report_connection(True)
             async for raw_message in websocket:
                 try:
                     event = _parse_delivery_event(raw_message)
@@ -239,10 +255,10 @@ class PcReceiver:
     ) -> bool:
         response = await client.get(path)
         if response.status_code == 204:
-            self.connected.set()
+            self._report_connection(True)
             return False
         response.raise_for_status()
-        self.connected.set()
+        self._report_connection(True)
         raw_event: object = response.json()
         try:
             event = _parse_delivery_event(raw_event)

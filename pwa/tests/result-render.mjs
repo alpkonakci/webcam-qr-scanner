@@ -6,9 +6,10 @@ import { runInNewContext } from "node:vm";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
+import { translate } from "../lib/i18n-core.ts";
 
 const require = createRequire(import.meta.url);
-export async function resultFixture(state, message, relayClient = {}, onScanAgain = () => {}) {
+export async function resultFixture(state, message, relayClient = {}, onScanAgain = () => {}, language = "en") {
   const source = await readFile(new URL("../app/QrResultView.tsx", import.meta.url), "utf8");
   const compiled = ts.transpileModule(source, {
     compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS },
@@ -33,6 +34,7 @@ export async function resultFixture(state, message, relayClient = {}, onScanAgai
     exports,
     require: (name) => name === "react" ? controlledReact
       : name === "../lib/relay-client" ? relayClient
+      : name === "../lib/i18n" ? { useLocale: () => ({ tr: (text, values) => translate(text, language, values) }) }
       : name === "react/jsx-runtime" ? captureRuntime : require(name),
   });
   const element = exports.QrResultView({
@@ -43,6 +45,6 @@ export async function resultFixture(state, message, relayClient = {}, onScanAgai
   return { element, buttons };
 }
 
-export async function renderResult(state, message) {
-  return renderToStaticMarkup((await resultFixture(state, message)).element);
+export async function renderResult(state, message, language = "en") {
+  return renderToStaticMarkup((await resultFixture(state, message, {}, () => {}, language)).element);
 }

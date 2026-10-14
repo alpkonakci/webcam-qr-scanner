@@ -13,6 +13,7 @@ import {
 } from "../lib/relay-client";
 import type { SenderCredentials } from "../lib/wqrs";
 import type { WebUrlResult } from "../lib/url-policy.mjs";
+import { useLocale } from "../lib/i18n";
 
 interface QrResultViewProps {
   result: WebUrlResult;
@@ -33,6 +34,7 @@ export function QrResultView({
   onPairRevoked,
   onScanAgain,
 }: QrResultViewProps) {
+  const { tr } = useLocale();
   const [deliveryState, setDeliveryState] = useState<DeliveryState>("idle");
   const [deliveryMessage, setDeliveryMessage] = useState("");
   const deliveryBusy = useRef(false);
@@ -62,15 +64,14 @@ export function QrResultView({
   if (!result.ok) {
     return (
       <section className="result-section" aria-live="polite">
-        <div className="result-pill result-pill-warning">QR rejected</div>
-        <h1>That code is not a safe web link.</h1>
+        <div className="result-pill result-pill-warning">{tr("QR rejected")}</div>
+        <h1>{tr("That code is not a safe web link.")}</h1>
         <div className="result-card result-card-warning" role="alert">
-          <p>{result.reason}</p>
-          <p className="result-note">Nothing was opened or sent.</p>
+          <p>{tr(result.reason)}</p>
+          <p className="result-note">{tr("Nothing was opened or sent.")}</p>
         </div>
         <button type="button" className="result-primary" onClick={onScanAgain}>
-          Scan another QR
-        </button>
+          {tr("Scan another QR")}</button>
       </section>
     );
   }
@@ -139,16 +140,16 @@ export function QrResultView({
 
   return (
     <section className="result-section" aria-live="polite">
-      <div className="result-pill result-pill-success">QR decoded</div>
-      <h1>Link ready.</h1>
+      <div className="result-pill result-pill-success">{tr("QR decoded")}</div>
+      <h1>{tr("Link ready.")}</h1>
 
       <div className="result-card">
-        <p className="result-label">WEBSITE</p>
+        <p className="result-label">{tr("WEBSITE")}</p>
         <p className="result-hostname">{result.hostname}</p>
-        <p className="result-label result-address-label">FULL ADDRESS</p>
+        <p className="result-label result-address-label">{tr("FULL ADDRESS")}</p>
         <p className="result-address">{result.href}</p>
         {result.insecure && (
-          <p className="http-warning">This address uses HTTP and is not encrypted.</p>
+          <p className="http-warning">{tr("This address uses HTTP and is not encrypted.")}</p>
         )}
       </div>
 
@@ -158,8 +159,7 @@ export function QrResultView({
           className="result-primary"
           onClick={openInNewTab}
         >
-          Open link in new tab
-        </button>
+          {tr("Open link in new tab")}</button>
         {isMobileClient &&
           (pairedPc ? (
             <button
@@ -168,7 +168,7 @@ export function QrResultView({
               disabled={deliveryState === "sending" || deliveryState === "checking" || deliveryState === "pending" || deliveryState === "unconfirmed" || deliveryState === "delivered"}
               onClick={() => { void sendToPc(); }}
             >
-              <span>{deliveryState === "sending" ? "Sending..." : deliveryState === "delivered" ? "Received by PC" : deliveryState === "unconfirmed" ? "Check your PC" : deliveryState === "pending" || deliveryState === "checking" ? "Awaiting receipt" : "Send to PC"}</span>
+              <span>{deliveryState === "sending" ? tr("Sending...") : deliveryState === "delivered" ? tr("Received by PC") : deliveryState === "unconfirmed" ? tr("Check your PC") : deliveryState === "pending" || deliveryState === "checking" ? tr("Awaiting receipt") : tr("Send to PC")}</span>
               <small>{pairedPc.pcLabel}</small>
             </button>
           ) : (
@@ -177,8 +177,8 @@ export function QrResultView({
               className="result-secondary result-secondary-enabled"
               onClick={onPairPc}
             >
-              <span>Pair a PC</span>
-              <small>Scan the pairing QR shown on your PC</small>
+              <span>{tr("Pair a PC")}</span>
+              <small>{tr("Scan the pairing QR shown on your PC")}</small>
             </button>
           ))}
         {deliveryMessage && (
@@ -186,8 +186,8 @@ export function QrResultView({
             className={`delivery-status delivery-status-${deliveryState}`}
             role={deliveryState === "error" ? "alert" : "status"}
           >
-            {deliveryMessage}
-            {awaitingReceipt && <span className="result-note"> Status is checked automatically while this page is open.</span>}
+            {tr(deliveryMessage)}
+            {awaitingReceipt && <span className="result-note"> {tr("Status is checked automatically while this page is open.")}</span>}
           </p>
         )}
         {pairedPc && (deliveryState === "pending" || deliveryState === "checking") && (
@@ -197,14 +197,14 @@ export function QrResultView({
             disabled={deliveryState === "checking"}
             onClick={() => { void sendToPc(true); }}
           >
-            <span>{deliveryState === "checking" ? "Checking..." : "Check delivery status"}</span>
-            <small>No new link will be sent</small>
+            <span>{deliveryState === "checking" ? tr("Checking...") : tr("Check delivery status")}</span>
+            <small>{tr("No new link will be sent")}</small>
           </button>
         )}
         <button type="button" className="result-text-button" disabled={deliveryState === "sending" || deliveryState === "checking"} onClick={() => { void scanAgain(); }}>
-          Scan another QR
-        </button>
-        {deliveryState === "delivered" && <p className="result-note">You can scan the same QR again to send it once more.</p>}
+          {tr("Scan another QR")}</button>
+        {deliveryState === "delivered" && <p className="result-note">{tr("The PC received the link. Opening it still requires confirmation on the PC.")}</p>}
+        {deliveryState === "delivered" && <p className="result-note">{tr("You can scan the same QR again to send it once more.")}</p>}
       </div>
     </section>
   );

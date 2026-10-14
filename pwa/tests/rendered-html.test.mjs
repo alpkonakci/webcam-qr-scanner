@@ -4,6 +4,17 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 
+test("Turkish receipt labels distinguish delivery from opening the browser", async () => {
+  const { renderResult } = await import("./result-render.mjs");
+  const pending = await renderResult("pending", "Delivery is not confirmed yet.", "tr");
+  assert.match(pending, /PC&#x27;nin alması bekleniyor/);
+  assert.doesNotMatch(pending, /PC aldı/);
+  const received = await renderResult("delivered", "My PC received and verified the link.", "tr");
+  assert.match(received, /PC aldı/);
+  assert.match(received, /Açılması için PC&#x27;de onay vermen gerekir/);
+  assert.match(received, /https:\/\/example.com\//);
+});
+
 test("keeps the QR Scanner mobile PWA shell in the Vercel build", async () => {
   const [layout, home] = await Promise.all([
     readFile(new URL("app/layout.tsx", root), "utf8"),
@@ -12,6 +23,8 @@ test("keeps the QR Scanner mobile PWA shell in the Vercel build", async () => {
   assert.match(layout, /QR Scanner/);
   assert.match(home, /Scan here\. Continue on your PC\./);
   assert.match(home, /Camera scanner ready/);
+  assert.match(home, /className="settings-toggle"/);
+  assert.doesNotMatch(home, /className="dev-badge settings-toggle"/);
   assert.match(home, /Scan a link, text or PC pairing code/);
   assert.match(home, /<TextResultView text=\{scanResult\.text\}/);
   assert.doesNotMatch(home, /Install app|Added to Home Screen/);

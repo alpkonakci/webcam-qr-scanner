@@ -138,6 +138,7 @@ test("pair status distinguishes active, revoked and invalid sender credentials",
   const senderToken = base64Url(32, 101);
   const tokenHash = createHash("sha256").update(senderToken).digest("hex");
   let revokedAt: number | null = null;
+  let lastSeenAt: number | null = null;
   globalThis.fetch = async (input, init = {}) => {
     const url = String(input);
     if (url.includes("/rest/v1/rpc/relay_cleanup")) return Response.json(null);
@@ -152,7 +153,7 @@ test("pair status distinguishes active, revoked and invalid sender credentials",
       }] : []);
     }
     if (url.includes("/rest/v1/relay_devices?")) {
-      return Response.json([{ device_id: deviceId, last_seen_at: null }]);
+      return Response.json([{ device_id: deviceId, last_seen_at: lastSeenAt }]);
     }
     throw new Error(`Unexpected test request: ${url}`);
   };
@@ -162,7 +163,24 @@ test("pair status distinguishes active, revoked and invalid sender credentials",
 
   const active = await handleRelayRequest(statusRequest(senderToken));
   assert.equal(active.status, 200);
-  assert.deepEqual(await active.json(), { status: "active", pair_id: pairId });
+  const activeBody = await active.json() as Record<string, unknown>;
+  assert.equal(activeBody.status, "active");
+  assert.equal(activeBody.pair_id, pairId);
+  assert.equal(activeBody.reachable, false);
+  assert.equal(activeBody.valid_for_seconds, 0);
+  assert.equal(typeof activeBody.checked_at, "number");
+
+  lastSeenAt = Math.floor(Date.now() / 1000) - 10;
+  const fresh = await handleRelayRequest(statusRequest(senderToken));
+  const freshBody = await fresh.json() as { reachable: boolean; valid_for_seconds: number };
+  assert.equal(freshBody.reachable, true);
+  assert.ok(freshBody.valid_for_seconds > 0 && freshBody.valid_for_seconds <= 65);
+  lastSeenAt -= 75;
+  const stale = await handleRelayRequest(statusRequest(senderToken));
+  const staleBody = await stale.json() as { status: string; reachable: boolean; valid_for_seconds: number };
+  assert.equal(staleBody.status, "active");
+  assert.equal(staleBody.reachable, false);
+  assert.equal(staleBody.valid_for_seconds, 0);
 
   revokedAt = Math.floor(Date.now() / 1000);
   const revoked = await handleRelayRequest(statusRequest(senderToken));

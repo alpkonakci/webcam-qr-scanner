@@ -6,6 +6,7 @@ import ctypes
 import os
 import threading
 from enum import Enum
+from desktop_i18n import t
 
 
 MB_OK = 0x00
@@ -43,13 +44,14 @@ def show_dialog(
 
     if os.name != "nt":
         return 0
+    message = "\n".join(t(line) for line in message.split("\n"))
     # These dialogs are often requested by a tray or receiver thread. Without
     # foreground flags Windows may place an ownerless message box behind the
     # home or pairing window. Serializing them also prevents an exit question
     # and an incoming-link question from covering each other.
     with _DIALOG_LOCK:
         user32 = ctypes.windll.user32
-        owner_handle = _find_window_handle(user32, owner_title)
+        owner_handle = _find_window_handle(user32, t(owner_title) if owner_title else None)
         message_box = user32.MessageBoxW
         message_box.argtypes = (
             ctypes.c_void_p,
@@ -62,7 +64,7 @@ def show_dialog(
             message_box(
                 owner_handle,
                 message,
-                title,
+                t(title),
                 style | MB_SETFOREGROUND | MB_TOPMOST,
             )
         )
@@ -92,10 +94,9 @@ def confirm_application_exit() -> bool:
     """Confirm an action that stops every part of the application."""
 
     message = (
-        "Exit QR Scanner completely?\n\n"
-        "The background controller and any active Phone-to-PC connection will "
-        "stop.\n\n"
-        "Choose No to keep QR Scanner running in the system tray."
+        t("Exit QR Scanner completely?") + "\n\n" +
+        t("The background controller and any active Phone-to-PC connection will stop.") + "\n\n" +
+        t("Choose No to keep QR Scanner running in the system tray.")
     )
     return (
         show_dialog(
@@ -112,10 +113,9 @@ def choose_home_window_close() -> WindowCloseChoice:
 
     response = show_dialog(
         "QR Scanner - Close",
-        "Keep QR Scanner running in the background?\n\n"
-        "Yes — Keep in the tray\n"
-        "No — Exit completely\n"
-        "Cancel — Return to QR Scanner",
+        t("Keep QR Scanner running in the background?") + "\n\n" +
+        t("Yes — Keep in the tray") + "\n" + t("No — Exit completely") + "\n" +
+        t("Cancel — Return to QR Scanner"),
         MB_YESNOCANCEL | MB_ICONINFORMATION | MB_DEFBUTTON3,
         owner_title=None,
     )
@@ -137,15 +137,14 @@ def confirm_phone_url(
     secure_note = (
         ""
         if url.lower().startswith("https://")
-        else "\n\nWarning: This website uses an unencrypted HTTP connection."
+        else "\n\n" + t("Warning: This website uses an unencrypted HTTP connection.")
     )
     message = (
-        f"{phone_label} sent this web address.\n\n"
-        f"Website:\n{hostname_ascii}\n\n"
-        f"Full address:\n{url[:900]}"
-        f"{'...' if len(url) > 900 else ''}"
-        f"{secure_note}\n\n"
-        "Open it in the default browser?"
+        t("{phone} sent this web address.", phone=phone_label) + "\n\n" +
+        t("Website:") + f"\n{hostname_ascii}\n\n" +
+        t("Full address:") + f"\n{url[:900]}" +
+        ("..." if len(url) > 900 else "") + f"{secure_note}\n\n" +
+        t("Open it in the default browser?")
     )
     return (
         show_dialog(
@@ -164,8 +163,8 @@ def confirm_remove_phone_access(
     """Confirm revocation with No selected by default."""
 
     message = (
-        f"Remove access for {phone_label} ({short_pair_id})?\n\n"
-        "The phone can be paired again later."
+        t("Remove access for {phone} ({id})?", phone=phone_label, id=short_pair_id) + "\n\n" +
+        t("The phone can be paired again later.")
     )
     return (
         show_dialog(
