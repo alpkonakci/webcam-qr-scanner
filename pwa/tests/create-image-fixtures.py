@@ -7,7 +7,7 @@ sys.path.insert(0, str(ROOT))
 from PIL import Image, ImageOps
 from qr_creator import create_qr
 
-out = ROOT / "dist" / "mobile-image-qa-20261010"
+out = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else ROOT / "dist" / "mobile-image-qa-20261010"
 out.mkdir(parents=True, exist_ok=True)
 first = create_qr("https://example.com/image-test", "link").image
 second = create_qr("https://example.org/second", "link").image

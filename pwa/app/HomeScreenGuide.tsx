@@ -1,8 +1,9 @@
 "use client";
 import type { HomeScreenContext } from "../lib/home-screen";
+import type { PairingGuideStatus } from "../lib/home-view";
 
 export function HomeScreenGuide({ context, pairing, tr }: {
-  context: HomeScreenContext; pairing: "checking" | "available" | "missing" | "unavailable"; tr(text: string): string;
+  context: HomeScreenContext; pairing: PairingGuideStatus; tr(text: string): string;
 }) {
   const pairingHelp = {
     checking: "Checking the saved pairing in this window…",

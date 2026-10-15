@@ -9,6 +9,8 @@ import { adjustSelection } from "../lib/keyboard-crop";
 
 interface Props { onCancel(): void; onDecoded(value: string): void }
 
+const WHOLE_IMAGE: ImageCrop = { x: 0, y: 0, width: 1, height: 1 };
+
 export function QrImageView({ onCancel, onDecoded }: Props) {
   const { tr } = useLocale();
   const picker = useRef<HTMLInputElement>(null);
@@ -29,31 +31,52 @@ export function QrImageView({ onCancel, onDecoded }: Props) {
     return () => {
       document.removeEventListener("keydown", escape);
       window.removeEventListener("pagehide", onCancel);
-      job.current?.abort(); localImage.current?.dispose(); localImage.current = null;
+      job.current?.abort();
+      localImage.current?.dispose();
+      localImage.current = null;
     };
   }, [onCancel]);
 
-  const choose = useCallback(async (file: Blob | undefined) => {
-    if (!file) return; // Dismissing the picker leaves the current image intact.
-    job.current?.abort(); localImage.current?.dispose(); localImage.current = null;
-    const controller = new AbortController(); job.current = controller;
-    setUrl(null); setCrop(null); setMessage(null); setBusy(true);
+  // Both whole-image and selected-area reads have the same job lifecycle.
+  // Only the latest, non-cancelled job may update the view or emit a result.
+  const runRead = useCallback(async (
+    operation: (signal: AbortSignal) => Promise<string | undefined>,
+    fallbackMessage: string,
+  ) => {
+    job.current?.abort();
+    const controller = new AbortController();
+    job.current = controller;
+    const isCurrent = () => !controller.signal.aborted && job.current === controller;
+    setMessage(null);
+    setBusy(true);
     try {
-      const loaded = await loadQrImage(file, controller.signal);
-      if (controller.signal.aborted || job.current !== controller) { loaded.dispose(); return; }
-      localImage.current = loaded; setUrl(loaded.url);
-      // A selected/pasted image is already the user's intended scan input.
-      // Ask for a crop only when whole-image decoding cannot choose one QR.
-      const value = await scanQrImage(loaded.image, { x: 0, y: 0, width: 1, height: 1 }, controller.signal);
-      if (!controller.signal.aborted && job.current === controller) onDecoded(value);
+      const value = await operation(controller.signal);
+      if (isCurrent() && value !== undefined) onDecoded(value);
     } catch (error) {
-      if (!controller.signal.aborted && job.current === controller) {
-        setMessage(error instanceof Error ? error.message : "This image could not be opened.");
-      }
+      if (isCurrent()) setMessage(error instanceof Error ? error.message : fallbackMessage);
     } finally {
-      if (!controller.signal.aborted && job.current === controller) setBusy(false);
+      if (isCurrent()) setBusy(false);
     }
   }, [onDecoded]);
+
+  const choose = useCallback(async (file: Blob | undefined) => {
+    if (!file) return; // Dismissing the picker leaves the current image intact.
+    localImage.current?.dispose();
+    localImage.current = null;
+    setUrl(null);
+    setCrop(null);
+    await runRead(async (signal) => {
+      const loaded = await loadQrImage(file, signal);
+      if (signal.aborted) {
+        loaded.dispose();
+        return;
+      }
+      localImage.current = loaded;
+      setUrl(loaded.url);
+      // Decode directly; ask for a crop only if no single QR can be chosen.
+      return scanQrImage(loaded.image, WHOLE_IMAGE, signal);
+    }, "This image could not be opened.");
+  }, [runRead]);
 
   useEffect(() => {
     const paste = (event: ClipboardEvent) => {
@@ -100,19 +123,8 @@ export function QrImageView({ onCancel, onDecoded }: Props) {
   };
   const read = async () => {
     if (busy || !crop || !localImage.current) return;
-    job.current?.abort();
-    const controller = new AbortController(); job.current = controller;
-    setBusy(true); setMessage(null);
-    try {
-      const value = await scanQrImage(localImage.current.image, crop, controller.signal);
-      if (!controller.signal.aborted && job.current === controller) onDecoded(value);
-    } catch (error) {
-      if (!controller.signal.aborted && job.current === controller) {
-        setMessage(error instanceof Error ? error.message : "The QR code could not be read.");
-      }
-    } finally {
-      if (!controller.signal.aborted && job.current === controller) setBusy(false);
-    }
+    const image = localImage.current.image;
+    await runRead((signal) => scanQrImage(image, crop, signal), "The QR code could not be read.");
   };
 
   return (
@@ -160,7 +172,7 @@ export function QrImageView({ onCancel, onDecoded }: Props) {
           </div>
           <div className="image-selection-actions">
             <button type="button" className="result-text-button" disabled={busy}
-              onClick={() => { setCrop({ x: 0, y: 0, width: 1, height: 1 }); setMessage(null); }}>{tr("Use whole image")}</button>
+              onClick={() => { setCrop(WHOLE_IMAGE); setMessage(null); }}>{tr("Use whole image")}</button>
             <button type="button" className="result-text-button" disabled={busy || !crop}
               onClick={() => { setCrop(null); setMessage(null); }}>{tr("Reset selection")}</button>
           </div>
@@ -171,7 +183,7 @@ export function QrImageView({ onCancel, onDecoded }: Props) {
               {([ ["x", "Left (%)"], ["y", "Top (%)"], ["width", "Width (%)"], ["height", "Height (%)"] ] as const).map(([field, label]) =>
                 <label key={field}>{tr(label)}
                   <input type="number" min={field === "x" || field === "y" ? 0 : 1} max={field === "x" || field === "y" ? 99 : 100} step={1}
-                    value={Math.round((crop ?? { x: 0, y: 0, width: 1, height: 1 })[field] * 100)}
+                    value={Math.round((crop ?? WHOLE_IMAGE)[field] * 100)}
                     onChange={(event) => { setCrop(adjustSelection(crop, field, event.target.valueAsNumber)); setMessage(null); }} />
                 </label>)}
             </fieldset>

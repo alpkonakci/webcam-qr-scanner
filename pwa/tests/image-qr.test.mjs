@@ -108,19 +108,9 @@ test("scan deadline releases a stalled worker instead of leaving it running", as
   await assert.rejects(pending, /took too long/);
   assert.equal(f.stats().terminated, 1); assert.equal(f.canvas.width, 0);
 });
-test("image reader is user-triggered, has no upload/camera APIs and cleans up", async () => {
-  const [home, view] = await Promise.all([readFile(new URL("../app/PwaHome.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/QrImageView.tsx", import.meta.url), "utf8")]);
-  assert.match(home, /onClick=\{startImage\}/);
-  assert.match(home, /<QrImageView onCancel=\{closeImage\} onDecoded=\{handleDecoded\}/);
-  assert.match(home, /scanSource === "image" \? startImage\(\) : startScanner\(\)/);
-  assert.match(view, /event\.target\.value = ""/); // Same file can be selected twice.
-  assert.match(view, /job\.current\?\.abort\(\)/);
-  assert.match(view, /localImage\.current\?\.dispose\(\)/);
-  assert.match(view, /controller\.signal\.aborted \|\| job\.current !== controller/);
-  assert.match(view, /if \(!file\) return/);
-  assert.match(view, /scanQrImage\(loaded\.image, \{ x: 0, y: 0, width: 1, height: 1 \}, controller\.signal\)/);
-  assert.match(view, /if \(!controller\.signal\.aborted && job\.current === controller\) onDecoded\(value\)/);
-  assert.match(view, /url && !busy &&/); // Crop is fallback, not a mandatory step.
+test("image reader has no upload, network, camera or delivery capability", async () => {
+  // Positive lifecycle behavior is exercised by browser-cleanup-smoke.mjs;
+  // this static guard deliberately checks forbidden capabilities, not layout.
+  const view = await readFile(new URL("../app/QrImageView.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(`${view}\n${source}`, /\bfetch\(|XMLHttpRequest|WebSocket|localStorage|getUserMedia|sendUrl|window\.open/);
 });

@@ -1,8 +1,25 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import { runInNewContext } from "node:vm";
 import test from "node:test";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 const root = new URL("../", import.meta.url);
+const require = createRequire(import.meta.url);
+
+function renderHome() {
+  const { buildSync } = require("esbuild");
+  const build = buildSync({
+    entryPoints: [fileURLToPath(new URL("app/PwaHome.tsx", root))],
+    bundle: true, write: false, platform: "node", format: "cjs", packages: "external", jsx: "automatic",
+  });
+  const compiledModule = { exports: {} };
+  runInNewContext(build.outputFiles[0].text, { module: compiledModule, exports: compiledModule.exports, require });
+  return renderToStaticMarkup(React.createElement(compiledModule.exports.PwaHome));
+}
 
 test("Turkish receipt labels distinguish delivery from opening the browser", async () => {
   const { renderResult } = await import("./result-render.mjs");
@@ -15,25 +32,18 @@ test("Turkish receipt labels distinguish delivery from opening the browser", asy
   assert.match(received, /https:\/\/example.com\//);
 });
 
-test("keeps the QR Scanner mobile PWA shell in the Vercel build", async () => {
-  const [layout, home] = await Promise.all([
-    readFile(new URL("app/layout.tsx", root), "utf8"),
-    readFile(new URL("app/PwaHome.tsx", root), "utf8"),
-  ]);
-  assert.match(layout, /QR Scanner/);
+test("renders the QR Scanner shell with user-triggered scan actions", () => {
+  const home = renderHome();
+  assert.match(home, /QR Scanner/);
   assert.match(home, /Scan here\. Continue on your PC\./);
   assert.match(home, /Camera scanner ready/);
-  assert.match(home, /className="settings-toggle"/);
-  assert.doesNotMatch(home, /className="dev-badge settings-toggle"/);
+  assert.match(home, /aria-label="Settings and about"/);
+  assert.match(home, /class="settings-toggle"/);
   assert.match(home, /Scan a link, text or PC pairing code/);
-  assert.match(home, /<TextResultView text=\{scanResult\.text\}/);
-  assert.doesNotMatch(home, /Install app|Added to Home Screen/);
+  assert.match(home, /Read from image/);
   assert.match(home, /No location access/);
-  assert.doesNotMatch(`${layout}\n${home}`, /Coming next/);
-  assert.doesNotMatch(
-    `${layout}\n${home}`,
-    /codex-preview|react-loading-skeleton|Your site is taking shape/i,
-  );
+  assert.doesNotMatch(home, /<video|role="dialog"|image-reader-heading/);
+  assert.doesNotMatch(home, /Coming next|codex-preview|react-loading-skeleton|Your site is taking shape/i);
 });
 
 test("applies privacy and embedding security headers", async () => {

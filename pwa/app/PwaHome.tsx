@@ -22,6 +22,7 @@ import { PcConnectionBadge } from "./PcConnectionBadge";
 import { SettingsView } from "./SettingsView";
 import { HomeScreenGuide } from "./HomeScreenGuide";
 import { homeScreenContext, type HomeScreenContext } from "../lib/home-screen";
+import { selectHomeView, pairingGuideStatus } from "../lib/home-view";
 
 const subscribeToStaticDeviceKind = () => () => {};
 const getServerDeviceKind = () => false;
@@ -44,8 +45,11 @@ function Home() {
   const [pairStoreError, setPairStoreError] = useState(false);
   const [scannerReturn, setScannerReturn] = useState<ReturnType<typeof parseScannerReturn>>(null);
   const surface = useRef<HTMLElement>(null);
-  const currentView = scannerOpen ? "camera" : settingsOpen ? "settings" : imageOpen ? "image" : pairingUri ? "pairing" : scanResult ? "result" : "home";
-  const titleId = settingsOpen ? "settings-title" : imageOpen ? "image-reader-title" : pairingUri ? "pairing-title" : scanResult?.kind === "text" ? "text-result-title" : scanResult ? "link-result-title" : "page-title";
+  const view = selectHomeView({ settingsOpen, imageOpen, pairingUri, scanResult });
+  // Keep text/link results in the same focus-transition group as before.
+  const resultView = view.kind === "text" || view.kind === "link";
+  const currentView = scannerOpen ? "camera" : resultView ? "result" : view.kind;
+  const guideStatus = pairingGuideStatus({ ready: pairStoreReady, error: pairStoreError, hasPair: pairedPc !== null });
   useEffect(() => {
     if (currentView === "camera") return;
     const frame = requestAnimationFrame(() => surface.current?.querySelector<HTMLElement>("h1")?.focus());
@@ -139,22 +143,16 @@ function Home() {
     setScanResult(parseQrPayload(value));
   }, []);
 
-  const startScanner = () => {
-    setScanSource("camera");
-    setImageOpen(false);
+  const startScan = (source: "camera" | "image") => {
+    setScanSource(source);
     setScanResult(null);
     setPairingUri(null);
-    setScannerOpen(true);
+    setScannerOpen(source === "camera");
+    setImageOpen(source === "image");
   };
-
-  const startImage = () => {
-    setScanSource("image");
-    setScanResult(null);
-    setPairingUri(null);
-    setScannerOpen(false);
-    setImageOpen(true);
-  };
-  const scanAgain = () => scanSource === "image" ? startImage() : startScanner();
+  const startScanner = () => startScan("camera");
+  const startImage = () => startScan("image");
+  const scanAgain = () => startScan(scanSource);
 
   const startPairingScanner = () => {
     setPairingUri(null);
@@ -165,47 +163,38 @@ function Home() {
     setPairedPc((current) => current?.pairId === pairId ? null : current);
   }, []);
 
-  return (
-    <main className="app-shell">
-      <section ref={surface} className="phone-surface" aria-labelledby={titleId} inert={scannerOpen}>
-        <header className="brand-row">
-          <div className="brand-mark" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
-          <div>
-            <p className="eyebrow">{tr("PHONE-TO-PC")}</p>
-            <p className="brand-name">QR Scanner</p>
-          </div>
-          <button type="button" className="settings-toggle" onClick={() => setSettingsOpen(true)} aria-label={tr("Settings and about")}>⚙</button>
-          <span className="sr-only">{APP_VERSION}</span>
-        </header>
-
-        {settingsOpen ? <SettingsView onBack={() => setSettingsOpen(false)} /> : imageOpen ? (
-          <QrImageView onCancel={closeImage} onDecoded={handleDecoded} />
-        ) : pairingUri ? (
+  const renderContent = () => {
+    switch (view.kind) {
+      case "settings":
+        return <SettingsView onBack={() => setSettingsOpen(false)} />;
+      case "image":
+        return <QrImageView onCancel={closeImage} onDecoded={handleDecoded} />;
+      case "pairing":
+        return (
           <PairingView
-            pairingUri={pairingUri}
+            pairingUri={view.uri}
             existingPair={pairedPc}
             pairStoreReady={pairStoreReady}
             onPaired={setPairedPc}
             onPairInvalid={clearRevokedPair}
             onCancel={closePairing}
           />
-        ) : scanResult?.kind === "text" ? (
-          <TextResultView text={scanResult.text} onScanAgain={scanAgain} />
-        ) : scanResult ? (
+        );
+      case "text":
+        return <TextResultView text={view.text} onScanAgain={scanAgain} />;
+      case "link":
+        return (
           <QrResultView
-            result={scanResult.result}
+            result={view.result}
             pairedPc={pairedPc}
             isMobileClient={isMobileClient}
             onPairPc={startPairingScanner}
             onPairRevoked={clearRevokedPair}
             onScanAgain={scanAgain}
           />
-        ) : (
+        );
+      case "home":
+        return (
           <>
             <div className="hero-copy">
               <div className="ready-pill">
@@ -241,7 +230,7 @@ function Home() {
             </section>
 
             {pairedPc && <PcConnectionBadge pair={pairedPc} onRevoked={clearRevokedPair} />}
-            <HomeScreenGuide context={installContext} pairing={!pairStoreReady ? "checking" : pairStoreError ? "unavailable" : pairedPc ? "available" : "missing"} tr={tr} />
+            <HomeScreenGuide context={installContext} pairing={guideStatus} tr={tr} />
 
             {pairedPc && (
               <aside className="return-panel" aria-label={tr("Return to your scanner")}>
@@ -285,7 +274,28 @@ function Home() {
               <a href="/licenses/THIRD_PARTY_NOTICES.txt">{tr("Open source · Licenses")}</a>
             </footer>
           </>
-        )}
+        );
+    }
+  };
+
+  return (
+    <main className="app-shell">
+      <section ref={surface} className="phone-surface" aria-labelledby={view.titleId} inert={scannerOpen}>
+        <header className="brand-row">
+          <div className="brand-mark" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+          <div>
+            <p className="eyebrow">{tr("PHONE-TO-PC")}</p>
+            <p className="brand-name">QR Scanner</p>
+          </div>
+          <button type="button" className="settings-toggle" onClick={() => setSettingsOpen(true)} aria-label={tr("Settings and about")}>⚙</button>
+          <span className="sr-only">{APP_VERSION}</span>
+        </header>
+        {renderContent()}
       </section>
 
       {scannerOpen && (
