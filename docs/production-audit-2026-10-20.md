@@ -1,5 +1,14 @@
 # Üretime hazırlık denetimi — 20 Ekim 2026
 
+> 22 Ekim son durum: `9c48e07` için GitHub push ve PR CI kontrollerinin tamamı,
+> ayrıca Vercel dağıtım kontrolü başarılı. Canlı beş dakikalık temizlik kuruldu ve
+> ilk otomatik çalışması doğrulandı; 28 kayıtlı eşleşme korundu. Aşağıdaki ilk
+> denetim tarihsel bulguları içerir. Kaynakta giderilmiş CI ve temizlik bulguları
+> güncel açık engel sayılmamalı. [Canlı kanıt](retention-live-2026-10-22.md).
+> PR #3 taslak; yeni HTTPS adayıyla gerçek cihaz ve erişilebilirlik kapsamındaki
+> açık kontroller, paket kaynak arşivinin güncellenmesi ve geri dönüş tatbikatı
+> tamamlanmadan stabil yayın onayı verilmedi.
+
 > 21 Ekim güncellemesi: aşağıdaki ilk kaynak–paket uyuşmazlığı, ayrı `dist/candidate-20261021` adayı üretilerek bu aday için giderildi. Eski accessibility paketi değiştirilmedi. Gerçek cihaz kabul testi ve diğer işletim/yayın kapıları açık; ayrıntılar belgenin sonundadır.
 
 **Sonuç: 78/100 — koşullarla yayımlanabilir beta; stabil sürüm onayı değil.**

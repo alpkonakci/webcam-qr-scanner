@@ -1,7 +1,9 @@
 # CI and retention operations — 21 October 2026
 
-Status: prepared locally. No push, hosted CI run, deployment, branch-protection
-change or live Cron activation has been performed for this work.
+Status updated 22 October: pushed to the working branch; push and PR CI passed
+on `9c48e07fc064f793101e601752a188ba158af802`. Live Cron was activated and its first
+automatic execution succeeded. See [activation evidence](retention-live-2026-10-22.md).
+Branch protection and a merge to main have not been performed by this work.
 
 ## Continuous integration
 
@@ -36,7 +38,8 @@ them as required checks. Local success does not prove the hosted workflow passed
 2. Verify all relay migrations are already applied, including
    `202610030001_separate_receipts_from_replay.sql`. Do not blindly rerun migrations
    containing data changes to satisfy this prerequisite.
-3. Enable `pg_cron` explicitly if necessary using the
+3. Enable `pg_cron` explicitly if necessary using the versioned
+   `supabase/operations/enable_retention_cron_extension.sql` prerequisite or the
    [Supabase Cron installation guide](https://supabase.com/docs/guides/cron/install).
 4. Inventory existing cleanup jobs, including unnamed jobs and jobs owned by
    other roles, in the administrator dashboard. SQL job visibility can depend on
