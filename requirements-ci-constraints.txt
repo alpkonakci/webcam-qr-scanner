@@ -1,0 +1,4 @@
+# Test-only constraint: the distribution source-correspondence test compares
+# certifi to the exact bundled MPL source archive in third_party/sources.
+# Update this pin and that archive together after dependency/security review.
+certifi==2026.7.22

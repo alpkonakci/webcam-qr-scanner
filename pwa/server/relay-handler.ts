@@ -100,8 +100,10 @@ export async function handleRelayRequest(request: Request): Promise<Response> {
   const url = new URL(request.url);
 
   try {
-    const admin = new SupabaseAdmin();
-    if ((crypto.getRandomValues(new Uint8Array(1))[0] & 63) === 0) {
+    const isProbe = request.method === "GET" &&
+      (url.pathname === "/healthz" || url.pathname === "/readyz");
+    const admin = new SupabaseAdmin(url.pathname === "/readyz" ? 2_000 : 5_000);
+    if (!isProbe && (crypto.getRandomValues(new Uint8Array(1))[0] & 63) === 0) {
       try {
         await admin.rpc("relay_cleanup", { p_now: unixTime() });
       } catch (error) {
@@ -160,6 +162,15 @@ async function routeRelayRequest(
 
   if (method === "GET" && path === "/healthz") {
     return json({ status: "ok", protocol: PROTOCOL, transport: "supabase-realtime" });
+  }
+  if (method === "GET" && path === "/readyz") {
+    // A zero-row SELECT verifies schema/DB access without loading phone records.
+    // Health probes must never trigger opportunistic cleanup or other writes.
+    const rows = await admin.select("relay_devices", filters({ select: "device_id", limit: "0" }));
+    if (!Array.isArray(rows) || rows.length !== 0) {
+      throw new SupabaseAdminError(503, "supabase_invalid_response", "The readiness response is invalid.");
+    }
+    return json({ status: "ready", protocol: PROTOCOL, database: "ok" });
   }
   if (method === "GET" && path === "/v1/realtime/config") {
     return json({

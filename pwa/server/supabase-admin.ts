@@ -20,6 +20,11 @@ export class SupabaseAdminError extends Error {
 
 export class SupabaseAdmin {
   private readonly config = supabaseServerConfig();
+  private readonly timeoutMs: number;
+
+  constructor(timeoutMs = 5_000) {
+    this.timeoutMs = timeoutMs;
+  }
 
   async select<T>(table: string, query: URLSearchParams): Promise<T[]> {
     return this.rest<T[]>(table, { method: "GET" }, query);
@@ -61,31 +66,38 @@ export class SupabaseAdmin {
   }
 
   async authenticatedUserId(accessToken: string): Promise<string> {
-    const response = await fetch(`${this.config.url}/auth/v1/user`, {
-      method: "GET",
-      headers: {
-        apikey: this.config.publishableKey,
-        Authorization: `Bearer ${accessToken}`,
-      },
-      cache: "no-store",
+    return this.withTimeout(async signal => {
+      const response = await fetch(`${this.config.url}/auth/v1/user`, {
+        method: "GET",
+        headers: {
+          apikey: this.config.publishableKey,
+          Authorization: `Bearer ${accessToken}`,
+        },
+        cache: "no-store",
+        signal,
+      });
+      if (!response.ok) {
+        await response.body?.cancel();
+        if (response.status !== 401 && response.status !== 403) {
+          throw new SupabaseAdminError(503, "supabase_unavailable", "The authentication service is temporarily unavailable.");
+        }
+        throw new SupabaseAdminError(
+          401,
+          "realtime_auth_required",
+          "A valid Realtime session is required.",
+        );
+      }
+      const value: unknown = await response.json();
+      const id = isObject(value) ? value.id : undefined;
+      if (typeof id !== "string" || !UUID_PATTERN.test(id)) {
+        throw new SupabaseAdminError(
+          401,
+          "realtime_auth_required",
+          "The Realtime session is invalid.",
+        );
+      }
+      return id;
     });
-    if (!response.ok) {
-      throw new SupabaseAdminError(
-        401,
-        "realtime_auth_required",
-        "A valid Realtime session is required.",
-      );
-    }
-    const value: unknown = await response.json();
-    const id = isObject(value) ? value.id : undefined;
-    if (typeof id !== "string" || !UUID_PATTERN.test(id)) {
-      throw new SupabaseAdminError(
-        401,
-        "realtime_auth_required",
-        "The Realtime session is invalid.",
-      );
-    }
-    return id;
   }
 
   private async rest<T>(
@@ -102,26 +114,56 @@ export class SupabaseAdmin {
     headers.set("apikey", this.config.secretKey);
     if (init.body !== undefined) headers.set("Content-Type", "application/json");
 
-    const response = await fetch(`${this.config.url}${path}`, {
-      ...init,
-      headers,
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      let body: PostgrestErrorBody = {};
-      try {
-        body = (await response.json()) as PostgrestErrorBody;
-      } catch {
-        // Do not expose an upstream HTML response.
+    return this.withTimeout(async signal => {
+      const response = await fetch(`${this.config.url}${path}`, {
+        ...init,
+        headers,
+        cache: "no-store",
+        signal,
+      });
+      if (!response.ok) {
+        let body: PostgrestErrorBody = {};
+        try {
+          body = (await response.json()) as PostgrestErrorBody;
+        } catch {
+          // Do not expose an upstream HTML response.
+        }
+        throw new SupabaseAdminError(
+          response.status,
+          body.code ?? "supabase_request_failed",
+          body.message ?? "Supabase rejected the relay request.",
+        );
       }
+      if (response.status === 204) return undefined as T;
+      return (await response.json()) as T;
+    });
+  }
+
+  private async withTimeout<T>(operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeoutError = () => new SupabaseAdminError(
+      503, "supabase_timeout", "The relay dependency did not respond in time.",
+    );
+    const deadline = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(timeoutError());
+      }, this.timeoutMs);
+    });
+    try {
+      // Keep the deadline active through response.json(), not just headers.
+      // Never retry here: a timed-out write may already have been committed.
+      return await Promise.race([operation(controller.signal), deadline]);
+    } catch (error) {
+      if (controller.signal.aborted) throw timeoutError();
+      if (error instanceof SupabaseAdminError) throw error;
       throw new SupabaseAdminError(
-        response.status,
-        body.code ?? "supabase_request_failed",
-        body.message ?? "Supabase rejected the relay request.",
+        503, "supabase_unavailable", "The relay dependency is temporarily unavailable.",
       );
+    } finally {
+      clearTimeout(timer);
     }
-    if (response.status === 204) return undefined as T;
-    return (await response.json()) as T;
   }
 }
 

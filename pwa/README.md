@@ -69,6 +69,37 @@ runbook is in `../docs/vercel-supabase-migration.tr.md`.
 The deployment and real-device release gates are tracked in
 `../docs/v0.2-beta-release-checklist.md`.
 
+## Relay health and dependency deadlines
+
+These endpoints describe the current source; they become available on a hosted
+environment only after that source is deployed there.
+
+- `GET /healthz` preserves the existing liveness/configuration response. It does
+  not contact Supabase, so HTTP 200 does not prove that delivery is possible.
+- `GET /readyz` verifies a read-only PostgREST query against `relay_devices`,
+  selecting `device_id` with `limit=0`. It loads no device rows and returns only
+  `{ "status": "ready", "protocol": "wqrs/1", "database": "ok" }`, or a generic
+  non-cacheable 503 on failure. It does not test Realtime or end-to-end delivery.
+  Zero-row responses are supported by
+  [PostgREST's documented limit=0 behavior](https://docs.postgrest.org/en/v11/releases/v10.0.0.html).
+- Neither probe runs opportunistic cleanup or writes data. Readiness checks
+  still contact the database; use a modest monitor interval (for example 60
+  seconds), not browser polling. Hosting-level abuse controls remain necessary.
+- Each Supabase auth/REST/RPC operation has a five-second deadline covering
+  headers and response-body reading; readiness uses a two-second deadline.
+  These are per-operation limits, not a total duration guarantee for a relay
+  request containing multiple operations.
+- A timeout aborts the outgoing request, returns a recoverable relay error and
+  never automatically retries a write. A write might already have committed:
+  keep the existing delivery-status check rather than submitting a duplicate.
+  An auth-service outage is not reported as invalid phone credentials.
+
+Monitor both liveness and readiness, but keep real pairing/send/revoke acceptance
+checks as a separate release gate. Neither endpoint is proof of complete relay
+availability. CI and opt-in scheduled retention scripts are prepared separately;
+hosted CI verification and live Cron activation remain pending. See the
+[CI and retention runbook](../docs/ci-retention-operations-2026-10-21.md).
+
 ## Privacy boundary
 
 The camera permission is requested only after the user presses **Scan QR** and

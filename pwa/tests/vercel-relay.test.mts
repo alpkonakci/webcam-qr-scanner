@@ -192,7 +192,7 @@ test("pair status distinguishes active, revoked and invalid sender credentials",
   assert.equal((await invalid.json() as { error: { code: string } }).error.code, "unauthorized");
 });
 
-test("unexpected relay failures never log raw exception data", async (context) => {
+test("upstream availability failures return a recoverable error without logging raw exception data", async (context) => {
   const originalFetch = globalThis.fetch;
   const originalConsoleError = console.error;
   const logged: unknown[][] = [];
@@ -214,15 +214,31 @@ test("unexpected relay failures never log raw exception data", async (context) =
     new Request("https://scanner.example/v1/devices", { method: "POST" }),
   );
 
-  assert.equal(response.status, 500);
+  assert.equal(response.status, 503);
   assert.deepEqual(await response.json(), {
     error: {
-      code: "internal_error",
-      message: "The relay could not process the request.",
+      code: "relay_unavailable",
+      message: "The relay is temporarily unavailable.",
     },
   });
   const output = JSON.stringify(logged);
   assert.doesNotMatch(output, /private\.example|Bearer secret|ciphertext/i);
+});
+
+test("unexpected non-transport failures still return a safe internal error", async context => {
+  const logged: unknown[][] = [];
+  context.mock.method(console, "error", (...values: unknown[]) => logged.push(values));
+  context.mock.method(crypto, "getRandomValues", () => {
+    throw new Error("https://private.example/path Authorization: Bearer secret ciphertext");
+  });
+  const response = await handleRelayRequest(
+    new Request("https://scanner.example/v1/devices", { method: "POST" }),
+  );
+  assert.equal(response.status, 500);
+  assert.deepEqual(await response.json(), {
+    error: { code: "internal_error", message: "The relay could not process the request." },
+  });
+  assert.doesNotMatch(JSON.stringify(logged), /private\.example|Bearer secret|ciphertext/i);
 });
 
 test("chunked JSON requests are rejected before an oversized body is buffered", async (context) => {
