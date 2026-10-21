@@ -7,7 +7,7 @@ change or live Cron activation has been performed for this work.
 
 `.github/workflows/ci.yml` runs on push, pull request and manual dispatch:
 
-- **Desktop (Windows):** Python 3.12.14, isolated `.venv`, dependency consistency
+- **Desktop (Windows):** Python 3.12.10, isolated `.venv`, dependency consistency
   and the full desktop unit suite.
 - **Web (build, tests, lint, types):** Node 22, locked npm install, production
   build, web tests, lint and typecheck.
