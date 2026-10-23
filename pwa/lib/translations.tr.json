@@ -1,4 +1,8 @@
 {
+  "Scan a QR.": "QR oku.",
+  "Use your camera or choose an image. Send links to your PC.": "Kameranı kullan veya bir görsel seç. Bağlantıları PC'ne gönder.",
+  "Open on this phone": "Bu telefonda aç",
+  "On-device QR reading": "QR'lar cihazında okunur",
   "Choose what you want to do.": "Ne yapmak istersin?",
   "Scan with Camera": "Kameradan QR oku",
   "Open the webcam and place a QR code inside the frame.": "Kamerayı aç ve QR kodunu çerçeveye yerleştir.",

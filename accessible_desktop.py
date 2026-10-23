@@ -30,16 +30,16 @@ def home_controls(*, pair_count: int, confirm_exit: Callable[[], bool] | None,
         if confirm_exit is None or confirm_exit():
             window.finish(HomeAction.EXIT)
 
-    window = ControlWindow("QR Scanner", (620, 575), on_close=leave,
+    window = ControlWindow("QR Scanner", (620, 585), on_close=leave,
                            on_escape=lambda: window.finish(HomeAction.BACKGROUND))
     window.label("title", "QR SCANNER", (28, 22, 330, 40), heading=True)
     window.label("intro", t("Choose what you want to do."), (28, 68, 560, 25))
-    window.label("status", "", (28, 96, 560, 28))
+    window.label("status", "", (28, 96, 560, 38))
     for index, card in enumerate(action_cards(pair_count)):
-        y = 137 + index * 83
+        y = 141 + index * 83
         window.button(card.action.value, t(card.title), (28, y, 564, 44),
                       lambda action=card.action: window.finish(action))
-        window.label("help_" + card.action.value, t(card.description), (35, y + 48, 554, 28))
+        window.label("help_" + card.action.value, t(card.description), (35, y + 46, 554, 34))
     window.button("settings", t("Settings and about"), (28, 486, 270, 42), lambda: window.finish(HomeAction.SETTINGS))
     window.button("exit", t("Exit"), (414, 486, 178, 42), exit_app)
     window.label("keyboard", t("Tab: move · Enter: select · ESC: background"), (28, 540, 560, 25))
@@ -58,6 +58,66 @@ def home_controls(*, pair_count: int, confirm_exit: Callable[[], bool] | None,
     window.on_tick = update_status
     update_status()
     return window
+
+
+def pairing_controls(qr_image, *, expires_at: int, request_received,
+                     cancel_requested, phone_opened, development_mode: bool) -> ControlWindow:
+    """Accessible shell around the existing in-memory, one-time pairing QR."""
+    from pairing_ui import PairingWindowOutcome, pairing_seconds_remaining
+    window = ControlWindow(t("QR Scanner - Pair Phone"), (574, 624),
+                           on_close=lambda: window.finish(PairingWindowOutcome.CANCELLED))
+    try:
+        window.label("title", t("PAIR A PHONE"), (28, 18, 518, 38), heading=True)
+        window.label("instructions", t("Scan with your camera or Google Lens.") + "\n" +
+                     t("Keep this window open until your phone connects."), (28, 61, 518, 46))
+        window.image("qr", qr_image, (80, 114, 414, 414), description=t("Pair Phone"))
+        window.label("timer", "", (28, 536, 518, 30))
+        if development_mode:
+            window.label("development", "Local test mode: a real phone cannot connect.", (28, 566, 518, 22))
+        window.button("cancel", t("Cancel"), (28, 588 if development_mode else 576, 518, 36 if development_mode else 44),
+                      lambda: window.finish(PairingWindowOutcome.CANCELLED))
+
+        def update() -> None:
+            if cancel_requested is not None and cancel_requested.is_set():
+                window.finish(PairingWindowOutcome.CANCELLED)
+            elif request_received.is_set():
+                window.finish(PairingWindowOutcome.REQUEST_RECEIVED)
+            elif phone_opened is not None and phone_opened.is_set():
+                window.finish(PairingWindowOutcome.PHONE_OPENED)
+            else:
+                remaining = pairing_seconds_remaining(expires_at)
+                if remaining <= 0:
+                    window.finish(PairingWindowOutcome.EXPIRED)
+                else:
+                    window.text("timer", t("{seconds} seconds remaining", seconds=remaining))
+        window.on_tick = update
+        window.text("timer", t("{seconds} seconds remaining", seconds=pairing_seconds_remaining(expires_at)))
+        return window
+    except BaseException:
+        window.close()
+        raise
+
+
+def scanner_return_controls(qr_image, *, phone_opened, expires_at: int | None) -> ControlWindow:
+    import time
+    window = ControlWindow(t("QR Scanner - Open Phone Scanner"), (574, 600))
+    try:
+        window.label("title", t("OPEN PHONE SCANNER"), (28, 20, 518, 38), heading=True)
+        window.label("intro", t("Scan to reopen. No new pairing needed."), (28, 61, 518, 34))
+        window.image("qr", qr_image, (112, 98, 350, 350), description=t("Open scanner on phone"))
+        window.label("browser", t("Use the same phone browser you paired with."), (28, 465, 518, 34))
+        window.label("next", t("Then tap Scan QR to send a link to this PC."), (28, 502, 518, 34))
+        window.button("back", t("Back"), (28, 548, 518, 44), lambda: window.finish(None))
+        def update() -> None:
+            if phone_opened is not None and phone_opened.is_set():
+                window.finish(None)
+            elif expires_at is not None and time.time() >= expires_at:
+                window.finish(None)
+        window.on_tick = update
+        return window
+    except BaseException:
+        window.close()
+        raise
 
 
 def phone_controls(

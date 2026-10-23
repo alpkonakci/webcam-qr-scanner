@@ -64,6 +64,13 @@ def _show_phone_scanner_window(
     origin: str, *, launch_url: str | None = None,
     phone_opened: threading.Event | None = None, expires_at: int | None = None,
 ) -> None:
+    from accessible_controls import available
+    if available():
+        from accessible_desktop import scanner_return_controls
+        normalized_origin = normalize_relay_origin(origin)
+        qr = generate_pairing_qr_image(launch_url or normalized_origin + "/", size=350)
+        scanner_return_controls(qr, phone_opened=phone_opened, expires_at=expires_at).run(poll_interval_ms=100)
+        return
     canvas = build_phone_scanner_canvas(origin, launch_url=launch_url)
     closed = False
 

@@ -93,6 +93,10 @@ class ControlWindow:
         self._controls: dict[str, _Control] = {}
         self._tab_order: list[str] = []
         self._fonts: list[int] = []
+        self._font_cache: dict[tuple[int, bool], int] = {}
+        self._bitmaps: list[int] = []
+        self._label_bounds: dict[str, Bounds] = {}
+        self._label_heading: dict[str, bool] = {}
         self._on_close = on_close or self.close
         self._on_escape = on_escape or self._on_close
         self.on_tick: Callable[[], None] | None = None
@@ -150,6 +154,8 @@ class ControlWindow:
             "AdjustWindowRect": ([c.POINTER(w.RECT), w.DWORD, w.BOOL], w.BOOL),
             "GetSystemMetrics": ([c.c_int], c.c_int),
             "GetKeyState": ([c.c_int], c.c_short), "PostQuitMessage": ([c.c_int], None),
+            "GetDC": ([w.HWND], w.HDC), "ReleaseDC": ([w.HWND, w.HDC], c.c_int),
+            "DrawTextW": ([w.HDC, w.LPCWSTR, c.c_int, c.POINTER(w.RECT), w.UINT], c.c_int),
         }
         for name, (arguments, result) in definitions.items():
             function = getattr(self.u, name)
@@ -161,10 +167,17 @@ class ControlWindow:
         self.g.DeleteObject.argtypes = [w.HANDLE]
         self.g.SetTextColor.argtypes = [w.HDC, w.DWORD]
         self.g.SetBkMode.argtypes = [w.HDC, c.c_int]
+        self.g.SelectObject.argtypes, self.g.SelectObject.restype = [w.HDC, w.HANDLE], w.HANDLE
+        self.g.CreateDIBSection.argtypes = [w.HDC, c.c_void_p, w.UINT, c.POINTER(c.c_void_p), w.HANDLE, w.DWORD]
+        self.g.CreateDIBSection.restype = w.HANDLE
 
     def _font(self, height: int, bold: bool = False):
+        key = (height, bold)
+        if key in self._font_cache:
+            return self._font_cache[key]
         font = self.g.CreateFontW(-height, 0, 0, 0, 600 if bold else 400, 0, 0, 0, 1, 0, 0, 5, 0, "Segoe UI")
         self._fonts.append(font)
+        self._font_cache[key] = font
         return font
 
     def _add(self, name: str, kind: str, text: str, bounds: Bounds, style: int,
@@ -185,6 +198,53 @@ class ControlWindow:
 
     def label(self, name: str, text: str, bounds: Bounds, *, heading: bool = False) -> None:
         self._add(name, "Static", text, bounds, SS_NOPREFIX, font=self._font(28, True) if heading else None)
+        self._label_bounds[name] = bounds
+        self._label_heading[name] = heading
+        self._fit_label(name)
+
+    def text_height(self, name: str) -> int:
+        """Measure native wrapped text with the control's actual GDI font."""
+        hwnd = self._controls[name].handle
+        dc = self.u.GetDC(hwnd)
+        old_font = self.g.SelectObject(dc, self.u.SendMessageW(hwnd, 0x0031, 0, 0))  # WM_GETFONT
+        try:
+            rect = w.RECT(0, 0, self._label_bounds[name][2], 0)
+            text = self.value(name)
+            self.u.DrawTextW(dc, text, -1, c.byref(rect), 0x10 | 0x400 | 0x800)
+            return rect.bottom - rect.top
+        finally:
+            self.g.SelectObject(dc, old_font)
+            self.u.ReleaseDC(hwnd, dc)
+
+    def _fit_label(self, name: str) -> None:
+        heading = self._label_heading[name]
+        for height in range(28 if heading else 16, 21 if heading else 13, -1):
+            font = self._font(height, heading)
+            self.u.SendMessageW(self._controls[name].handle, WM_SETFONT, font, 1)
+            if self.text_height(name) <= self._label_bounds[name][3]:
+                break
+
+    def image(self, name: str, image, bounds: Bounds, *, description: str) -> None:
+        """Keep a QR bitmap in memory, using a standard Static image control."""
+        class BitmapHeader(c.Structure):
+            _fields_ = [("size", w.DWORD), ("width", w.LONG), ("height", w.LONG),
+                        ("planes", w.WORD), ("bits", w.WORD), ("compression", w.DWORD),
+                        ("image_size", w.DWORD), ("x_ppm", w.LONG), ("y_ppm", w.LONG),
+                        ("used", w.DWORD), ("important", w.DWORD)]
+        rgb = image.convert("RGB")
+        if rgb.size != bounds[2:]:
+            raise ValueError("QR bitmap bounds must match its pixel size")
+        pixels = rgb.tobytes("raw", "BGRX")
+        header = BitmapHeader(c.sizeof(BitmapHeader), rgb.width, -rgb.height, 1, 32,
+                              0, len(pixels), 0, 0, 0, 0)
+        address = c.c_void_p()
+        bitmap = self.g.CreateDIBSection(None, c.byref(header), 0, c.byref(address), None, 0)
+        if not bitmap:
+            raise c.WinError(c.get_last_error())
+        self._bitmaps.append(bitmap)
+        c.memmove(address, pixels, len(pixels))
+        hwnd = self._add(name, "Static", description, bounds, 0x000E | 0x0200)
+        self.u.SendMessageW(hwnd, 0x0172, 0, bitmap)  # STM_SETIMAGE / IMAGE_BITMAP
 
     def button(self, name: str, text: str, bounds: Bounds, action: Action, *, enabled: bool = True) -> None:
         self._add(name, "Button", text, bounds, WS_TABSTOP | BS_MULTILINE, action, enabled=enabled)
@@ -234,6 +294,8 @@ class ControlWindow:
         # Only announce real changes, not every polling tick.
         if self.value(name) != value:
             self.u.SetWindowTextW(hwnd, value)
+            if name in self._label_bounds:
+                self._fit_label(name)
             self.u.NotifyWinEvent(EVENT_OBJECT_NAMECHANGE, hwnd, OBJID_CLIENT, 0)
 
     def title(self, value: str) -> None:
@@ -298,13 +360,13 @@ class ControlWindow:
             return 0
         return self.u.DefWindowProcW(hwnd, message, wp, lp)
 
-    def run(self):
+    def run(self, *, poll_interval_ms: int = REFRESH_INTERVAL_MS):
         self._running = True
         self.u.ShowWindow(self.hwnd, SW_SHOW)
         self.u.SetForegroundWindow(self.hwnd)
         if self._tab_order:
             self.focus(self._tab_order[0])
-        self.u.SetTimer(self.hwnd, REFRESH_TIMER_ID, REFRESH_INTERVAL_MS, None)
+        self.u.SetTimer(self.hwnd, REFRESH_TIMER_ID, poll_interval_ms, None)
         message = w.MSG()
         try:
             while True:
@@ -336,5 +398,7 @@ class ControlWindow:
             self.u.DestroyWindow(hwnd)
         for font in self._fonts:
             self.g.DeleteObject(font)
+        for bitmap in self._bitmaps:
+            self.g.DeleteObject(bitmap)
         self.g.DeleteObject(self._brush)
         self.u.UnregisterClassW(self._class_name, self._instance)

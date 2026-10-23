@@ -5,6 +5,141 @@ import unittest
 
 @unittest.skipUnless(os.name == "nt", "Native Windows controls")
 class AccessibleControlTests(unittest.TestCase):
+    def test_qr_factories_close_native_resources_when_image_construction_fails(self):
+        import threading
+        from unittest.mock import patch
+        from PIL import Image
+        from accessible_controls import ControlWindow
+        from accessible_desktop import pairing_controls, scanner_return_controls
+        created = []
+        def create_window(*args, **kwargs):
+            window = ControlWindow(*args, **kwargs)
+            created.append(window)
+            self.addCleanup(window.close)
+            return window
+        for factory, kwargs in (
+            (pairing_controls, dict(expires_at=9999999999, request_received=threading.Event(),
+                                   cancel_requested=None, phone_opened=None, development_mode=False)),
+            (scanner_return_controls, dict(phone_opened=None, expires_at=None)),
+        ):
+            with self.subTest(factory=factory.__name__):
+                with patch("accessible_desktop.ControlWindow", side_effect=create_window):
+                    with self.assertRaisesRegex(ValueError, "bounds must match"):
+                        factory(Image.new("RGB", (8, 8)), **kwargs)
+                self.assertTrue(created[-1]._closed, "Failed factory must release its real window")
+
+    def test_native_text_measurement_counts_complete_emoji_text(self):
+        import ctypes
+        from ctypes import wintypes
+        from accessible_controls import ControlWindow
+        window = ControlWindow("Unicode measurement", (420, 400))
+        self.addCleanup(window.close)
+        text = "📱 PC 😀 " * 25
+        window.label("unicode", text, (20, 20, 160, 330))
+        hwnd = window._controls["unicode"].handle
+        dc = window.u.GetDC(hwnd)
+        old_font = window.g.SelectObject(dc, window.u.SendMessageW(hwnd, 0x0031, 0, 0))
+        try:
+            bounds = wintypes.RECT(0, 0, 160, 0)
+            window.u.DrawTextW(dc, text, -1, ctypes.byref(bounds), 0x10 | 0x400 | 0x800)
+            self.assertEqual(window.text_height("unicode"), bounds.bottom)
+        finally:
+            window.g.SelectObject(dc, old_font)
+            window.u.ReleaseDC(hwnd, dc)
+
+    def test_pairing_cancel_is_a_real_keyboard_action(self):
+        import threading
+        from PIL import Image
+        from accessible_desktop import pairing_controls
+        from pairing_ui import PairingWindowOutcome
+        window = pairing_controls(Image.new("RGB", (414, 414), "white"),
+                                  expires_at=9999999999, request_received=threading.Event(),
+                                  cancel_requested=None, phone_opened=None, development_mode=False)
+        self.addCleanup(window.close)
+        window.focus("cancel")
+        window.key("Enter")
+        self.assertIs(window.result, PairingWindowOutcome.CANCELLED)
+
+    def test_pairing_request_wins_over_opened_and_expiry(self):
+        import threading
+        from PIL import Image
+        from accessible_desktop import pairing_controls
+        from pairing_ui import PairingWindowOutcome
+        request, opened = threading.Event(), threading.Event()
+        request.set()
+        opened.set()
+        window = pairing_controls(Image.new("RGB", (414, 414), "white"), expires_at=1,
+                                  request_received=request, cancel_requested=None,
+                                  phone_opened=opened, development_mode=False)
+        self.addCleanup(window.close)
+        window.on_tick()
+        self.assertIs(window.result, PairingWindowOutcome.REQUEST_RECEIVED)
+
+    def test_phone_return_back_and_acknowledgement_close_native_window(self):
+        import threading
+        from PIL import Image
+        from accessible_desktop import scanner_return_controls
+        for acknowledge in (False, True):
+            with self.subTest(acknowledge=acknowledge):
+                opened = threading.Event()
+                window = scanner_return_controls(Image.new("RGB", (350, 350), "white"),
+                                                 phone_opened=opened, expires_at=None)
+                self.addCleanup(window.close)
+                if acknowledge:
+                    opened.set()
+                    window.on_tick()
+                else:
+                    window.focus("back")
+                    window.key("Enter")
+                self.assertTrue(window._closed)
+
+    def test_long_native_label_fits_within_its_reserved_height(self):
+        from accessible_controls import ControlWindow
+        window = ControlWindow("Fitting text", (620, 200))
+        self.addCleanup(window.close)
+        window.label("help", "Choose a screenshot or saved QR code and select the area to scan.",
+                     (28, 20, 300, 40))
+        self.assertLessEqual(window.text_height("help"), 40)
+
+    def test_both_languages_fit_native_screen_labels(self):
+        import threading
+        from unittest.mock import patch
+        from PIL import Image
+        from accessible_desktop import home_controls, settings_controls, pairing_controls, scanner_return_controls
+        from native_dialogs import WindowCloseChoice
+        for language in ("en", "tr"):
+            with patch.dict(os.environ, {"WQRS_UI_LANGUAGE": language}):
+                screens = [
+                    home_controls(pair_count=999, confirm_exit=None, choose_close=lambda: WindowCloseChoice.CANCEL),
+                    settings_controls(startup_reader=lambda: False),
+                    pairing_controls(Image.new("RGB", (414, 414), "white"), expires_at=9999999999,
+                                     request_received=threading.Event(), cancel_requested=None,
+                                     phone_opened=None, development_mode=False),
+                    scanner_return_controls(Image.new("RGB", (350, 350), "white"),
+                                            phone_opened=None, expires_at=None),
+                ]
+                for window in screens:
+                    self.addCleanup(window.close)
+                    for name, bounds in window._label_bounds.items():
+                        with self.subTest(language=language, label=name, text=window.value(name)):
+                            self.assertLessEqual(window.text_height(name), bounds[3])
+
+    def test_pairing_cancel_and_expiry_keep_original_outcomes(self):
+        import threading
+        from PIL import Image
+        from accessible_desktop import pairing_controls
+        from pairing_ui import PairingWindowOutcome
+        for cancel in (False, True):
+            event = threading.Event()
+            if cancel:
+                event.set()
+            window = pairing_controls(Image.new("RGB", (414, 414), "white"), expires_at=1,
+                                      request_received=threading.Event(), cancel_requested=event,
+                                      phone_opened=None, development_mode=False)
+            self.addCleanup(window.close)
+            window.on_tick()
+            self.assertIs(window.result, PairingWindowOutcome.CANCELLED if cancel else PairingWindowOutcome.EXPIRED)
+
     def test_native_focus_cues_are_not_hidden(self):
         from accessible_controls import ControlWindow
         window = ControlWindow("Visible focus test", (420, 220))

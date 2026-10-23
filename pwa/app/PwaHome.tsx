@@ -34,7 +34,6 @@ function Home() {
   const { tr } = useLocale();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [installContext, setInstallContext] = useState<HomeScreenContext>({ platform: "other", installed: false });
-  const [serviceWorkerReady, setServiceWorkerReady] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
   const [scanSource, setScanSource] = useState<"camera" | "image">("camera");
@@ -72,10 +71,8 @@ function Home() {
     standalone.addEventListener("change", readMode);
 
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("/sw.js", { scope: "/" })
-        .then(() => { if (active) setServiceWorkerReady(true); })
-        .catch(() => { if (active) setServiceWorkerReady(false); });
+      void navigator.serviceWorker.register("/sw.js", { scope: "/" })
+        .catch(() => { /* Scanning also works without an installed service worker. */ });
     }
 
     getMostRecentPair()
@@ -197,14 +194,22 @@ function Home() {
         return (
           <>
             <div className="hero-copy">
-              <div className="ready-pill">
-                <span className="ready-dot" aria-hidden="true" />
-                {pairedPc ? `${tr("Pairing saved")}: ${pairedPc.pcLabel}` : tr("Camera scanner ready")}
-              </div>
-              <h1 id="page-title" tabIndex={-1}>{tr("Scan here. Continue on your PC.")}</h1>
-              <p>
-                {tr("Scan a QR link or text with your phone, or scan the one-time pairing code shown by QR Scanner on your PC.")}</p>
+              <h1 id="page-title" tabIndex={-1}>{tr("Scan a QR.")}</h1>
+              <p>{tr("Use your camera or choose an image. Send links to your PC.")}</p>
             </div>
+
+            {pairedPc && (
+              <PcConnectionBadge pair={pairedPc} onRevoked={clearRevokedPair}>
+                <details className="connection-help">
+                  <summary>{tr("How do I send another QR?")}</summary>
+                  <p>{tr("Your connection is saved in this browser.")}</p>
+                  <p>{tr("Bookmark this page to return later. Closing the tab does not remove your pairing.")}</p>
+                  <p className="return-address">{pairedPc.relayOrigin}</p>
+                  <p>{tr("Open this page in the same browser and tap Scan QR. Your phone's normal camera opens websites directly; it does not send them to your PC.")}</p>
+                  <p>{tr("Lost the tab? On your PC, open Paired Phones → Open scanner on phone and scan that code. If you use another browser, private browsing or clear site data, you may need to pair again.")}</p>
+                </details>
+              </PcConnectionBadge>
+            )}
 
             <section className="action-panel" aria-label={tr("Available actions")}>
               <button
@@ -229,24 +234,7 @@ function Home() {
               </button>
             </section>
 
-            {pairedPc && <PcConnectionBadge pair={pairedPc} onRevoked={clearRevokedPair} />}
             <HomeScreenGuide context={installContext} pairing={guideStatus} tr={tr} />
-
-            {pairedPc && (
-              <aside className="return-panel" aria-label={tr("Return to your scanner")}>
-                <strong>{tr("Your connection is saved in this browser.")}</strong>
-                <p>
-                  {tr("Bookmark this page to return later. Closing the tab does not remove your pairing.")}</p>
-                <p className="return-address">{pairedPc.relayOrigin}</p>
-                <details>
-                  <summary>{tr("How do I send another QR?")}</summary>
-                  <p>
-                    {tr("Open this page in the same browser and tap Scan QR. Your phone's normal camera opens websites directly; it does not send them to your PC.")}</p>
-                  <p>
-                    {tr("Lost the tab? On your PC, open Paired Phones → Open scanner on phone and scan that code. If you use another browser, private browsing or clear site data, you may need to pair again.")}</p>
-                </details>
-              </aside>
-            )}
 
             <section className="privacy-panel" aria-labelledby="privacy-title">
               <div>
@@ -267,9 +255,9 @@ function Home() {
             </section>
 
             <footer>
-              <span className={serviceWorkerReady ? "status-online" : "status-idle"}>
+              <span className="status-idle">
                 <i aria-hidden="true" />
-                {serviceWorkerReady ? tr("Scanner ready") : tr("Preparing scanner")}
+                {tr("On-device QR reading")}
               </span>
               <a href="/licenses/THIRD_PARTY_NOTICES.txt">{tr("Open source · Licenses")}</a>
             </footer>

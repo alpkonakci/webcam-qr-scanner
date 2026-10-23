@@ -34,6 +34,7 @@ class PhoneScannerUiTests(unittest.TestCase):
 
     def run_window(self, *, wait_key=27, **kwargs):
         with (
+            patch("accessible_controls.available", return_value=False),
             patch("phone_scanner_ui.cv2.namedWindow"),
             patch("phone_scanner_ui.set_window_icon"),
             patch("phone_scanner_ui.set_window_arrow"),

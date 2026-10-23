@@ -2,6 +2,24 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderResult, resultFixture } from "./result-render.mjs";
 
+test("paired mobile offers sending first without enabling duplicate delivery", async () => {
+  const idle = await renderResult("idle", "");
+  assert.ok(idle.indexOf("Send to PC") < idle.indexOf("Open on this phone"));
+  assert.match(idle, /class="result-primary result-send"[^>]*><span>Send to PC/);
+  for (const state of ["pending", "checking", "sending", "unconfirmed", "delivered"]) {
+    const html = await renderResult(state, "");
+    assert.match(html, /class="result-primary result-send" disabled=""/, `${state} must retain the delivery lock`);
+  }
+});
+
+test("unpaired mobile and desktop keep local opening primary", async () => {
+  for (const props of [{ pairedPc: null }, { isMobileClient: false }]) {
+    const html = await renderResult("idle", "", "en", props);
+    assert.match(html, /class="result-primary"[^>]*>Open link in new tab/);
+    assert.doesNotMatch(html, /result-send|Open on this phone/);
+  }
+});
+
 test("rendered pending/checking results disable sending and expose receipt-only checks", async () => {
   const pending = await renderResult("pending", "Delivery is not confirmed yet. This link may still arrive.");
   assert.match(pending, /disabled=""[^>]*><span>Awaiting receipt/);

@@ -1,10 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { getPcConnection, type PcConnection } from "../lib/relay-client";
 import { freshConnection } from "../lib/connection-state";
 import type { SenderCredentials } from "../lib/wqrs";
 import { useLocale } from "../lib/i18n";
-export function PcConnectionBadge({ pair, onRevoked }: { pair: SenderCredentials; onRevoked(pairId: string): void }) {
+export function PcConnectionBadge({ pair, onRevoked, children }: { pair: SenderCredentials; onRevoked(pairId: string): void; children?: ReactNode }) {
   const { tr, language } = useLocale();
   const [value, setValue] = useState<PcConnection | null>(null);
   const [lastCheck, setLastCheck] = useState<number | null>(null);
@@ -51,5 +51,6 @@ export function PcConnectionBadge({ pair, onRevoked }: { pair: SenderCredentials
     {lastCheck && <small>{tr("Last check")}: {new Date(lastCheck).toLocaleTimeString(language === "tr" ? "tr-TR" : "en-GB")}</small>}
     <button type="button" disabled={busy} onClick={() => setRequest((n) => n + 1)}>{tr(busy ? "Checking connection…" : "Check connection")}</button>
     <small>{tr("A saved pairing does not mean the PC is online.")}</small>
+    {children}
   </section>;
 }

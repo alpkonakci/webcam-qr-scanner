@@ -9,7 +9,7 @@ import ts from "typescript";
 import { translate } from "../lib/i18n-core.ts";
 
 const require = createRequire(import.meta.url);
-export async function resultFixture(state, message, relayClient = {}, onScanAgain = () => {}, language = "en") {
+export async function resultFixture(state, message, relayClient = {}, onScanAgain = () => {}, language = "en", propsOverrides = {}) {
   const source = await readFile(new URL("../app/QrResultView.tsx", import.meta.url), "utf8");
   const compiled = ts.transpileModule(source, {
     compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS },
@@ -40,11 +40,11 @@ export async function resultFixture(state, message, relayClient = {}, onScanAgai
   const element = exports.QrResultView({
     result: { ok: true, href: "https://example.com/", hostname: "example.com", insecure: false },
     pairedPc: { pcLabel: "My PC" }, isMobileClient: true,
-    onPairPc() {}, onPairRevoked() {}, onScanAgain,
+    onPairPc() {}, onPairRevoked() {}, onScanAgain, ...propsOverrides,
   });
   return { element, buttons };
 }
 
-export async function renderResult(state, message, language = "en") {
-  return renderToStaticMarkup((await resultFixture(state, message, {}, () => {}, language)).element);
+export async function renderResult(state, message, language = "en", propsOverrides = {}) {
+  return renderToStaticMarkup((await resultFixture(state, message, {}, () => {}, language, propsOverrides)).element);
 }

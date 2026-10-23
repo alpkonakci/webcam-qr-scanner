@@ -35,8 +35,8 @@ test("Turkish receipt labels distinguish delivery from opening the browser", asy
 test("renders the QR Scanner shell with user-triggered scan actions", () => {
   const home = renderHome();
   assert.match(home, /QR Scanner/);
-  assert.match(home, /Scan here\. Continue on your PC\./);
-  assert.match(home, /Camera scanner ready/);
+  assert.match(home, /Scan a QR\./);
+  assert.match(home, /On-device QR reading/);
   assert.match(home, /aria-label="Settings and about"/);
   assert.match(home, /class="settings-toggle"/);
   assert.match(home, /Scan a link, text or PC pairing code/);
@@ -127,7 +127,6 @@ test("opens decoded links without replacing the QR Scanner page", async () => {
   assert.match(resultView, /window\.open\(result\.href, "_blank", "noopener,noreferrer"\)/);
   assert.match(resultView, /onClick=\{openInNewTab\}/);
   assert.doesNotMatch(resultView, /window\.location\.(?:assign|replace)/);
-  assert.doesNotMatch(resultView, /Open on this phone/);
   assert.match(resultView, /Scan the pairing QR shown on your PC/);
   assert.match(resultView, /isMobileClient/);
   assert.doesNotMatch(resultView, /Pair a PC first/);

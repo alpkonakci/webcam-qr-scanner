@@ -138,6 +138,15 @@ export function QrResultView({
     }
   };
 
+  const preferPc = isMobileClient && pairedPc !== null;
+  const openLocally = (
+    <button type="button"
+      className={preferPc ? "result-secondary result-secondary-enabled result-local" : "result-primary"}
+      onClick={openInNewTab}>
+      {tr(preferPc ? "Open on this phone" : "Open link in new tab")}
+    </button>
+  );
+
   return (
     <section className="result-section" aria-live="polite">
       <div className="result-pill result-pill-success">{tr("QR decoded")}</div>
@@ -154,17 +163,12 @@ export function QrResultView({
       </div>
 
       <div className="result-actions">
-        <button
-          type="button"
-          className="result-primary"
-          onClick={openInNewTab}
-        >
-          {tr("Open link in new tab")}</button>
+        {!preferPc && openLocally}
         {isMobileClient &&
           (pairedPc ? (
             <button
               type="button"
-              className="result-secondary result-secondary-enabled"
+              className="result-primary result-send"
               disabled={deliveryState === "sending" || deliveryState === "checking" || deliveryState === "pending" || deliveryState === "unconfirmed" || deliveryState === "delivered"}
               onClick={() => { void sendToPc(); }}
             >
@@ -181,6 +185,7 @@ export function QrResultView({
               <small>{tr("Scan the pairing QR shown on your PC")}</small>
             </button>
           ))}
+        {preferPc && openLocally}
         {deliveryMessage && (
           <p
             className={`delivery-status delivery-status-${deliveryState}`}

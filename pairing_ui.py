@@ -180,6 +180,13 @@ def show_pairing_qr_window(
     """Show one QR until a request arrives, the user exits, or it expires."""
 
     qr_image = generate_pairing_qr_image(pairing_value)
+    from accessible_controls import available
+    if available():
+        from accessible_desktop import pairing_controls
+        window = pairing_controls(qr_image, expires_at=expires_at,
+                                  request_received=request_received, cancel_requested=cancel_requested,
+                                  phone_opened=phone_opened, development_mode=development_mode)
+        return window.run(poll_interval_ms=100)
     cv2.namedWindow(WINDOW_TITLE, cv2.WINDOW_AUTOSIZE)
     set_window_icon(WINDOW_TITLE)
     set_window_arrow(WINDOW_TITLE)
