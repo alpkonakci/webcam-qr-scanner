@@ -340,7 +340,12 @@ def _self_test_frame(value: str) -> np.ndarray:
 
 
 def run_self_test(timeout: float = 3.0) -> bool:
-    """Verify bundled OpenCV imports and background QR decoding without a camera."""
+    """Verify TLS initialization and QR decoding without network or camera access."""
+    import certifi
+    import ssl
+
+    # Catch missing frozen runtime data before declaring this EXE healthy.
+    ssl.create_default_context(cafile=certifi.where())
     expected = "https://example.com/qr-scanner-self-test"
     version = 0
     results: list[QRResult] | None = None

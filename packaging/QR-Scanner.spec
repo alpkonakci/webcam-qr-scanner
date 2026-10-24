@@ -1,5 +1,6 @@
 # Project-authored MIT build recipe. No upstream PyInstaller hook was copied.
 import os
+import ssl
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_all
 
@@ -7,11 +8,15 @@ root = Path(SPECPATH).parent
 dx_data, dx_binaries, dx_imports = collect_all('dxcam')
 replacement = os.environ.get('WQRS_BUILD_IMPORT_PATH')
 probe = os.environ.get('WQRS_REBUILD_PROBE') == '1'
+# Some build runtimes augment SSLContext with a public trust-policy file.
+# Preserve that policy in the frozen module root; never disable TLS checks.
+ssl_support = Path(ssl.__file__).with_name('codex-rejected-cas.pem')
+ssl_data = [(str(ssl_support), '.')] if ssl_support.is_file() else []
 a = Analysis(
     [str(root / 'launcher.py')],
     pathex=([replacement] if replacement else []) + [str(root)],
     binaries=dx_binaries,
-    datas=dx_data + [(str(root / 'assets/QR-Scanner.ico'), 'assets'),
+    datas=dx_data + ssl_data + [(str(root / 'assets/QR-Scanner.ico'), 'assets'),
                      (str(root / 'pwa/lib/translations.tr.json'), 'assets'),
                      (str(root / 'pwa/lib/translations.en.json'), 'assets')],
     hiddenimports=['bridge.pairing_controller', 'bridge.realtime', 'pystray._win32'] + dx_imports,
