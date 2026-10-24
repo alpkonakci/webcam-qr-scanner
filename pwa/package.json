@@ -48,6 +48,9 @@
     "fast-glob": "$fast-glob",
     "sharp": "0.35.5",
     "fflate": "0.8.3",
+    "miniflare": {
+      "undici": "7.30.1"
+    },
     "@esbuild-kit/core-utils": {
       "esbuild": "0.25.12"
     }

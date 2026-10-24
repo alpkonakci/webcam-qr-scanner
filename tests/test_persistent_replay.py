@@ -10,6 +10,7 @@ import sys
 import tempfile
 import time
 import unittest
+import httpx
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from pathlib import Path
@@ -198,6 +199,58 @@ class PersistentReplayTests(unittest.TestCase):
             asyncio.run(receiver._poll_once(client, "/synthetic"))
         client.post.assert_not_called()
         callback.assert_not_called()
+
+    def test_ack_transport_loss_still_prompts_once_across_receiver_restart(self):
+        for committed in (False, True):
+            with self.subTest(ack_committed=committed):
+                credentials = ReceiverCredentials(
+                    device_id=random_b64url(16), receiver_token=random_b64url(32),
+                    pair_id=random_b64url(16), root_key=b"r" * 32,
+                )
+                event = {
+                    "event": "url_message", "delivery_id": random_b64url(16),
+                    "envelope": build_url_envelope(SenderCredentials(
+                        pair_id=credentials.pair_id, sender_token=random_b64url(32),
+                        root_key=credentials.root_key,
+                    ), "https://example.com/ack-loss"),
+                }
+                received = []
+                state = {"committed": False}
+
+                def transport(request):
+                    if request.method == "GET":
+                        return (httpx.Response(204) if state["committed"]
+                                else httpx.Response(200, json=event))
+                    import json
+                    if json.loads(request.content)["event"] == "delivery_ack":
+                        state["committed"] = committed
+                        raise httpx.ReadTimeout("synthetic ACK response loss", request=request)
+                    return httpx.Response(202)
+
+                def receiver():
+                    return PcReceiver(
+                        relay_origin="https://relay.example", credentials=credentials,
+                        on_url=received.append,
+                        replay_guards={credentials.pair_id: self.guard(credentials.pair_id)},
+                    )
+
+                async def exercise():
+                    async with httpx.AsyncClient(
+                        base_url="https://relay.example",
+                        transport=httpx.MockTransport(transport),
+                    ) as client:
+                        with self.assertRaises(httpx.ReadTimeout):
+                            await receiver()._poll_once(client, "/messages")
+                        self.assertEqual([item.url for item in received],
+                                         ["https://example.com/ack-loss"])
+                        # New receiver and ledger instance, as in production reconnect.
+                        restarted = receiver()
+                        self.assertFalse(await restarted._poll_once(client, "/messages"))
+                        self.assertEqual(len(received), 1)
+                        with self.assertRaises(ReplayDetected):
+                            restarted._decrypt_event(event)
+
+                asyncio.run(exercise())
 
     @unittest.skipUnless(os.name == "nt", "requires current-user Windows DPAPI")
     def test_dpapi_ledger_survives_a_separate_process(self):

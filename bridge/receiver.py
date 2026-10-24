@@ -11,6 +11,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 from websockets.asyncio.client import connect
+from websockets.exceptions import ConnectionClosed
 
 from bridge.protocol import (
     ProtocolViolation,
@@ -156,13 +157,19 @@ class PcReceiver:
                         )
                     continue
 
-                await websocket.send(
-                    _event_json(
-                        "delivery_ack",
-                        event["delivery_id"],
-                        envelope=acknowledgement,
+                try:
+                    await websocket.send(
+                        _event_json(
+                            "delivery_ack",
+                            event["delivery_id"],
+                            envelope=acknowledgement,
+                        )
                     )
-                )
+                except (ConnectionClosed, OSError):
+                    # Replay consumption is already durable; ACK loss must not
+                    # discard the authenticated local receipt or permit replays.
+                    await _run_callback(self.on_url, received)
+                    raise
                 await _run_callback(self.on_url, received)
                 delivered += 1
                 if stop_after is not None and delivered >= stop_after:
@@ -276,16 +283,23 @@ class PcReceiver:
                 )
             return False
 
-        acknowledgement_response = await client.post(
-            f"/v1/devices/{self.credentials.device_id}"
-            f"/deliveries/{event['delivery_id']}",
-            json={
-                "event": "delivery_ack",
-                "delivery_id": event["delivery_id"],
-                "envelope": acknowledgement,
-            },
-        )
-        acknowledgement_response.raise_for_status()
+        try:
+            acknowledgement_response = await client.post(
+                f"/v1/devices/{self.credentials.device_id}"
+                f"/deliveries/{event['delivery_id']}",
+                json={
+                    "event": "delivery_ack",
+                    "delivery_id": event["delivery_id"],
+                    "envelope": acknowledgement,
+                },
+            )
+            acknowledgement_response.raise_for_status()
+        except httpx.TransportError:
+            # The relay outcome is unknown, but the verified message has already
+            # been replay-recorded. Preserve its one local confirmation attempt.
+            # Explicit HTTP rejections are not transport errors and still fail closed.
+            await _run_callback(self.on_url, received)
+            raise
         await _run_callback(self.on_url, received)
         return True
 
