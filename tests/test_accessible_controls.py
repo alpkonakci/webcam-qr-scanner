@@ -5,6 +5,54 @@ import unittest
 
 @unittest.skipUnless(os.name == "nt", "Native Windows controls")
 class AccessibleControlTests(unittest.TestCase):
+    def test_reactivating_the_window_restores_the_selected_button(self):
+        from accessible_controls import ControlWindow
+        window = ControlWindow("Restore keyboard focus", (420, 220))
+        self.addCleanup(window.close)
+        window.button("first", "First", (20, 20, 160, 44), lambda: None)
+        window.button("last", "Last", (210, 20, 160, 44), lambda: None)
+        window.focus("last")
+        window.u.SetFocus(window.hwnd)  # Actual native WM_SETFOCUS, not key().
+        self.assertEqual(window.focused_name(), "last")
+
+    def test_tab_clears_hidden_native_focus_cues(self):
+        from accessible_controls import ControlWindow
+        window = ControlWindow("Visible keyboard focus", (420, 220))
+        self.addCleanup(window.close)
+        window.button("first", "First", (20, 20, 160, 44), lambda: None)
+        window.button("last", "Last", (210, 20, 160, 44), lambda: None)
+        window.focus("first")
+        window.u.SendMessageW(window.hwnd, 0x0127, 1 | (1 << 16), 0)  # UIS_SET / HIDEFOCUS
+        self.assertTrue(window.u.SendMessageW(window.hwnd, 0x0129, 0, 0) & 1)
+        window.key("Tab")
+        self.assertEqual(window.focused_name(), "last")
+        self.assertFalse(window.u.SendMessageW(window.hwnd, 0x0129, 0, 0) & 1)
+
+    def test_message_loop_routes_tab_and_enter_after_window_reactivation(self):
+        import ctypes
+        from ctypes import wintypes
+        import time
+        from accessible_controls import ControlWindow
+        window = ControlWindow("Real message loop", (420, 220))
+        self.addCleanup(window.close)
+        window.button("first", "First", (20, 20, 160, 44), lambda: window.finish("first"))
+        window.button("last", "Last", (210, 20, 160, 44), lambda: window.finish("last"))
+        window.u.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, ctypes.c_size_t, ctypes.c_ssize_t]
+        deadline = time.monotonic() + 2
+        sent = False
+        def tick():
+            nonlocal sent
+            if time.monotonic() > deadline:
+                window.finish("timeout")
+            elif not sent:
+                sent = True
+                window.focus("first")
+                window.u.SetFocus(window.hwnd)
+                window.u.PostMessageW(window.hwnd, 0x0100, 9, 0)
+                window.u.PostMessageW(window.hwnd, 0x0100, 13, 0)
+        window.on_tick = tick
+        self.assertEqual(window.run(poll_interval_ms=10), "last")
+
     def test_qr_factories_close_native_resources_when_image_construction_fails(self):
         import threading
         from unittest.mock import patch

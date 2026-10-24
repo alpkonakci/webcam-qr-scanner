@@ -32,6 +32,8 @@ CBS_HASSTRINGS = 0x0200
 LBS_NOTIFY = 0x0001
 LBS_NOINTEGRALHEIGHT = 0x0040
 WM_DESTROY = 0x0002
+WM_ACTIVATE = 0x0006
+WM_SETFOCUS = 0x0007
 WM_CLOSE = 0x0010
 WM_SETFONT = 0x0030
 WM_KEYDOWN = 0x0100
@@ -92,6 +94,7 @@ class ControlWindow:
         self._callbacks: dict[int, Callable[[], None]] = {}
         self._controls: dict[str, _Control] = {}
         self._tab_order: list[str] = []
+        self._last_focus_name: str | None = None
         self._fonts: list[int] = []
         self._font_cache: dict[tuple[int, bool], int] = {}
         self._bitmaps: list[int] = []
@@ -305,6 +308,11 @@ class ControlWindow:
         self.u.EnableWindow(self._controls[name].handle, enabled)
 
     def focus(self, name: str) -> None:
+        self._last_focus_name = name
+        # Windows can hide keyboard cues again after activation. Clear them
+        # when moving focus, not only while constructing the hidden window.
+        hidden_cues = UISF_HIDEFOCUS | UISF_HIDEACCEL
+        self.u.SendMessageW(self.hwnd, WM_CHANGEUISTATE, UIS_CLEAR | (hidden_cues << 16), 0)
         self.u.SetFocus(self._controls[name].handle)
 
     def focused_name(self) -> str | None:
@@ -335,6 +343,16 @@ class ControlWindow:
 
     def _dispatch(self, hwnd, message, wp, lp):
         try:
+            if message == WM_ACTIVATE and not (wp & 0xFFFF):
+                focused = self.focused_name()
+                if focused is not None:
+                    self._last_focus_name = focused
+            if message == WM_SETFOCUS:
+                names = [name for name in self._tab_order
+                         if self.u.IsWindowEnabled(self._controls[name].handle)]
+                if names:
+                    self.focus(self._last_focus_name if self._last_focus_name in names else names[0])
+                return 0
             if message == WM_COMMAND:  # Real controls invoke the same actions as the mouse.
                 identifier, event = wp & 0xFFFF, (wp >> 16) & 0xFFFF
                 if event in {0, 1} and identifier in self._callbacks:
