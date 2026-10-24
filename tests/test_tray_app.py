@@ -23,6 +23,13 @@ from tray_app import (
 
 
 class TrayApplicationTests(unittest.TestCase):
+    def test_home_return_refreshes_preferences_changed_inside_the_ui_process(self):
+        application = self._application()
+        with patch("tray_app.reload_language") as reload:
+            application._handle_home_action(0)
+        reload.assert_called_once_with()
+        self.icon.update_menu.assert_called_once_with()
+
     @patch("tray_app.threading.Thread")
     def test_settings_is_single_instance_and_blocks_home(self, thread_type):
         process = Mock()

@@ -588,6 +588,11 @@ class TrayApplication:
                 self._launch_home()
 
     def _handle_home_action(self, return_code: int) -> None:
+        # Settings can now run inside the home UI child. Refresh preferences
+        # when that child hands control back, including a hide-to-tray choice.
+        reload_language()
+        self.icon.menu = self._build_menu()
+        self.icon.update_menu()
         if return_code == CONTROL_SETTINGS:
             self._launch_settings()
             return

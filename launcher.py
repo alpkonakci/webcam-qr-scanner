@@ -108,10 +108,18 @@ def run_home(*, pair_count: int = 0) -> int:
     from home_ui import HomeAction, show_home_window
     from native_dialogs import confirm_application_exit
 
-    action = show_home_window(
-        confirm_exit=confirm_application_exit,
-        pair_count=max(0, pair_count),
-    )
+    # Keep settings navigation in the process that received the user's input.
+    # Closing the home child and asking the background tray to spawn another
+    # child loses Windows foreground eligibility during the hand-off.
+    while True:
+        action = show_home_window(
+            confirm_exit=confirm_application_exit,
+            pair_count=max(0, pair_count),
+        )
+        if action is not HomeAction.SETTINGS:
+            break
+        from settings_ui import show_settings_window
+        show_settings_window()
     return {
         HomeAction.BACKGROUND: 0,
         HomeAction.SCAN_CAMERA: CONTROL_SCAN_CAMERA,

@@ -21,6 +21,7 @@ ajanın telefonda bağımsız çalıştırdığı bir otomasyon sonucu değildir
 | Tamamen çıkma | Kullanıcı tepsi simgesinin kaybolduğunu ve donmadan kapandığını doğruladı. |
 | Aynı .cmd test başlatıcısıyla yeniden açma | Kullanıcı geçici bypass anahtarını tekrar girdikten sonra eşleşmiş telefonun korunduğunu doğruladı. |
 | Gerçek klavyede Tab/Enter ile ana menü/ayarlar | Kullanıcı hiçbir işlemin çalışmadığını bildirdi. Başarısız/açık; otomatik doğrudan tuş işleyici testleri gerçek cihaz kabulü yerine sayılmıyor. |
+| Klavye düzeltmeli 26869e8 adayı | Kullanıcı Tab ve Enter'ın çalıştığını doğruladı; Ayarlar'a geçerken uygulamanın arkaya düştüğünü bildirdi. Bu ayrı geçiş sorunu son adayda yeniden kabul bekliyor. |
 
 Önceki ve güncel önizleme adreslerinin farklı olması, web tarayıcısının aynı-origin
 eşleştirme kontrolünde uyuşmazlık ihtimalini doğurdu. Güncel adreste tekrar başarılı
@@ -29,7 +30,7 @@ güvenlik kuralı gevşetilmedi, ürün kodu değiştirilmedi.
 
 ## Henüz tamamlanmış sayılmayanlar
 
-- Kullanıcının bildirdiği ana menü Tab/Enter sorununun odak/gerçek tuş girdisi düzeyinde teşhisi ve yeniden kabulü. Bu açıkken yayın kabulü verilmez.
+- Son Ayarlar geçiş düzeltmesiyle paketlenmiş EXE'de ana menü → Ayarlar → Geri cihaz kabulü. Önceki Tab/Enter reddi klavye düzeltmeli adayda kullanıcı tarafından giderilmiş olarak doğrulandı; geçiş sorunu açıkken yayın kabulü verilmez.
 - Fiziksel Windows %200 ölçeğinde ana menü/ayarlar/telefon listesi/QR kabuğu.
 - Fiziksel ekran okuyucuda kontrol adları, odak ve sesli bildirim kabulü.
 - Bu adaya ait Android ve tarayıcı–kurulu PWA depolama geçişi kabulü.

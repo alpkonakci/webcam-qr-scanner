@@ -17,6 +17,26 @@ from paired_phones_ui import PairedPhonesAction, PairedPhonesDecision
 
 
 class LauncherTests(unittest.TestCase):
+    def test_home_settings_returns_in_same_ui_process_before_next_action(self):
+        events = []
+        actions = iter([HomeAction.SETTINGS, HomeAction.SCAN_SCREEN])
+        def home(**kwargs):
+            events.append("home")
+            return next(actions)
+        with patch("home_ui.show_home_window", side_effect=home), \
+             patch("settings_ui.show_settings_window", side_effect=lambda: events.append("settings")):
+            result = launcher.run_home(pair_count=1)
+        from exit_codes import CONTROL_SCAN_SCREEN
+        self.assertEqual(events, ["home", "settings", "home"])
+        self.assertEqual(result, CONTROL_SCAN_SCREEN)
+
+    def test_home_settings_keeps_background_and_exit_choices_distinct(self):
+        for final, expected in ((HomeAction.BACKGROUND, 0), (HomeAction.EXIT, APPLICATION_EXIT_REQUESTED)):
+            with self.subTest(final=final), \
+                 patch("home_ui.show_home_window", side_effect=[HomeAction.SETTINGS, final]), \
+                 patch("settings_ui.show_settings_window"):
+                self.assertEqual(launcher.run_home(), expected)
+
     def test_creator_runs_offline_child_and_returns_home(self) -> None:
         with patch("qr_creator_ui.show_creator_window") as show_creator, patch("launcher.run_bridge") as bridge:
             result = launcher.main(["--create-qr-process"])
