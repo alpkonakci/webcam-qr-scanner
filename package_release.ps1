@@ -1,17 +1,46 @@
 param(
-    [string]$Version = "v0.1.1"
+    [string]$Version = "v0.2.0-beta.8-preview.2",
+    [string]$ExecutablePath = "",
+    [string]$OutputDirectory = "",
+    [Parameter(Mandatory)]
+    [string]$AnalysisPath,
+    [switch]$FailIfExists
 )
 
 $ErrorActionPreference = "Stop"
 
 $projectDirectory = [System.IO.Path]::GetFullPath($PSScriptRoot)
 $distDirectory = Join-Path $projectDirectory "dist"
-$executablePath = Join-Path $distDirectory "QR-Scanner.exe"
+if (-not $ExecutablePath) {
+    $ExecutablePath = Join-Path $distDirectory "QR-Scanner.exe"
+}
+if (-not $OutputDirectory) {
+    $OutputDirectory = $distDirectory
+}
+$executablePath = [System.IO.Path]::GetFullPath($ExecutablePath)
+$outputDirectory = [System.IO.Path]::GetFullPath($OutputDirectory)
+if (-not ($outputDirectory.Equals($distDirectory, [System.StringComparison]::OrdinalIgnoreCase) -or
+    $outputDirectory.StartsWith(
+        $distDirectory + [System.IO.Path]::DirectorySeparatorChar,
+        [System.StringComparison]::OrdinalIgnoreCase
+    ))) {
+    throw "Output directory must be inside dist: $outputDirectory"
+}
 $packageName = "Webcam-QR-Scanner-$Version-windows-x64"
-$packageDirectory = Join-Path $distDirectory $packageName
-$archivePath = Join-Path $distDirectory "$packageName.zip"
-$checksumsPath = Join-Path $distDirectory "SHA256SUMS.txt"
+$packageDirectory = Join-Path $outputDirectory $packageName
+$archivePath = Join-Path $outputDirectory "$packageName.zip"
+$checksumsPath = Join-Path $outputDirectory "SHA256SUMS.txt"
 $pythonPath = Join-Path $projectDirectory ".venv\Scripts\python.exe"
+
+# Ship application source from an immutable local revision, not a moving branch.
+# Untracked unrelated notes are not included; tracked edits must be committed.
+$trackedChanges = & git -C $projectDirectory status --porcelain --untracked-files=no
+if ($LASTEXITCODE -ne 0 -or $trackedChanges) {
+    throw "Commit tracked release inputs before packaging source material."
+}
+$sourceRevision = & git -C $projectDirectory rev-parse HEAD
+if ($LASTEXITCODE -ne 0) { throw "Cannot identify source revision." }
+if (-not (Test-Path -LiteralPath $AnalysisPath)) { throw "PyInstaller analysis inventory is required." }
 
 if (-not (Test-Path -LiteralPath $executablePath)) {
     throw "Build the executable first: $executablePath"
@@ -20,15 +49,20 @@ if (-not (Test-Path -LiteralPath $pythonPath)) {
     throw "Virtual environment not found: $pythonPath"
 }
 
+New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
+
 foreach ($target in @($packageDirectory, $archivePath, $checksumsPath)) {
     $resolvedTarget = [System.IO.Path]::GetFullPath($target)
     if (-not $resolvedTarget.StartsWith(
-        $distDirectory + [System.IO.Path]::DirectorySeparatorChar,
+        $outputDirectory + [System.IO.Path]::DirectorySeparatorChar,
         [System.StringComparison]::OrdinalIgnoreCase
     )) {
-        throw "Refusing to replace a path outside the dist directory: $resolvedTarget"
+        throw "Refusing to replace a path outside the output directory: $resolvedTarget"
     }
     if (Test-Path -LiteralPath $resolvedTarget) {
+        if ($FailIfExists) {
+            throw "Release output already exists: $resolvedTarget"
+        }
         Remove-Item -LiteralPath $resolvedTarget -Recurse -Force
     }
 }
@@ -43,6 +77,12 @@ Copy-Item -LiteralPath (Join-Path $projectDirectory "LICENSE") `
     -Destination (Join-Path $packageDirectory "LICENSE.txt")
 Copy-Item -LiteralPath (Join-Path $projectDirectory "THIRD_PARTY_NOTICES.md") `
     -Destination $packageDirectory
+Copy-Item -LiteralPath (Join-Path $projectDirectory "docs\distribution-sources-and-rebuild.md") `
+    -Destination (Join-Path $packageDirectory "REBUILDING.md")
+& git -C $projectDirectory archive --format=zip "--output=$packageDirectory\APPLICATION_SOURCE.zip" HEAD
+if ($LASTEXITCODE -ne 0) { throw "Application source archive failed." }
+@("Application source revision: $sourceRevision", "Application license: MIT", "See REBUILDING.md and THIRD_PARTY_LICENSES/SOURCES/manifest.json") |
+    Set-Content -LiteralPath (Join-Path $packageDirectory "SOURCE_REVISION.txt") -Encoding utf8
 
 $pythonBase = & $pythonPath -c "import sys; print(sys.base_prefix)"
 $pythonLicense = Join-Path $pythonBase "LICENSE.txt"
@@ -50,7 +90,31 @@ Copy-Item -LiteralPath $pythonLicense `
     -Destination (New-Item -ItemType Directory -Path `
         (Join-Path $licenseDirectory "Python") -Force)
 
+$tkLicense = Join-Path $pythonBase "tcl\tk8.6\license.terms"
+if (-not (Test-Path -LiteralPath $tkLicense)) {
+    throw "Bundled Tcl/Tk license not found: $tkLicense"
+}
+Copy-Item -LiteralPath $tkLicense `
+    -Destination (New-Item -ItemType Directory -Path `
+        (Join-Path $licenseDirectory "Tcl-Tk") -Force)
+
 $sitePackages = Join-Path $projectDirectory ".venv\Lib\site-packages"
+
+function Copy-LicenseTree {
+    param(
+        [Parameter(Mandatory)]
+        [string]$DistributionDirectory,
+        [Parameter(Mandatory)]
+        [string]$DestinationName
+    )
+
+    $source = Join-Path $sitePackages "$DistributionDirectory\licenses"
+    if (-not (Test-Path -LiteralPath $source)) {
+        throw "Dependency license directory not found: $source"
+    }
+    Copy-Item -LiteralPath $source `
+        -Destination (Join-Path $licenseDirectory $DestinationName) -Recurse
+}
 
 $opencvLicenseDirectory = New-Item -ItemType Directory -Path `
     (Join-Path $licenseDirectory "OpenCV") -Force
@@ -66,17 +130,76 @@ $numpyLicenseSource = Join-Path $sitePackages `
 Copy-Item -LiteralPath $numpyLicenseSource `
     -Destination (Join-Path $licenseDirectory "NumPy") -Recurse
 
+$pillowLicenseSource = Join-Path $sitePackages `
+    "pillow-12.3.0.dist-info\licenses"
+Copy-Item -LiteralPath $pillowLicenseSource `
+    -Destination (Join-Path $licenseDirectory "Pillow") -Recurse
+
+$pystrayLicenseDirectory = New-Item -ItemType Directory -Path `
+    (Join-Path $licenseDirectory "pystray") -Force
+Copy-Item -LiteralPath `
+    (Join-Path $sitePackages "pystray-0.19.5.dist-info\COPYING") `
+    -Destination $pystrayLicenseDirectory
+Copy-Item -LiteralPath `
+    (Join-Path $sitePackages "pystray-0.19.5.dist-info\COPYING.LGPL") `
+    -Destination $pystrayLicenseDirectory
+
+$sixLicenseDirectory = New-Item -ItemType Directory -Path `
+    (Join-Path $licenseDirectory "six") -Force
+Copy-Item -LiteralPath `
+    (Join-Path $sitePackages "six-1.17.0.dist-info\LICENSE") `
+    -Destination $sixLicenseDirectory
+
+@(
+    @("anyio-4.14.2.dist-info", "AnyIO"),
+    @("certifi-2026.7.22.dist-info", "certifi"),
+    @("cffi-2.1.0.dist-info", "cffi"),
+    @("cryptography-50.0.2.dist-info", "cryptography"),
+    @("comtypes-1.4.17.dist-info", "comtypes"),
+    @("dxcam-0.3.0.dist-info", "DXcam"),
+    @("h11-0.16.0.dist-info", "h11"),
+    @("httpcore-1.0.9.dist-info", "httpcore"),
+    @("httpx-0.28.1.dist-info", "HTTPX"),
+    @("idna-3.18.dist-info", "idna"),
+    @("typing_extensions-4.16.0.dist-info", "typing_extensions"),
+    @("websockets-16.1.1.dist-info", "websockets")
+) | ForEach-Object {
+    Copy-LicenseTree -DistributionDirectory $_[0] -DestinationName $_[1]
+}
+
 $pyInstallerLicenseDirectory = New-Item -ItemType Directory -Path `
     (Join-Path $licenseDirectory "PyInstaller") -Force
 Copy-Item -LiteralPath `
     (Join-Path $sitePackages "pyinstaller-6.21.0.dist-info\licenses\COPYING.txt") `
     -Destination $pyInstallerLicenseDirectory
 
+# Audit what was actually frozen, not just our direct requirements list.
+& $pythonPath (Join-Path $projectDirectory "scripts\release_licenses.py") `
+    --analysis $AnalysisPath --destination $licenseDirectory `
+    --sources (Join-Path $projectDirectory "third_party\sources")
+if ($LASTEXITCODE -ne 0) { throw "Dependency inventory/license/source verification failed." }
+& $pythonPath (Join-Path $projectDirectory "scripts\verify_distribution.py") --exe $executablePath
+if ($LASTEXITCODE -ne 0) { throw "Frozen distribution contents failed verification." }
+
 Compress-Archive -LiteralPath $packageDirectory -DestinationPath $archivePath `
     -CompressionLevel Optimal
 
-$archiveHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archivePath).Hash
-$executableHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $executablePath).Hash
+function Get-Sha256Hash {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $stream = [System.IO.File]::OpenRead($Path)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return [System.BitConverter]::ToString($sha256.ComputeHash($stream)).Replace("-", "")
+    }
+    finally {
+        $sha256.Dispose()
+        $stream.Dispose()
+    }
+}
+
+$archiveHash = Get-Sha256Hash -Path $archivePath
+$executableHash = Get-Sha256Hash -Path $executablePath
 $checksumContent = @(
     "$archiveHash  $packageName.zip"
     "$executableHash  QR-Scanner.exe (inside ZIP)"

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/alpkonakci/webcam-qr-scanner/protocol/schemas/pair-request-payload.schema.json",
+  "title": "WQRS/1 pair request payload",
+  "type": "object",
+  "required": [
+    "payload_version",
+    "kind",
+    "phone_label",
+    "platform"
+  ],
+  "properties": {
+    "payload_version": {
+      "const": 1
+    },
+    "kind": {
+      "const": "pair_request"
+    },
+    "phone_label": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "platform": {
+      "const": "pwa"
+    }
+  },
+  "additionalProperties": false
+}

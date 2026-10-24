@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import ctypes
+import importlib
 import os
+import re
+import time
 from collections.abc import Callable
-from dataclasses import dataclass
 from ctypes import wintypes
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -15,7 +18,7 @@ class ScreenCaptureError(RuntimeError):
     """Raised when Windows cannot capture the virtual desktop."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScreenBounds:
     """Position and size of the virtual desktop in Windows coordinates."""
 
@@ -23,6 +26,16 @@ class ScreenBounds:
     top: int
     width: int
     height: int
+
+
+@dataclass(frozen=True, slots=True)
+class ConnectedDisplay:
+    """One physical monitor exposed by Windows."""
+
+    number: int
+    device_name: str
+    bounds: ScreenBounds
+    primary: bool = False
 
 
 SM_XVIRTUALSCREEN = 76
@@ -34,6 +47,7 @@ SRCCOPY = 0x00CC0020
 CAPTUREBLT = 0x40000000
 BI_RGB = 0
 DIB_RGB_COLORS = 0
+MONITORINFOF_PRIMARY = 1
 
 
 class BITMAPINFOHEADER(ctypes.Structure):
@@ -68,6 +82,25 @@ class BITMAPINFO(ctypes.Structure):
     ]
 
 
+class RECT(ctypes.Structure):
+    _fields_ = [
+        ("left", wintypes.LONG),
+        ("top", wintypes.LONG),
+        ("right", wintypes.LONG),
+        ("bottom", wintypes.LONG),
+    ]
+
+
+class MONITORINFOEXW(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wintypes.DWORD),
+        ("rcMonitor", RECT),
+        ("rcWork", RECT),
+        ("dwFlags", wintypes.DWORD),
+        ("szDevice", wintypes.WCHAR * 32),
+    ]
+
+
 def virtual_screen_bounds(
     get_metric: Callable[[int], int],
 ) -> ScreenBounds:
@@ -81,6 +114,92 @@ def virtual_screen_bounds(
     if bounds.width <= 0 or bounds.height <= 0:
         raise ScreenCaptureError("Windows reported an invalid desktop size.")
     return bounds
+
+
+def _display_sort_key(
+    item: tuple[str, ScreenBounds, bool],
+) -> tuple[int, str]:
+    match = re.search(r"(\d+)$", item[0])
+    return (int(match.group(1)) if match else 2**31 - 1, item[0].casefold())
+
+
+def number_connected_displays(
+    displays: list[tuple[str, ScreenBounds, bool]],
+) -> tuple[ConnectedDisplay, ...]:
+    """Apply stable Windows display numbers to enumerated monitor records."""
+
+    ordered = sorted(displays, key=_display_sort_key)
+    return tuple(
+        ConnectedDisplay(
+            number=index,
+            device_name=device_name,
+            bounds=bounds,
+            primary=primary,
+        )
+        for index, (device_name, bounds, primary) in enumerate(ordered, start=1)
+    )
+
+
+def connected_displays() -> tuple[ConnectedDisplay, ...]:
+    """Return every connected physical monitor in Windows display order."""
+
+    if os.name != "nt":
+        raise ScreenCaptureError("Screen scanning currently supports Windows only.")
+
+    user32 = ctypes.windll.user32
+    _enable_dpi_awareness(user32)
+    callback_type = ctypes.WINFUNCTYPE(
+        wintypes.BOOL,
+        wintypes.HMONITOR,
+        wintypes.HDC,
+        ctypes.POINTER(RECT),
+        wintypes.LPARAM,
+    )
+    user32.GetMonitorInfoW.argtypes = [
+        wintypes.HMONITOR,
+        ctypes.POINTER(MONITORINFOEXW),
+    ]
+    user32.GetMonitorInfoW.restype = wintypes.BOOL
+    user32.EnumDisplayMonitors.argtypes = [
+        wintypes.HDC,
+        ctypes.POINTER(RECT),
+        callback_type,
+        wintypes.LPARAM,
+    ]
+    user32.EnumDisplayMonitors.restype = wintypes.BOOL
+    records: list[tuple[str, ScreenBounds, bool]] = []
+
+    def collect_monitor(
+        monitor: wintypes.HMONITOR,
+        _: wintypes.HDC,
+        __: ctypes.POINTER(RECT),
+        ___: wintypes.LPARAM,
+    ) -> bool:
+        info = MONITORINFOEXW()
+        info.cbSize = ctypes.sizeof(MONITORINFOEXW)
+        if not user32.GetMonitorInfoW(monitor, ctypes.byref(info)):
+            return True
+        rect = info.rcMonitor
+        bounds = ScreenBounds(
+            left=int(rect.left),
+            top=int(rect.top),
+            width=int(rect.right - rect.left),
+            height=int(rect.bottom - rect.top),
+        )
+        if bounds.width > 0 and bounds.height > 0:
+            records.append(
+                (
+                    str(info.szDevice),
+                    bounds,
+                    bool(info.dwFlags & MONITORINFOF_PRIMARY),
+                )
+            )
+        return True
+
+    callback = callback_type(collect_monitor)
+    if not user32.EnumDisplayMonitors(None, None, callback, 0) or not records:
+        raise ScreenCaptureError("Windows could not list the connected displays.")
+    return number_connected_displays(records)
 
 
 def _enable_dpi_awareness(user32: ctypes.WinDLL) -> None:
@@ -139,16 +258,18 @@ def _configure_gdi(user32: ctypes.WinDLL, gdi32: ctypes.WinDLL) -> None:
     gdi32.DeleteDC.restype = wintypes.BOOL
 
 
-def capture_virtual_screen() -> np.ndarray:
-    """Capture all connected displays as a BGR image held only in memory."""
+def capture_screen_bounds(bounds: ScreenBounds) -> np.ndarray:
+    """Capture one Windows screen rectangle as an in-memory BGR image."""
+
     if os.name != "nt":
         raise ScreenCaptureError("Screen scanning currently supports Windows only.")
+    if bounds.width <= 0 or bounds.height <= 0:
+        raise ScreenCaptureError("Windows reported an invalid screen size.")
 
     user32 = ctypes.windll.user32
     gdi32 = ctypes.windll.gdi32
     _enable_dpi_awareness(user32)
     _configure_gdi(user32, gdi32)
-    bounds = virtual_screen_bounds(user32.GetSystemMetrics)
 
     screen_dc = user32.GetDC(None)
     if not screen_dc:
@@ -227,3 +348,111 @@ def capture_virtual_screen() -> np.ndarray:
         if memory_dc:
             gdi32.DeleteDC(memory_dc)
         user32.ReleaseDC(None, screen_dc)
+
+
+def capture_display(display: ConnectedDisplay) -> np.ndarray:
+    """Capture one selected physical display, preferring Windows DXGI."""
+
+    try:
+        return capture_display_dxgi(display)
+    except (ImportError, ScreenCaptureError, OSError, RuntimeError):
+        # GDI remains a useful fallback for remote sessions, older display
+        # drivers, and development environments where Desktop Duplication is
+        # unavailable.
+        return capture_screen_bounds(display.bounds)
+
+
+def _dxcam_output_indices(
+    dxcam_module: object,
+    device_name: str,
+) -> tuple[int, int]:
+    """Resolve a Windows display name to DXcam's adapter/output indices."""
+
+    factory = vars(dxcam_module).get("__factory")
+    outputs = getattr(factory, "outputs", ())
+    expected = device_name.casefold()
+    for device_index, device_outputs in enumerate(outputs):
+        for output_index, output in enumerate(device_outputs):
+            if str(getattr(output, "devicename", "")).casefold() == expected:
+                return device_index, output_index
+    raise ScreenCaptureError(
+        f"Windows display {device_name} was not available to the DXGI capturer."
+    )
+
+
+def capture_display_dxgi(
+    display: ConnectedDisplay,
+    *,
+    dxcam_module: object | None = None,
+) -> np.ndarray:
+    """Capture a display through Desktop Duplication as an in-memory BGR image."""
+
+    if os.name != "nt":
+        raise ScreenCaptureError("Screen scanning currently supports Windows only.")
+
+    dxcam_module = dxcam_module or importlib.import_module("dxcam")
+    device_index, output_index = _dxcam_output_indices(
+        dxcam_module,
+        display.device_name,
+    )
+    camera = None
+    try:
+        camera = dxcam_module.create(
+            device_idx=device_index,
+            output_idx=output_index,
+            output_color="BGR",
+            backend="dxgi",
+            processor_backend="cv2",
+        )
+        frame = None
+        for _ in range(3):
+            frame = camera.grab(new_frame_only=False)
+            if frame is not None:
+                break
+            time.sleep(0.03)
+        if frame is None:
+            raise ScreenCaptureError("DXGI did not return a desktop image.")
+
+        image = np.asarray(frame)
+        expected_shape = (
+            display.bounds.height,
+            display.bounds.width,
+            3,
+        )
+        if image.shape != expected_shape or image.dtype != np.uint8:
+            raise ScreenCaptureError("DXGI returned an invalid desktop image.")
+        return np.ascontiguousarray(image)
+    except ScreenCaptureError:
+        raise
+    except Exception as error:
+        raise ScreenCaptureError("DXGI could not capture the selected display.") from error
+    finally:
+        if camera is not None:
+            try:
+                camera.release()
+            except Exception:
+                # Capture has already finished or failed. Cleanup must not
+                # replace the useful capture error with a driver-specific one.
+                pass
+
+
+def is_probably_blanked_frame(frame: np.ndarray) -> bool:
+    """Detect the near-uniform black frame returned for protected surfaces."""
+
+    if frame.ndim != 3 or frame.shape[2] < 3 or frame.size == 0:
+        return False
+    pixels = frame[:, :, :3]
+    black_ratio = float(np.count_nonzero(np.all(pixels <= 6, axis=2))) / (
+        pixels.shape[0] * pixels.shape[1]
+    )
+    return black_ratio >= 0.995 and float(pixels.std()) <= 3.0
+
+
+def capture_virtual_screen() -> np.ndarray:
+    """Capture all connected displays as a BGR image held only in memory."""
+
+    if os.name != "nt":
+        raise ScreenCaptureError("Screen scanning currently supports Windows only.")
+    user32 = ctypes.windll.user32
+    _enable_dpi_awareness(user32)
+    return capture_screen_bounds(virtual_screen_bounds(user32.GetSystemMetrics))

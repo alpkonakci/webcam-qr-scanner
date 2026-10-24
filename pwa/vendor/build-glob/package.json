@@ -1,0 +1,15 @@
+{
+  "name": "@wqrs/build-glob",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Project-scoped fast-glob calls implemented with tinyglobby",
+  "license": "MIT",
+  "main": "index.cjs",
+  "exports": {
+    ".": "./index.cjs",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "tinyglobby": "0.2.17"
+  }
+}
