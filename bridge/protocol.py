@@ -22,6 +22,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from web_urls import MAX_WEB_URL_BYTES as MAX_URL_BYTES, validate_web_url
 
 
 PROTOCOL = "wqrs/1"
@@ -30,7 +31,6 @@ PAIRING_TTL_SECONDS = 120
 MESSAGE_TTL_SECONDS = 300
 ACK_TTL_SECONDS = 10
 MAX_CLOCK_SKEW_SECONDS = 120
-MAX_URL_BYTES = 4096
 MAX_SAFE_JSON_INTEGER = 9_007_199_254_740_991
 
 _BASE64URL_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -738,36 +738,10 @@ def create_local_pairing(
 def validate_url(value: object) -> tuple[str, str, bool]:
     """Validate a decrypted URL and return URL, ASCII host, and HTTPS state."""
 
-    if not isinstance(value, str) or not value:
-        raise ProtocolViolation("URL must be a non-empty string")
-    if value != value.strip():
-        raise ProtocolViolation("URL may not contain surrounding whitespace")
-    if len(value.encode("utf-8")) > MAX_URL_BYTES:
-        raise ProtocolViolation("URL exceeds the 4096-byte limit")
-    if any(ord(character) < 32 or ord(character) == 127 for character in value):
-        raise ProtocolViolation("URL contains a control character")
-    if "\\" in value:
-        raise ProtocolViolation("URL contains a backslash")
-
-    parsed = urlsplit(value)
-    scheme = parsed.scheme.lower()
-    if scheme not in {"http", "https"} or not parsed.hostname:
-        raise ProtocolViolation("only absolute HTTP(S) URLs are accepted")
-    if parsed.username is not None or parsed.password is not None:
-        raise ProtocolViolation("URL credentials are forbidden")
     try:
-        parsed.port
-    except ValueError as error:
-        raise ProtocolViolation("URL contains an invalid port") from error
-    try:
-        hostname_ascii = parsed.hostname.encode("idna").decode("ascii").lower()
-    except UnicodeError as error:
-        raise ProtocolViolation("URL hostname is invalid") from error
-    if not hostname_ascii or any(
-        ord(character) <= 32 for character in hostname_ascii
-    ):
-        raise ProtocolViolation("URL hostname is invalid")
-    return value, hostname_ascii, scheme == "https"
+        return validate_web_url(value)
+    except (ValueError, UnicodeError) as error:
+        raise ProtocolViolation("URL is invalid or has an unsupported hostname") from error
 
 
 def build_url_envelope(

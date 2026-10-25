@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "v0.2.0-beta.9",
+    [string]$Version = "",
     [string]$ExecutablePath = "",
     [string]$OutputDirectory = "",
     [Parameter(Mandatory)]
@@ -26,6 +26,8 @@ if (-not ($outputDirectory.Equals($distDirectory, [System.StringComparison]::Ord
     ))) {
     throw "Output directory must be inside dist: $outputDirectory"
 }
+. (Join-Path $projectDirectory 'scripts/release_version.ps1')
+$Version = Resolve-ReleaseVersion -ProjectDirectory $projectDirectory -RequestedVersion $Version
 $packageName = "Webcam-QR-Scanner-$Version-windows-x64"
 $packageDirectory = Join-Path $outputDirectory $packageName
 $archivePath = Join-Path $outputDirectory "$packageName.zip"

@@ -327,7 +327,7 @@ class PhoneToPcPairingProtocolTests(unittest.TestCase):
 class PhoneToPcUrlValidationTests(unittest.TestCase):
     def test_https_and_unicode_host_are_accepted_with_ascii_display(self) -> None:
         url, hostname, secure = validate_url("https://bücher.example/path")
-        self.assertEqual(url, "https://bücher.example/path")
+        self.assertEqual(url, "https://xn--bcher-kva.example/path")
         self.assertEqual(hostname, "xn--bcher-kva.example")
         self.assertTrue(secure)
 

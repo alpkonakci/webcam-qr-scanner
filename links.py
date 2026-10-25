@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import webbrowser
 from urllib.parse import urlparse
+from web_urls import validate_web_url
 
 
 def payload_kind(value: str) -> str:
@@ -16,8 +17,9 @@ def payload_kind(value: str) -> str:
 
 def open_web_url(value: str) -> bool:
     """Open only a valid HTTP(S) URL in the default browser."""
-    clean_value = value.strip()
-    if payload_kind(clean_value) != "URL":
+    try:
+        clean_value, _, _ = validate_web_url(value.strip())
+    except (ValueError, UnicodeError):
         return False
 
     try:

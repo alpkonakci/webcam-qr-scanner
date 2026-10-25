@@ -10,7 +10,6 @@ from collections.abc import Callable
 from datetime import datetime
 from enum import Enum, auto
 from typing import Sequence
-from urllib.parse import urlparse
 
 os.environ.setdefault("OPENCV_LOG_LEVEL", "ERROR")
 
@@ -20,6 +19,7 @@ import numpy as np
 from camera import CameraConfig, CameraError, CameraStream
 from exit_codes import APPLICATION_EXIT_REQUESTED
 from links import open_web_url, payload_kind
+from web_urls import validate_web_url
 from native_dialogs import confirm_application_exit, show_dialog, show_error_dialog
 from performance import FPSCounter
 from qr_reader import QRReader, QRResult
@@ -91,11 +91,10 @@ def _unique_results(results: list[QRResult]) -> list[QRResult]:
 
 def confirm_screen_url(value: str) -> bool:
     """Ask before opening a URL discovered in a screen capture."""
-    host = urlparse(value).hostname or "(unknown host)"
     try:
-        host = host.encode("idna").decode("ascii")
-    except UnicodeError:
-        pass
+        value, host, _ = validate_web_url(value)
+    except (ValueError, UnicodeError):
+        return False
     message = (
         "A QR code on the screen contains this web address.\n\n"
         f"Website:\n{host}\n\n"
