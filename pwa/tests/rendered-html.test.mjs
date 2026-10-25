@@ -62,6 +62,8 @@ test("applies privacy and embedding security headers", async () => {
   assert.match(csp, /connect-src 'self'/);
   assert.match(csp, /worker-src 'self' blob:/);
   assert.match(csp, /img-src 'self' data: blob:/);
+  const scripts = csp.split(";").find(value => value.trim().startsWith("script-src "));
+  assert.doesNotMatch(scripts, /'unsafe-inline'/);
   assert.doesNotMatch(buildContentSecurityPolicy(false), /'unsafe-eval'/);
   assert.match(buildContentSecurityPolicy(true), /'unsafe-eval'/);
   assert.equal(

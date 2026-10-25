@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import sqlite3
 import threading
+import tempfile
 import time
 from contextlib import closing
 from pathlib import Path
@@ -37,6 +39,24 @@ class PersistentReplayGuard:
         self.scope = scope.encode("utf-8")
         self.protector = protector if protector is not None else DpapiProtector()
 
+    def _initialize_if_missing(self) -> None:
+        if self.path.exists():
+            return
+        # Publish only a complete database. Hard-link creation is atomic and
+        # cannot replace a ledger concurrently published by another process.
+        protected = self.protector.protect(b'{"version":1,"kind":"wqrs-replay","entries":{}}')
+        if not protected or len(protected) > MAX_PROTECTED_BYTES:
+            raise SecureStorageError("replay ledger protection failed")
+        with tempfile.TemporaryDirectory(prefix=".replay-init-", dir=self.path.parent) as directory:
+            candidate = Path(directory) / "ledger.sqlite3"
+            with closing(sqlite3.connect(candidate)) as db, db:
+                db.execute("CREATE TABLE replay_state (id INTEGER PRIMARY KEY CHECK(id=1), payload BLOB NOT NULL)")
+                db.execute("INSERT INTO replay_state (id, payload) VALUES (1, ?)", (protected,))
+            try:
+                os.link(candidate, self.path)
+            except FileExistsError:
+                pass  # Validate the winning ledger normally; never reset it.
+
     def remember(self, message_id: bytes, *, expires_at: int, now: int | None = None) -> None:
         current_time = int(time.time()) if now is None else now
         if (
@@ -49,7 +69,7 @@ class PersistentReplayGuard:
         digest = hashlib.sha256(self.scope + b"\0" + message_id).hexdigest()
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            existed = self.path.exists()
+            self._initialize_if_missing()
             with closing(sqlite3.connect(self.path, timeout=5, isolation_level=None)) as db:
                 db.execute("PRAGMA secure_delete=ON")
                 db.execute("BEGIN IMMEDIATE")
@@ -58,10 +78,7 @@ class PersistentReplayGuard:
                         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='replay_state'"
                     ).fetchone()
                     if table is None:
-                        if existed:
-                            raise SecureStorageError("replay ledger schema is missing")
-                        db.execute("CREATE TABLE replay_state (id INTEGER PRIMARY KEY CHECK(id=1), payload BLOB NOT NULL)")
-                        entries: dict[str, int] = {}
+                        raise SecureStorageError("replay ledger schema is missing")
                     else:
                         row = db.execute("SELECT payload FROM replay_state WHERE id=1").fetchone()
                         if row is None or not isinstance(row[0], bytes) or len(row[0]) > MAX_PROTECTED_BYTES:

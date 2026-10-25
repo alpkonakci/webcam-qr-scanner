@@ -8,6 +8,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 import httpx
@@ -115,6 +116,104 @@ class PersistentReplayTests(unittest.TestCase):
             outcomes = list(pool.map(accept, range(8)))
         self.assertEqual(outcomes.count("accepted"), 1)
         self.assertEqual(outcomes.count("replay"), 7)
+
+    def test_first_open_never_exposes_an_uninitialized_ledger(self):
+        connected = threading.Event()
+        release = threading.Event()
+        real_connect = sqlite3.connect
+
+        def connect(path, *args, **kwargs):
+            db = real_connect(path, *args, **kwargs)
+            if Path(path) == self.path and threading.current_thread().name == "creator":
+                connected.set()
+                if not release.wait(5):
+                    db.close()
+                    raise RuntimeError("test synchronization timeout")
+            return db
+
+        def accept(name):
+            threading.current_thread().name = name
+            try:
+                self.remember(self.guard())
+                return "accepted"
+            except ReplayDetected:
+                return "replay"
+
+        with patch("bridge.replay.sqlite3.connect", side_effect=connect):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                first = pool.submit(accept, "creator")
+                try:
+                    self.assertTrue(connected.wait(5))
+                    second = pool.submit(accept, "second").result(timeout=5)
+                finally:
+                    release.set()
+                outcomes = [first.result(timeout=5), second]
+        self.assertCountEqual(outcomes, ["accepted", "replay"])
+
+    def test_existing_empty_or_missing_schema_is_not_reset(self):
+        for sqlite_file in (False, True):
+            with self.subTest(sqlite_file=sqlite_file):
+                self.path.write_bytes(b"")
+                if sqlite_file:
+                    with closing(sqlite3.connect(self.path)) as db, db:
+                        db.execute("CREATE TABLE unrelated (id INTEGER)")
+                before = self.path.read_bytes()
+                with self.assertRaises(SecureStorageError):
+                    self.remember()
+                self.assertEqual(self.path.read_bytes(), before)
+
+    def test_concurrent_publishers_never_replace_the_winning_ledger(self):
+        publishers = threading.Barrier(4)
+        real_link = os.link
+
+        def publish(source, target):
+            publishers.wait(timeout=5)
+            real_link(source, target)
+
+        def accept(_):
+            try:
+                self.remember(self.guard())
+                return "accepted"
+            except ReplayDetected:
+                return "replay"
+
+        with patch("bridge.replay.os.link", side_effect=publish):
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                outcomes = list(pool.map(accept, range(4)))
+        self.assertEqual(outcomes.count("accepted"), 1)
+        self.assertEqual(outcomes.count("replay"), 3)
+        self.assertEqual(list(self.path.parent.iterdir()), [self.path])
+
+    def test_failed_publication_leaves_no_partial_ledger(self):
+        with patch("bridge.replay.os.link", side_effect=OSError("synthetic failure")):
+            with self.assertRaises(SecureStorageError):
+                self.remember()
+        self.assertEqual(list(self.path.parent.iterdir()), [])
+
+    @unittest.skipUnless(os.name == "nt", "requires current-user Windows DPAPI")
+    def test_multiple_processes_accept_first_message_only_once(self):
+        code = (
+            "import sys; from pathlib import Path; "
+            "from bridge.replay import PersistentReplayGuard; "
+            "from bridge.protocol import ReplayDetected\n"
+            "try:\n"
+            " PersistentReplayGuard(Path(sys.argv[1]), scope='process-race').remember(b'm'*16, now=1000, expires_at=1300)\n"
+            "except ReplayDetected:\n sys.exit(10)\n"
+        )
+        processes = [subprocess.Popen(
+            [sys.executable, "-c", code, str(self.path)],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        ) for _ in range(4)]
+        try:
+            for process in processes:
+                _, errors = process.communicate(timeout=15)
+                self.assertIn(process.returncode, (0, 10), errors.decode(errors="replace"))
+            self.assertCountEqual([process.returncode for process in processes], [0, 10, 10, 10])
+        finally:
+            for process in processes:
+                if process.poll() is None:
+                    process.kill()
+                process.communicate()
 
     def test_protection_failure_never_falls_back_to_memory(self):
         protector = TestProtector()
