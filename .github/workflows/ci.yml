@@ -94,3 +94,7 @@ jobs:
         run: psql --version
       - name: Test operation scripts against disposable SQL fixtures
         run: node scripts/check_retention_schedule.mjs --postgres
+      - name: Test delivery revocation against a separate disposable database
+        run: |
+          createdb -h 127.0.0.1 -p 5432 -U postgres wqrs_revocation_test
+          node scripts/check_revocation.mjs --postgres

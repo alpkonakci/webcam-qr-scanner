@@ -540,6 +540,9 @@ async function submitMessage(
       status: "pending",
     });
   } catch (error) {
+    if (error instanceof SupabaseAdminError && error.code === "P0410") {
+      throw new RelayError(410, "pair_revoked", "This phone no longer has access to the paired PC.");
+    }
     if (isUniqueViolation(error)) {
       throw new RelayError(409, "replay_rejected", "This encrypted message was already submitted.");
     }

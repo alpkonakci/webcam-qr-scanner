@@ -9,6 +9,54 @@ process.env.RELAY_RATE_LIMIT_PEPPER = "r".repeat(32);
 
 const { handleRelayRequest } = await import("../server/relay-handler.ts");
 
+test("revocation during message-body upload returns pair_revoked, not a delivery", { timeout: 5_000 }, async context => {
+  const pairId = base64Url(16, 51);
+  const senderToken = base64Url(32, 61);
+  const now = Math.floor(Date.now() / 1000);
+  let revoked = false;
+  let releaseBody!: () => void;
+  const authorized = new Promise<void>(resolve => { releaseBody = resolve; });
+  context.mock.method(globalThis, "fetch", async (input: unknown, init: RequestInit = {}) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/rpc/relay_cleanup")) return Response.json(null);
+    if (url.pathname.endsWith("/rpc/relay_consume_rate_limit")) {
+      releaseBody();
+      return Response.json([{ allowed: true, retry_after: 60 }]);
+    }
+    if (url.pathname.endsWith("/relay_pairs")) return Response.json([{
+      pair_id: pairId, device_id: base64Url(16, 71), revoked_at: null,
+      sender_token_hash: createHash("sha256").update(senderToken).digest("hex"),
+    }]);
+    if (url.pathname.endsWith("/relay_devices")) return Response.json([{ last_seen_at: now }]);
+    if (url.pathname.endsWith("/relay_deliveries") && init.method === "POST") {
+      assert.equal(revoked, true);
+      // Database trigger rejects the write even though the earlier API read authorized it.
+      return Response.json({ code: "P0410", message: "Pair revoked" }, { status: 400 });
+    }
+    throw new Error(`Unexpected test request: ${url.pathname}`);
+  });
+  const body = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      await authorized;
+      revoked = true;
+      controller.enqueue(new TextEncoder().encode(JSON.stringify({
+        protocol: "wqrs/1", type: "url_message", pair_id: pairId, key_epoch: 1,
+        message_id: base64Url(16, 81), created_at: now, expires_at: now + 300,
+        nonce: base64Url(12, 91), ciphertext: base64Url(16, 101),
+      })));
+      controller.close();
+    },
+  });
+  const response = await handleRelayRequest(new Request(
+    `https://scanner.example/v1/pairs/${pairId}/messages`, {
+      method: "POST", headers: { Authorization: `Bearer ${senderToken}` }, body,
+      duplex: "half",
+    } as RequestInit,
+  ));
+  assert.equal(response.status, 410);
+  assert.equal((await response.json()).error.code, "pair_revoked");
+});
+
 test("Vercel health and Realtime config expose no server secret", async () => {
   const health = await handleRelayRequest(
     new Request("https://scanner.example/healthz"),
