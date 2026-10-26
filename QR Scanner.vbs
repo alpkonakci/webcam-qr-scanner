@@ -7,7 +7,7 @@ Set fileSystem = CreateObject("Scripting.FileSystemObject")
 
 appDirectory = fileSystem.GetParentFolderName(WScript.ScriptFullName)
 pythonWindowed = appDirectory & "\.venv\Scripts\pythonw.exe"
-application = appDirectory & "\app.py"
+application = appDirectory & "\launcher.py"
 
 If Not fileSystem.FileExists(pythonWindowed) Then
     MsgBox "Application environment not found. Follow the setup instructions in README.md.", 16, "QR Scanner"

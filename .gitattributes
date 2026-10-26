@@ -1,0 +1,2 @@
+# Preserve verified upstream bytes on Windows checkouts as well as git archive.
+third_party/sources/** -text

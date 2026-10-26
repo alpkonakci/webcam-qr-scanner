@@ -1,0 +1,20 @@
+VSVersionInfo(
+    ffi=FixedFileInfo(
+        filevers=(0, 2, 0, 0), prodvers=(0, 2, 0, 0), mask=0x3f,
+        flags=0x00, OS=0x40004, fileType=0x1, subtype=0x0, date=(0, 0)
+    ),
+    kids=[
+        StringFileInfo([
+            StringTable('040904B0', [
+                StringStruct('FileDescription', 'Webcam QR Scanner'),
+                StringStruct('FileVersion', '0.2.0'),
+                StringStruct('InternalName', 'QR-Scanner'),
+                StringStruct('OriginalFilename', 'QR-Scanner.exe'),
+                StringStruct('ProductName', 'Webcam QR Scanner'),
+                StringStruct('ProductVersion', '0.2.0'),
+                StringStruct('Comments', 'Stable release; see published security limitations'),
+            ])
+        ]),
+        VarFileInfo([VarStruct('Translation', [1033, 1200])])
+    ]
+)
