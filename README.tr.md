@@ -14,19 +14,11 @@ varsayılan tarayıcıda açılır ve QR Scanner otomatik olarak kapanır.
 
 ![Webcam QR Scanner kullanım videosu](docs/assets/webcam-qr-scanner-demo.gif)
 
-> **Geliştirme durumu:** Güncel kararlı GitHub sürümü `v0.1.1`'dir. Mevcut dal
-> kararlı sürüm değil, `v0.2.0-beta.7` sınırlı Telefon-PC ön sürümünü hedefler.
-> Normal kullanım açık [qrwebcam.vercel.app](https://qrwebcam.vercel.app/)
-> hizmetinde çalışır; Vercel girişi, bypass secret veya PowerShell kurulumu
-> gerekmez. iPhone/Android temel akışları, ayrı Windows hesabında eşleştirme ve
-> gönderim, ayrıca farklı ağlar arasında teslim kullanıcı tarafından doğrulandı.
-> Tam kabul ve güvenlik matrisi henüz tamamlanmadı. Beta.6, test edilmiş yerel
-> tinyglobby adaptörüyle geliştirme araçlarındaki braces zincirini kaldırır;
-> tam npm taraması sıfır bulgu bildirir. Beta.5'in QR özellikleri korunur.
-> Beta.7, telefonda site açılınca geri dönüş QR penceresini otomatik kapatır;
-> bağımlılık kaynaklarını, tam lisans metinlerini ve derleme yönergesini içerir.
-> Ayrıntılar için [beta.7 sürüm notlarına](docs/v0.2.0-beta.7-release-notes.md)
-> ve [beta yayın kontrol listesine](docs/v0.2-beta-release-checklist.tr.md) bakın.
+> **Yayın kanalı:** Kararlı sürüm hedefi `v0.2.0`'dır. Telefon-PC hizmeti
+> [qrwebcam.vercel.app](https://qrwebcam.vercel.app/) üzerinden Vercel girişi,
+> bypass anahtarı veya PowerShell kurulumu olmadan çalışır. **Bağımsız insan
+> güvenlik incelemesi yapılmadı**; yayın sahibi bu eksikliği kabul etti.
+> [Sürüm notları ve sınırlar](docs/v0.2.0-release-notes.md).
 
 ## Özellikler
 
@@ -53,7 +45,7 @@ varsayılan tarayıcıda açılır ve QR Scanner otomatik olarak kapanır.
 
 ## İndirme ve kullanım
 
-Son GitHub Release içinden `Webcam-QR-Scanner-v0.1.1-windows-x64.zip` dosyasını
+Son GitHub Release içinden `Webcam-QR-Scanner-v0.2.0-windows-x64.zip` dosyasını
 indirin ve arşivden çıkarın. Python veya OpenCV'yi ayrıca kurmanız gerekmez.
 
 ### Kamerayla tarama
@@ -63,7 +55,7 @@ indirin ve arşivden çıkarın. Python veya OpenCV'yi ayrıca kurmanız gerekme
 1. Windows kamera izni isterse izin verin.
 2. QR kodun tamamını turkuaz çerçevenin içine yerleştirin.
 3. Geçerli web bağlantısı varsayılan tarayıcıda açılır.
-4. Kararlı `v0.1.1` sürümünde ilk başarılı okumadan sonra QR Scanner kapanır.
+4. İlk başarılı okumadan sonra kamera kapanır; tam çıkış için Exit kullanılır.
 
 ### Bilgisayar ekranında görünen QR kodu tarama
 
@@ -95,9 +87,9 @@ Tek dosyalı paket, içindeki dosyaları hazırladığı için ilk açılış bi
 daha uzun sürebilir. İnternetten indirilen imzasız EXE'ler için Windows
 SmartScreen uyarı gösterebilir.
 
-### v0.2 beta: arka plan davranışı
+### v0.2: arka plan davranışı
 
-Mevcut kaynak kod ve yerel olarak oluşturulan `v0.2.0-beta.7` paketi yine tek bir
+Mevcut kaynak kod ve `v0.2.0` paketi tek bir
 `QR-Scanner.exe` dağıtır; EXE kendi içinde ayrı çalışma kipleri başlatır:
 
 - Hafif masaüstü denetleyicisi Windows sistem tepsisinde görünür kalır.
@@ -139,8 +131,8 @@ ikinci yerel kayıt oluşturmak yerine **Continue** veya açık **Replace pairin
 seçimi sunulur. PC URL'yi doğrular ve çözer, şifreli teslim alındısı gönderir;
 adresi açmadan önce yine kullanıcıdan onay ister. Vercel/Supabase production
 adayıyla iPhone Safari ve Android Chrome üzerinde şifreli aktarım akışları elle
-doğrulanmıştır. Bağımsız güvenlik incelemesi tamamlanmadan v0.2 kararlı
-sayılmayacaktır.
+doğrulanmıştır. Bağımsız insan güvenlik incelemesi hâlâ eksiktir; yayın sahibi
+bunu v0.2.0 için açık bir sınırlama olarak kabul etmiştir. Güvenlik sertifikası yoktur.
 
 Eşleştirme bağlantısının açılması, masaüstünün QR penceresini kapatabilmesi için
 kısa ömürlü bir yaşam döngüsü sinyali gönderir. Tek kullanımlık eşleştirme
@@ -300,7 +292,7 @@ Self-test, kamera açmadan OpenCV yüklemesini ve QR çözümlemeyi doğrular.
 Build sonunda terminal göstermeyen EXE ile dağıtıma hazır arşiv oluşturulur:
 
 ```text
-dist\Webcam-QR-Scanner-v0.2.0-beta.7-windows-x64.zip
+dist\Webcam-QR-Scanner-v0.2.0-windows-x64.zip
 ```
 
 ZIP içinde `QR-Scanner.exe`, `Scan Screen.vbs` başlatıcısı, proje MIT lisansı,

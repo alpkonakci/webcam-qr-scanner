@@ -14,20 +14,11 @@ default browser, and closes the scanner automatically.
 
 ![Webcam QR Scanner usage demo](docs/assets/webcam-qr-scanner-demo.gif)
 
-> **Development status:** The latest stable GitHub release is `v0.1.1`. The
-> current branch targets `v0.2.0-beta.7`, a limited Phone-to-PC pre-release,
-> not a stable release. Normal use runs through the public
-> [qrwebcam.vercel.app](https://qrwebcam.vercel.app/) service without a Vercel
-> login, bypass secret or PowerShell setup. iPhone and Android core flows,
-> separate-Windows-account pairing/sending and cross-network delivery have
-> user-confirmed evidence; the full acceptance/security matrix remains open.
-> Beta.6 removes the reported braces dependency chain from development tools
-> through a tested, project-scoped tinyglobby adapter. Full npm audit reports
-> zero findings. QR creation and mobile image reading from beta.5 remain.
-> Beta.7 closes the return-to-phone QR automatically when the site opens and
-> includes dependency sources, full license notices and rebuilding instructions.
-> See the [beta.7 release notes](docs/v0.2.0-beta.7-release-notes.md) and
-> [beta release checklist](docs/v0.2-beta-release-checklist.md).
+> **Release channel:** `v0.2.0` is the stable release target. Phone-to-PC uses
+> [qrwebcam.vercel.app](https://qrwebcam.vercel.app/) without a Vercel login,
+> bypass secret or PowerShell setup. **No independent human security audit
+> has been performed**; the maintainer accepted this limitation. See the
+> [release notes and limitations](docs/v0.2.0-release-notes.md).
 
 ## Features
 
@@ -54,7 +45,7 @@ default browser, and closes the scanner automatically.
 
 ## Download and use
 
-Download `Webcam-QR-Scanner-v0.1.1-windows-x64.zip` from the latest GitHub
+Download `Webcam-QR-Scanner-v0.2.0-windows-x64.zip` from the latest GitHub
 Release and extract it. No separate Python or OpenCV installation is required.
 
 ### Scan with the camera
@@ -64,7 +55,7 @@ Double-click `QR-Scanner.exe`:
 1. Allow camera access if Windows asks for permission.
 2. Place the complete QR code inside the turquoise frame.
 3. A valid web link opens in the default browser.
-4. In stable `v0.1.1`, the scanner closes after the first successful scan.
+4. The camera view closes after the first successful scan; use Exit for full shutdown.
 
 ### Scan a QR code already displayed on the computer
 
@@ -97,9 +88,9 @@ The first launch can take a few seconds longer because the single-file package
 needs to prepare its bundled files. Windows SmartScreen may warn about unsigned
 executables downloaded from the internet.
 
-### v0.2 beta: background behavior
+### v0.2: background behavior
 
-The current source and locally generated `v0.2.0-beta.7` package still distribute
+The current source and `v0.2.0` package distribute
 one `QR-Scanner.exe`, but the executable starts separate internal modes:
 
 - A lightweight controller stays visible in the Windows system tray.
@@ -140,8 +131,9 @@ and enables **Send to PC**. If the browser is already paired, it offers
 creating another local credential. The PC authenticates and decrypts the URL,
 sends an encrypted delivery receipt, and still asks the user before opening the
 address. The Vercel/Supabase production candidate completed manual encrypted
-transfer tests on iPhone Safari and Android Chrome. An independent security
-review is still required before v0.2 can be considered stable.
+transfer tests on iPhone Safari and Android Chrome. Independent human security
+review remains outstanding and is disclosed as a maintainer-accepted
+limitation of v0.2.0, not a completed certification.
 
 Opening the pairing link sends a short-lived lifecycle signal so the desktop
 can dismiss the QR window. Submitting its one-time pairing request completes
@@ -297,7 +289,7 @@ The self-test verifies OpenCV imports and QR decoding without opening a camera.
 The build produces the terminal-free executable and a distributable ZIP:
 
 ```text
-dist\Webcam-QR-Scanner-v0.2.0-beta.7-windows-x64.zip
+dist\Webcam-QR-Scanner-v0.2.0-windows-x64.zip
 ```
 
 The ZIP contains `QR-Scanner.exe`, the `Scan Screen.vbs` launcher, the project

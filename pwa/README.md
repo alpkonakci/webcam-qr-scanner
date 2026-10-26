@@ -5,10 +5,10 @@ Scanner and the Vercel-hosted relay API. The WQRS/1 cryptographic contract stays
 shared with the Python desktop application while deployment-specific code stays
 inside this directory.
 
-> **Beta status:** Vercel + Supabase is deployed at
-> `https://qrwebcam.vercel.app`. Real-device acceptance is ongoing; this is not
-> a stable release. The legacy Sites/Cloudflare beta remains available during
-> the transition.
+> **Release channel:** v0.2.0 targets the stable Windows / Vercel + Supabase
+> service at `https://qrwebcam.vercel.app`. Human protocol/cryptography review
+> remains outstanding and was explicitly accepted by the maintainer; see
+> [release notes and limitations](../docs/v0.2.0-release-notes.md).
 
 ## Current scope
 
@@ -43,9 +43,10 @@ The current PWA milestone includes:
   manifest, cache-policy and security-header tests.
 
 **Open link in new tab**, browser pairing, and encrypted **Send to PC** are
-available through the Vercel production beta. The revised remove-and-repair
-flow still needs an iPhone Safari and Android Chrome retest. An independent
-security review is required before a stable release.
+available through the Vercel production service. Remove-and-repair flows have
+user-confirmed Safari/iPhone 15 Plus and Samsung Internet/S24 FE evidence;
+this is not a complete browser-version matrix. Independent human security
+review remains outstanding and was explicitly accepted for v0.2.0.
 
 ## Local development
 
